@@ -25,6 +25,8 @@ namespace CSMOO.Server
         {
             _listener.Start();
             _isRunning = true;
+            
+            Logger.DisplaySectionHeader("TELNET SERVER");
             Logger.Game("Telnet server started...");
             
             while (_isRunning)

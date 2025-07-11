@@ -13,8 +13,15 @@ namespace CSMOO
                 // Load configuration
                 var config = Config.Instance;
                 
+                // Initialize logging system (sets up log rotation and directories)
+                Logger.Initialize();
+                
+                // Display startup banner
+                Logger.DisplayBanner();
+                
+                Logger.DisplaySectionHeader("SYSTEM INITIALIZATION");
                 Logger.Info("Starting CSMOO Server...");
-                Logger.Info($"Server configuration: Port={config.Server.Port}, DebugMode={config.Server.DebugMode}");
+                Logger.Info($"Server configuration: Port={config.Server.Port}, ShowDebugInConsole={config.Server.ShowDebugInConsole}");
                 Logger.Info($"Database files: Game={config.Database.GameDataFile}, Log={config.Database.LogDataFile}");
                 
                 // Initialize the server and world

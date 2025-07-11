@@ -14,6 +14,7 @@ public static class ServerInitializer
     /// </summary>
     public static void Initialize()
     {
+        Logger.DisplaySectionHeader("SERVER INITIALIZATION");
         Logger.Info("Initializing CSMOO Server...");
         
         try

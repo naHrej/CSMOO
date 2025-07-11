@@ -1,7 +1,7 @@
 {
   "Server": {
     "Port": 1701,
-    "DebugMode": false
+    "ShowDebugInConsole": false
   },
   "Database": {
     "GameDataFile": "gamedata.db",
@@ -10,8 +10,9 @@
   "Logging": {
     "EnableConsoleLogging": true,
     "EnableFileLogging": true,
-    "GameLogFile": "game.log",
-    "DebugLogFile": "debug.log",
-    "LogLevel": "Debug"
+    "GameLogFile": "logs/game.log",
+    "DebugLogFile": "logs/debug.log",
+    "LogLevel": "Debug",
+    "MaxLogFiles": 5
   }
 }
