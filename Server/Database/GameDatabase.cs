@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using LiteDB;
+using CSMOO.Server.Configuration;
 
 namespace CSMOO.Server.Database;
 
@@ -47,7 +48,7 @@ public class GameDatabase : IDisposable
         {
             lock (_lock)
             {
-                return _instance ??= new GameDatabase("gamedata.db");
+                return _instance ??= new GameDatabase(Config.Instance.Database.GameDataFile);
             }
         }
     }

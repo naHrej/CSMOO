@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using LiteDB;
+using CSMOO.Server.Logging;
 
 namespace CSMOO.Server.Database;
 
@@ -219,7 +220,7 @@ public static class ObjectManager
         
         if (objectsNeedingDbRef.Any())
         {
-            Console.WriteLine($"Migrating {objectsNeedingDbRef.Count} objects to have DBREFs...");
+            Logger.Info($"Migrating {objectsNeedingDbRef.Count} objects to have DBREFs...");
             int nextDbRef = allObjects.Where(o => o.DbRef > 0).Any() ? allObjects.Max(o => o.DbRef) + 1 : 1;
             
             foreach (var obj in objectsNeedingDbRef)
@@ -228,7 +229,7 @@ public static class ObjectManager
                 GameDatabase.Instance.GameObjects.Update(obj);
             }
             
-            Console.WriteLine($"Migration complete. Next DBREF will be #{nextDbRef}");
+            Logger.Info($"Migration complete. Next DBREF will be #{nextDbRef}");
         }
     }
 

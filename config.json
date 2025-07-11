@@ -1,0 +1,17 @@
+{
+  "Server": {
+    "Port": 1701,
+    "DebugMode": false
+  },
+  "Database": {
+    "GameDataFile": "gamedata.db",
+    "LogDataFile": "gamedata-log.db"
+  },
+  "Logging": {
+    "EnableConsoleLogging": true,
+    "EnableFileLogging": true,
+    "GameLogFile": "game.log",
+    "DebugLogFile": "debug.log",
+    "LogLevel": "Debug"
+  }
+}

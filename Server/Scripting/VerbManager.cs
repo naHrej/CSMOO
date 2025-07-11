@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text.RegularExpressions;
 using LiteDB;
 using CSMOO.Server.Database;
+using CSMOO.Server.Logging;
 
 namespace CSMOO.Server.Scripting;
 
@@ -256,15 +257,15 @@ public static class VerbManager
                 .ToList();
         }
 
-        Console.WriteLine($"FindMatchingVerb: Looking for '{verb}' on object {objectId}");
-        Console.WriteLine($"Found {allVerbs.Count} total verbs (including inheritance):");
+        Logger.Debug($"FindMatchingVerb: Looking for '{verb}' on object {objectId}");
+        Logger.Debug($"Found {allVerbs.Count} total verbs (including inheritance):");
         
         foreach (var v in allVerbs)
         {
-            Console.WriteLine($"  Verb: ID={v.Id}, Name='{v.Name}', CodeLength={v.Code?.Length ?? 0}");
+            Logger.Debug($"  Verb: ID={v.Id}, Name='{v.Name}', CodeLength={v.Code?.Length ?? 0}");
             if (!string.IsNullOrEmpty(v.Code) && v.Code.Length > 0)
             {
-                Console.WriteLine($"    Code preview: {v.Code.Substring(0, Math.Min(50, v.Code.Length))}...");
+                Logger.Debug($"    Code preview: {v.Code.Substring(0, Math.Min(50, v.Code.Length))}...");
             }
         }
 
@@ -294,30 +295,30 @@ public static class VerbManager
 
         if (matchingVerbs.Count > 1)
         {
-            Console.WriteLine($"⚠️  WARNING: Found {matchingVerbs.Count} verbs matching '{verb}':");
+            Logger.Debug($"⚠️  WARNING: Found {matchingVerbs.Count} verbs matching '{verb}':");
             foreach (var v in matchingVerbs)
             {
-                Console.WriteLine($"    ID={v.Id}, Name='{v.Name}', CodeLength={v.Code?.Length ?? 0}");
+                Logger.Debug($"    ID={v.Id}, Name='{v.Name}', CodeLength={v.Code?.Length ?? 0}");
             }
             
             // Prioritize verbs that have actual code
             var verbWithCode = matchingVerbs.FirstOrDefault(v => !string.IsNullOrEmpty(v.Code) && v.Code.Length > 0);
             if (verbWithCode != null)
             {
-                Console.WriteLine($"  -> CHOOSING verb with code: ID={verbWithCode.Id}, CodeLength={verbWithCode.Code.Length}");
+                Logger.Debug($"  -> CHOOSING verb with code: ID={verbWithCode.Id}, CodeLength={verbWithCode.Code.Length}");
                 return verbWithCode;
             }
             
-            Console.WriteLine($"  -> No verbs have code, using first match: ID={matchingVerbs[0].Id}");
+            Logger.Debug($"  -> No verbs have code, using first match: ID={matchingVerbs[0].Id}");
             return matchingVerbs[0];
         }
         else if (matchingVerbs.Count == 1)
         {
-            Console.WriteLine($"  -> MATCH: {matchingVerbs[0].Name} (CodeLength: {matchingVerbs[0].Code?.Length ?? 0})");
+            Logger.Debug($"  -> MATCH: {matchingVerbs[0].Name} (CodeLength: {matchingVerbs[0].Code?.Length ?? 0})");
             return matchingVerbs[0];
         }
 
-        Console.WriteLine($"  -> NO MATCH found for '{verb}' on object {objectId}");
+        Logger.Debug($"  -> NO MATCH found for '{verb}' on object {objectId}");
         return null;
     }
 
@@ -328,8 +329,8 @@ public static class VerbManager
     {
         try
         {
-            Console.WriteLine($"Executing verb '{verb.Name}' with code length: {verb.Code?.Length ?? 0}");
-            Console.WriteLine($"Verb code: '{verb.Code ?? "(null)"}'");
+            Logger.Debug($"Executing verb '{verb.Name}' with code length: {verb.Code?.Length ?? 0}");
+            Logger.Debug($"Verb code: '{verb.Code ?? "(null)"}'");
             
             var scriptEngine = new VerbScriptEngine();
             var result = scriptEngine.ExecuteVerb(verb, input, player, commandProcessor, thisObjectId);
@@ -344,8 +345,7 @@ public static class VerbManager
         catch (Exception ex)
         {
             commandProcessor.SendToPlayer($"Error executing verb '{verb.Name}': {ex.Message}");
-            Console.WriteLine($"Error executing verb '{verb.Name}': {ex.Message}");
-            Console.WriteLine($"Stack trace: {ex.StackTrace}");
+            Logger.Error($"Error executing verb '{verb.Name}'", ex);
             return true; // We handled it, even if it errored
         }
     }
@@ -373,41 +373,41 @@ public static class VerbManager
     /// </summary>
     public static void UpdateVerbCode(string verbId, string code)
     {
-        Console.WriteLine($"UpdateVerbCode called with verbId: '{verbId}', code length: {code?.Length ?? 0}");
+        Logger.Debug($"UpdateVerbCode called with verbId: '{verbId}', code length: {code?.Length ?? 0}");
         
         var verbCollection = GameDatabase.Instance.GetCollection<Verb>("verbs");
         var verb = verbCollection.FindById(verbId);
         
         if (verb != null)
         {
-            Console.WriteLine($"Found verb: {verb.Name}, current code length: {verb.Code?.Length ?? 0}");
+            Logger.Debug($"Found verb: {verb.Name}, current code length: {verb.Code?.Length ?? 0}");
             verb.Code = code ?? string.Empty;
             verb.ModifiedAt = DateTime.UtcNow;
             
             try
             {
                 verbCollection.Update(verb);
-                Console.WriteLine($"Verb updated successfully. New code length: {verb.Code?.Length ?? 0}");
+                Logger.Debug($"Verb updated successfully. New code length: {verb.Code?.Length ?? 0}");
                 
                 // Verify the update worked
                 var verifyVerb = verbCollection.FindById(verbId);
                 if (verifyVerb != null)
                 {
-                    Console.WriteLine($"Verification: Code in database is now {verifyVerb.Code?.Length ?? 0} characters");
+                    Logger.Debug($"Verification: Code in database is now {verifyVerb.Code?.Length ?? 0} characters");
                 }
                 else
                 {
-                    Console.WriteLine("ERROR: Could not find verb after update!");
+                    Logger.Error("Could not find verb after update!");
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"ERROR updating verb: {ex.Message}");
+                Logger.Error($"Error updating verb: {ex.Message}");
             }
         }
         else
         {
-            Console.WriteLine($"ERROR: Verb with ID '{verbId}' not found!");
+            Logger.Error($"Verb with ID '{verbId}' not found!");
         }
     }
 

@@ -1,5 +1,6 @@
 using System;
 using CSMOO.Server.Database;
+using CSMOO.Server.Logging;
 
 namespace CSMOO.Server;
 
@@ -13,16 +14,16 @@ public static class ServerInitializer
     /// </summary>
     public static void Initialize()
     {
-        Console.WriteLine("Initializing CSMOO Server...");
+        Logger.Info("Initializing CSMOO Server...");
         
         try
         {
             // Initialize the database connection
-            Console.WriteLine("Setting up database...");
+            Logger.Info("Setting up database...");
             var db = GameDatabase.Instance; // This creates the singleton instance
             
             // Initialize the world structure
-            Console.WriteLine("Initializing world...");
+            Logger.Info("Initializing world...");
             WorldManager.InitializeWorld();
             
             // Migrate existing objects to have DBREFs
@@ -30,12 +31,13 @@ public static class ServerInitializer
             
             // Create a test admin player if none exists
             CreateDefaultAdminIfNeeded();
-                  Console.WriteLine("Server initialization complete!");
-        PrintWorldStats();
+            
+            Logger.Info("Server initialization complete!");
+            PrintWorldStats();
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Server initialization failed: {ex.Message}");
+            Logger.Error($"Server initialization failed", ex);
             throw;
         }
     }
@@ -48,11 +50,11 @@ public static class ServerInitializer
         var existingPlayers = GameDatabase.Instance.Players.FindAll();
         if (existingPlayers.Any())
         {
-            Console.WriteLine($"Found {existingPlayers.Count()} existing players in database.");
+            Logger.Info($"Found {existingPlayers.Count()} existing players in database.");
             return;
         }
 
-        Console.WriteLine("No players found. Creating default admin player...");
+        Logger.Info("No players found. Creating default admin player...");
         
         var startingRoom = WorldManager.GetStartingRoom();
         var admin = PlayerManager.CreatePlayer("admin", "password", startingRoom?.Id);
@@ -68,7 +70,7 @@ public static class ServerInitializer
         ObjectManager.SetProperty(admin, "longDescription", 
             "The all-powerful administrator of this realm. They have the ability to create and modify the world itself.");
 
-        Console.WriteLine("Default admin player created (username: admin, password: password)");
+        Logger.Info("Default admin player created (username: admin, password: password)");
     }
 
     /// <summary>
@@ -81,12 +83,12 @@ public static class ServerInitializer
         var playerCount = GameDatabase.Instance.Players.Count();
         var roomCount = WorldManager.GetAllRooms().Count;
 
-        Console.WriteLine("\n=== World Statistics ===");
-        Console.WriteLine($"Object Classes: {classCount}");
-        Console.WriteLine($"Game Objects: {objectCount}");
-        Console.WriteLine($"Players: {playerCount}");
-        Console.WriteLine($"Rooms: {roomCount}");
-        Console.WriteLine("========================\n");
+        Logger.Game("\n=== World Statistics ===");
+        Logger.Game($"Object Classes: {classCount}");
+        Logger.Game($"Game Objects: {objectCount}");
+        Logger.Game($"Players: {playerCount}");
+        Logger.Game($"Rooms: {roomCount}");
+        Logger.Game("========================\n");
     }
 
     /// <summary>
@@ -94,7 +96,7 @@ public static class ServerInitializer
     /// </summary>
     public static void Shutdown()
     {
-        Console.WriteLine("Shutting down CSMOO Server...");
+        Logger.Info("Shutting down CSMOO Server...");
         
         // Disconnect all players
         var onlinePlayers = PlayerManager.GetOnlinePlayers();
@@ -106,6 +108,6 @@ public static class ServerInitializer
         // Close database connection
         GameDatabase.Instance.Dispose();
         
-        Console.WriteLine("Server shutdown complete.");
+        Logger.Info("Server shutdown complete.");
     }
 }

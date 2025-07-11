@@ -1,4 +1,6 @@
 ﻿using CSMOO.Server;
+using CSMOO.Server.Configuration;
+using CSMOO.Server.Logging;
 
 namespace CSMOO
 {
@@ -6,23 +8,39 @@ namespace CSMOO
     {
         static void Main(string[] args)
         {
-            // Initialize the server and world
-            ServerInitializer.Initialize();
-            
-            ServerTelnet serverTelnet = new ServerTelnet(1701);
             try
             {
-                serverTelnet.Start();
+                // Load configuration
+                var config = Config.Instance;
+                
+                Logger.Info("Starting CSMOO Server...");
+                Logger.Info($"Server configuration: Port={config.Server.Port}, DebugMode={config.Server.DebugMode}");
+                Logger.Info($"Database files: Game={config.Database.GameDataFile}, Log={config.Database.LogDataFile}");
+                
+                // Initialize the server and world
+                ServerInitializer.Initialize();
+                
+                ServerTelnet serverTelnet = new ServerTelnet(config.Server.Port);
+                try
+                {
+                    serverTelnet.Start();
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error($"An error occurred during server operation", ex);
+                }
+                finally
+                {
+                    serverTelnet.Stop();
+                    ServerInitializer.Shutdown();
+                    Logger.Info("Server has stopped.");
+                }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"An error occurred: {ex.Message}");
-            }
-            finally
-            {
-                serverTelnet.Stop();
-                ServerInitializer.Shutdown();
-                Console.WriteLine("Server has stopped.");
+                Logger.Error("Fatal error during startup", ex);
+                Console.WriteLine("Press any key to exit...");
+                Console.ReadKey();
             }
         }
     }

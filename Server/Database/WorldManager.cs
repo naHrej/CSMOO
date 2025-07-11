@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using LiteDB;
 using CSMOO.Server.Scripting;
+using CSMOO.Server.Logging;
 
 namespace CSMOO.Server.Database;
 
@@ -417,13 +418,13 @@ Say($""You drop the {itemFullName}."");", "system");
                 verbCollection.Update(verb);
                 anyUpdated = true;
                 
-                Console.WriteLine($"Updated verb '{verb.Name}' - replaced 'this.id' with 'ThisObject'");
+                Logger.Debug($"Updated verb '{verb.Name}' - replaced 'this.id' with 'ThisObject'");
             }
         }
         
         if (anyUpdated)
         {
-            Console.WriteLine("Verb syntax migration completed.");
+            Logger.Info("Verb syntax migration completed.");
         }
     }
 }

@@ -143,9 +143,7 @@ public class ScriptGlobals
         var objectClass = GameDatabase.Instance.ObjectClasses.FindOne(c => c.Name == className);
         if (objectClass == null) return new List<string>();
         
-        return Database.ObjectManager.FindObjectsByClass(objectClass.Id)
-            .Select(obj => obj.Id)
-            .ToList();
+        return [.. Database.ObjectManager.FindObjectsByClass(objectClass.Id).Select(obj => obj.Id)];
     }
 }
 
@@ -178,9 +176,7 @@ public class ScriptObjectManager
 
     public List<string> GetObjectsInLocation(string locationId)
     {
-        return Database.ObjectManager.GetObjectsInLocation(locationId)
-            .Select(obj => obj.Id)
-            .ToList();
+        return [.. Database.ObjectManager.GetObjectsInLocation(locationId).Select(obj => obj.Id)];
     }
 }
 
@@ -196,9 +192,7 @@ public class ScriptWorldManager
 
     public List<string> GetAllRooms()
     {
-        return Database.WorldManager.GetAllRooms()
-            .Select(room => room.Id)
-            .ToList();
+        return [.. Database.WorldManager.GetAllRooms().Select(room => room.Id)];
     }
 
     public void CreateExit(string fromRoomId, string toRoomId, string direction, string returnDirection)
@@ -219,9 +213,7 @@ public class ScriptPlayerManager
 {
     public List<string> GetOnlinePlayerNames()
     {
-        return Database.PlayerManager.GetOnlinePlayers()
-            .Select(p => p.Name)
-            .ToList();
+        return [.. PlayerManager.GetOnlinePlayers().Select(p => p.Name)];
     }
 
     public string? GetPlayerLocation(string playerName)

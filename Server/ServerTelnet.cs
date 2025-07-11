@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using System.Net.Sockets;
 using CSMOO.Server.Session;
 using CSMOO.Server.Commands;
+using CSMOO.Server.Logging;
 
 namespace CSMOO.Server
 {
@@ -24,7 +25,7 @@ namespace CSMOO.Server
         {
             _listener.Start();
             _isRunning = true;
-            Console.WriteLine("Telnet server started...");
+            Logger.Game("Telnet server started...");
             
             while (_isRunning)
             {
@@ -35,7 +36,7 @@ namespace CSMOO.Server
         
         private async void HandleClient(TcpClient client)
         {
-            Console.WriteLine("Client connected.");
+            Logger.Debug("Client connected.");
             
             var clientGuid = Guid.NewGuid();
             SessionHandler.AddSession(clientGuid, client);
@@ -96,13 +97,13 @@ namespace CSMOO.Server
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Client disconnected with error: {ex.Message}");
+                Logger.Debug($"Client disconnected with error: {ex.Message}");
             }
             finally
             {
                 SessionHandler.RemoveSession(clientGuid);
                 client.Close();
-                Console.WriteLine("Client disconnected.");
+                Logger.Debug("Client disconnected.");
             }
         }
         
@@ -110,7 +111,7 @@ namespace CSMOO.Server
         {
             _isRunning = false;
             _listener.Stop();
-            Console.WriteLine("Telnet server stopped.");
+            Logger.Game("Telnet server stopped.");
         }
     }
 }

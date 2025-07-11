@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using CSMOO.Server.Database;
 using CSMOO.Server.Scripting;
+using CSMOO.Server.Logging;
 
 namespace CSMOO.Server.Commands;
 
@@ -104,12 +105,12 @@ public class ProgrammingCommands
         {
             verb = VerbManager.CreateVerb(objectId, verbName, "", "", _player.Name);
             _commandProcessor.SendToPlayer($"Created new verb '{verbName}' on {GetObjectName(objectId)}.");
-            Console.WriteLine($"Created new verb: ID={verb.Id}, Name={verb.Name}, ObjectId={verb.ObjectId}");
+            Logger.Debug($"Created new verb: ID={verb.Id}, Name={verb.Name}, ObjectId={verb.ObjectId}");
         }
         else
         {
             _commandProcessor.SendToPlayer($"Editing existing verb '{verbName}' on {GetObjectName(objectId)}.");
-            Console.WriteLine($"Editing existing verb: ID={verb.Id}, Name={verb.Name}, CurrentCodeLength={verb.Code?.Length ?? 0}");
+            Logger.Debug($"Editing existing verb: ID={verb.Id}, Name={verb.Name}, CurrentCodeLength={verb.Code?.Length ?? 0}");
         }
 
         // Enter programming mode
@@ -117,7 +118,7 @@ public class ProgrammingCommands
         _currentVerbId = verb.Id;
         _currentCode.Clear(); // Always start with empty code - @program replaces existing code
         
-        Console.WriteLine($"Entering programming mode for verb ID: {_currentVerbId}");
+        Logger.Debug($"Entering programming mode for verb ID: {_currentVerbId}");
         
         if (!string.IsNullOrEmpty(verb.Code))
         {
@@ -156,8 +157,8 @@ public class ProgrammingCommands
         {
             // Finish programming
             var code = _currentCode.ToString();
-            Console.WriteLine($"Saving verb code. VerbId: {_currentVerbId}, Code length: {code.Length}");
-            Console.WriteLine($"Code content: '{code}'");
+            Logger.Debug($"Saving verb code. VerbId: {_currentVerbId}, Code length: {code.Length}");
+            Logger.Debug($"Code content: '{code}'");
             
             VerbManager.UpdateVerbCode(_currentVerbId, code);
             
@@ -165,14 +166,14 @@ public class ProgrammingCommands
             var savedVerb = GameDatabase.Instance.GetCollection<Verb>("verbs").FindById(_currentVerbId);
             if (savedVerb != null)
             {
-                Console.WriteLine($"Verification: Saved code length: {savedVerb.Code?.Length ?? 0}");
+                Logger.Debug($"Verification: Saved code length: {savedVerb.Code?.Length ?? 0}");
                 _commandProcessor.SendToPlayer("Verb programming complete.");
                 _commandProcessor.SendToPlayer($"Code saved ({code.Split('\n').Length} lines).");
                 _commandProcessor.SendToPlayer($"Verified: Code length is {savedVerb.Code?.Length ?? 0} characters.");
             }
             else
             {
-                Console.WriteLine($"ERROR: Could not find verb with ID {_currentVerbId} after saving!");
+                Logger.Error($"Could not find verb with ID {_currentVerbId} after saving!");
                 _commandProcessor.SendToPlayer("ERROR: Could not verify that code was saved!");
             }
             
@@ -596,7 +597,7 @@ public class ProgrammingCommands
     /// </summary>
     private string? ResolveObject(string objectName)
     {
-        Console.WriteLine($"Resolving object name: '{objectName}'");
+        Logger.Debug($"Resolving object name: '{objectName}'");
         
         string? result = null;
         
@@ -618,7 +619,7 @@ public class ProgrammingCommands
                 {
                     var obj = GameDatabase.Instance.GameObjects.FindOne(o => o.DbRef == dbref);
                     result = obj?.Id;
-                    Console.WriteLine($"DBREF lookup #{dbref} -> {result ?? "not found"}");
+                    Logger.Debug($"DBREF lookup #{dbref} -> {result ?? "not found"}");
                 }
                 // Check if it's a class reference (starts with "class:" or ends with ".class")
                 else if (objectName.StartsWith("class:", StringComparison.OrdinalIgnoreCase))
@@ -627,7 +628,7 @@ public class ProgrammingCommands
                     var objectClass = GameDatabase.Instance.ObjectClasses.FindOne(c => 
                         c.Name.Equals(className, StringComparison.OrdinalIgnoreCase));
                     result = objectClass?.Id;
-                    Console.WriteLine($"Class lookup '{className}' -> {result ?? "not found"}");
+                    Logger.Debug($"Class lookup '{className}' -> {result ?? "not found"}");
                 }
                 else if (objectName.EndsWith(".class", StringComparison.OrdinalIgnoreCase))
                 {
@@ -635,7 +636,7 @@ public class ProgrammingCommands
                     var objectClass = GameDatabase.Instance.ObjectClasses.FindOne(c => 
                         c.Name.Equals(className, StringComparison.OrdinalIgnoreCase));
                     result = objectClass?.Id;
-                    Console.WriteLine($"Class lookup '{className}' -> {result ?? "not found"}");
+                    Logger.Debug($"Class lookup '{className}' -> {result ?? "not found"}");
                 }
                 else
                 {
@@ -651,14 +652,14 @@ public class ProgrammingCommands
                         if (objectClass != null)
                         {
                             result = objectClass.Id;
-                            Console.WriteLine($"Found class '{objectName}' -> {result}");
+                            Logger.Debug($"Found class '{objectName}' -> {result}");
                         }
                     }
                 }
                 break;
         }
         
-        Console.WriteLine($"Resolved '{objectName}' to: {result ?? "null"}");
+        Logger.Debug($"Resolved '{objectName}' to: {result ?? "null"}");
         return result;
     }
 
@@ -682,7 +683,7 @@ public class ProgrammingCommands
             
             if (localMatch != null)
             {
-                Console.WriteLine($"Found '{name}' locally: #{localMatch.DbRef} ({ObjectManager.GetProperty(localMatch, "name")?.AsString})");
+                Logger.Debug($"Found '{name}' locally: #{localMatch.DbRef} ({ObjectManager.GetProperty(localMatch, "name")?.AsString})");
                 return localMatch.Id;
             }
         }
@@ -695,7 +696,7 @@ public class ProgrammingCommands
             var playerObj = GameDatabase.Instance.GameObjects.FindById(playerMatch.Id);
             if (playerObj != null)
             {
-                Console.WriteLine($"Found player '{name}': #{playerObj.DbRef} ({playerMatch.Name})");
+                Logger.Debug($"Found player '{name}': #{playerObj.DbRef} ({playerMatch.Name})");
                 return playerMatch.Id;
             }
         }
@@ -711,11 +712,11 @@ public class ProgrammingCommands
         
         if (globalMatch != null)
         {
-            Console.WriteLine($"Found '{name}' globally: #{globalMatch.DbRef} ({ObjectManager.GetProperty(globalMatch, "name")?.AsString})");
+            Logger.Debug($"Found '{name}' globally: #{globalMatch.DbRef} ({ObjectManager.GetProperty(globalMatch, "name")?.AsString})");
             return globalMatch.Id;
         }
         
-        Console.WriteLine($"Object '{name}' not found anywhere");
+        Logger.Debug($"Object '{name}' not found anywhere");
         return null;
     }
 
@@ -732,7 +733,7 @@ public class ProgrammingCommands
         if (systemObj == null)
         {
             // System object doesn't exist, create it
-            Console.WriteLine("System object not found, creating it...");
+            Logger.Debug("System object not found, creating it...");
             // Use Container class instead of abstract Object class
             var containerClass = GameDatabase.Instance.ObjectClasses.FindOne(c => c.Name == "Container");
             if (containerClass != null)
@@ -743,16 +744,16 @@ public class ProgrammingCommands
                 ObjectManager.SetProperty(systemObj, "longDescription", "This is the system object that holds global verbs and functions.");
                 ObjectManager.SetProperty(systemObj, "isSystemObject", true);
                 ObjectManager.SetProperty(systemObj, "gettable", false); // Don't allow players to pick up the system
-                Console.WriteLine($"Created system object with ID: {systemObj.Id}");
+                Logger.Debug($"Created system object with ID: {systemObj.Id}");
             }
             else
             {
-                Console.WriteLine("ERROR: Could not find Container class to create system object!");
+                Logger.Error("Could not find Container class to create system object!");
                 return null;
             }
         }
         
-        Console.WriteLine($"Resolved 'system' to object ID: {systemObj?.Id}");
+        Logger.Debug($"Resolved 'system' to object ID: {systemObj?.Id}");
         return systemObj?.Id;
     }
 
