@@ -49,12 +49,15 @@ public class ProgrammingCommands
         return command switch
         {
             "@program" => HandleProgramCommand(parts),
+            "@script" => HandleScriptCommand(parts),
             "@verb" => HandleVerbCommand(parts),
             "@list" => HandleListCommand(parts),
             "@edit" => HandleEditCommand(parts),
-            "@examine" => HandleExamineCommand(parts),
             "@verbs" => HandleVerbsCommand(parts),
             "@rmverb" => HandleRemoveVerbCommand(parts),
+            "@flag" => HandleFlagCommand(parts),
+            "@flags" => HandleFlagsCommand(parts),
+            "@update-permissions" => HandleUpdatePermissionsCommand(parts),
             "@debug" when parts.Length > 1 && parts[1] == "verbs" => HandleDebugVerbsCommand(parts),
             "@fix" when parts.Length > 1 && parts[1] == "verbs" => HandleFixVerbsCommand(parts),
             "@remove" when parts.Length > 1 && parts[1] == "verb" => HandleRemoveVerbByIdCommand(parts),
@@ -71,6 +74,13 @@ public class ProgrammingCommands
     /// </summary>
     private bool HandleProgramCommand(string[] parts)
     {
+        // Check if player has Programmer flag
+        if (!PermissionManager.HasFlag(_player, PermissionManager.Flag.Programmer))
+        {
+            _commandProcessor.SendToPlayer("You need the Programmer flag to use the @program command.");
+            return true;
+        }
+
         if (parts.Length != 2)
         {
             _commandProcessor.SendToPlayer("Usage: @program <object>:<verb>");
@@ -152,32 +162,94 @@ public class ProgrammingCommands
     }
 
     /// <summary>
+    /// Handle @script command - multi-line script execution for testing
+    /// </summary>
+    private bool HandleScriptCommand(string[] parts)
+    {
+        // Enter programming mode for script testing
+        _isInProgrammingMode = true;
+        _currentVerbId = string.Empty; // No verb ID for script mode
+        _currentCode.Clear();
+        
+        Logger.Debug("Entering script mode for testing");
+        
+        _commandProcessor.SendToPlayer("Enter your C# code for testing:");
+        _commandProcessor.SendToPlayer("Type '.' on a line by itself to execute, or '.abort' to cancel.");
+        _commandProcessor.SendToPlayer("Script mode active. Available variables:");
+        _commandProcessor.SendToPlayer("  player - the current player");
+        _commandProcessor.SendToPlayer("  me - alias for player");
+        _commandProcessor.SendToPlayer("  here - the current room");
+        _commandProcessor.SendToPlayer("  this - the object (same as here for scripts)");
+        _commandProcessor.SendToPlayer("  notify(player, message) - send message to specific player");
+        _commandProcessor.SendToPlayer("  SayToRoom(message) - send message to all in room");
+
+        return true;
+    }
+
+    /// <summary>
     /// Handle input while in programming mode
     /// </summary>
     private bool HandleProgrammingInput(string input)
     {
         if (input.Trim() == ".")
         {
-            // Finish programming
+            // Finish programming or execute script
             var code = _currentCode.ToString();
-            Logger.Debug($"Saving verb code. VerbId: {_currentVerbId}, Code length: {code.Length}");
-            Logger.Debug($"Code content: '{code}'");
             
-            VerbManager.UpdateVerbCode(_currentVerbId, code);
-            
-            // Verify the code was saved
-            var savedVerb = GameDatabase.Instance.GetCollection<Verb>("verbs").FindById(_currentVerbId);
-            if (savedVerb != null)
+            if (string.IsNullOrEmpty(_currentVerbId))
             {
-                Logger.Debug($"Verification: Saved code length: {savedVerb.Code?.Length ?? 0}");
-                _commandProcessor.SendToPlayer("Verb programming complete.");
-                _commandProcessor.SendToPlayer($"Code saved ({code.Split('\n').Length} lines).");
-                _commandProcessor.SendToPlayer($"Verified: Code length is {savedVerb.Code?.Length ?? 0} characters.");
+                // Script mode - execute the code immediately
+                Logger.Debug($"Executing script code. Code length: {code.Length}");
+                Logger.Debug($"Script content: '{code}'");
+                
+                try
+                {
+                    // Create a temporary verb to execute the script with proper globals
+                    var tempVerb = new Verb
+                    {
+                        Name = "script",
+                        Code = code,
+                        ObjectId = "system"
+                    };
+                    
+                    // Use VerbScriptEngine for consistency with single-line script verb
+                    var scriptEngine = new VerbScriptEngine();
+                    var result = scriptEngine.ExecuteVerb(tempVerb, "@script", _player, _commandProcessor, "system");
+                    
+                    _commandProcessor.SendToPlayer("Script executed successfully.");
+                    if (!string.IsNullOrEmpty(result) && result != "null")
+                    {
+                        _commandProcessor.SendToPlayer($"Script result: {result}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _commandProcessor.SendToPlayer($"Script execution failed: {ex.Message}");
+                    Logger.Error($"Script execution exception: {ex}");
+                }
             }
             else
             {
-                Logger.Error($"Could not find verb with ID {_currentVerbId} after saving!");
-                _commandProcessor.SendToPlayer("ERROR: Could not verify that code was saved!");
+                // Verb programming mode - save the code
+                Logger.Debug($"Saving verb code. VerbId: {_currentVerbId}, Code length: {code.Length}");
+                Logger.Debug($"Code content: '{code}'");
+                
+                VerbManager.UpdateVerbCode(_currentVerbId, code);
+                
+                // Verify the code was saved
+                var savedVerb = GameDatabase.Instance.GetCollection<Verb>("verbs").FindById(_currentVerbId);
+                if (savedVerb != null)
+                {
+                    Logger.Debug($"Verification: Saved code length: {savedVerb.Code?.Length ?? 0}");
+                    _commandProcessor.SendToPlayer("Verb programming complete.");
+                    _commandProcessor.SendToPlayer($"Code saved ({code.Split('\n').Length} lines).");
+                    _commandProcessor.SendToPlayer($"Verified: Code length is {savedVerb.Code?.Length ?? 0} characters.");
+                }
+                else
+                {
+                    Logger.Error($"Could not find verb with ID {_currentVerbId} after saving!");
+                    _commandProcessor.SendToPlayer("ERROR: Could not verify that code was saved!");
+                }
             }
             
             _isInProgrammingMode = false;
@@ -208,6 +280,13 @@ public class ProgrammingCommands
     /// </summary>
     private bool HandleVerbCommand(string[] parts)
     {
+        // Check if player has Programmer flag
+        if (!PermissionManager.HasFlag(_player, PermissionManager.Flag.Programmer))
+        {
+            _commandProcessor.SendToPlayer("You need the Programmer flag to use the @verb command.");
+            return true;
+        }
+
         if (parts.Length < 3)
         {
             _commandProcessor.SendToPlayer("Usage: @verb <object> <name> [aliases] [pattern]");
@@ -315,6 +394,13 @@ public class ProgrammingCommands
     /// </summary>
     private bool HandleEditCommand(string[] parts)
     {
+        // Check if player has Programmer flag
+        if (!PermissionManager.HasFlag(_player, PermissionManager.Flag.Programmer))
+        {
+            _commandProcessor.SendToPlayer("You need the Programmer flag to use the @edit command.");
+            return true;
+        }
+
         // Just redirect to @program for now
         return HandleProgramCommand(new[] { "@program", parts.Length > 1 ? parts[1] : "" });
     }
@@ -368,6 +454,13 @@ public class ProgrammingCommands
     /// </summary>
     private bool HandleRemoveVerbCommand(string[] parts)
     {
+        // Check if player has Programmer flag
+        if (!PermissionManager.HasFlag(_player, PermissionManager.Flag.Programmer))
+        {
+            _commandProcessor.SendToPlayer("You need the Programmer flag to use the @rmverb command.");
+            return true;
+        }
+
         if (parts.Length != 2)
         {
             _commandProcessor.SendToPlayer("Usage: @rmverb <object>:<verb>");
@@ -904,60 +997,213 @@ public class ProgrammingCommands
     }
 
     /// <summary>
-    /// @examine <object> - Show detailed information about an object
+    /// @flag <player> <flag> - Grant or remove a flag from a player
+    /// Usage: @flag <player> +<flag> or @flag <player> -<flag>
     /// </summary>
-    private bool HandleExamineCommand(string[] parts)
+    private bool HandleFlagCommand(string[] parts)
     {
-        var objectName = parts.Length > 1 ? parts[1] : "here";
-        var objectId = ResolveObject(objectName);
-        
-        if (objectId == null)
+        if (parts.Length != 3)
         {
-            _commandProcessor.SendToPlayer($"Object '{objectName}' not found.");
+            _commandProcessor.SendToPlayer("Usage: @flag <player> <+/-flag>");
+            _commandProcessor.SendToPlayer("Available flags: Admin, Programmer, Moderator");
+            _commandProcessor.SendToPlayer("Examples: @flag joe +programmer, @flag mary -moderator");
             return true;
         }
 
-        var obj = GameDatabase.Instance.GameObjects.FindById(objectId);
-        if (obj == null)
+        var playerName = parts[1];
+        var flagSpec = parts[2];
+
+        if (string.IsNullOrEmpty(flagSpec) || flagSpec.Length < 2 || (flagSpec[0] != '+' && flagSpec[0] != '-'))
         {
-            _commandProcessor.SendToPlayer("Object not found in database.");
+            _commandProcessor.SendToPlayer("Flag must start with + (grant) or - (remove)");
             return true;
         }
 
-        var objClass = GameDatabase.Instance.ObjectClasses.FindById(obj.ClassId);
-        var name = ObjectManager.GetProperty(obj, "name")?.AsString ?? "unnamed";
-        var shortDesc = ObjectManager.GetProperty(obj, "shortDescription")?.AsString ?? "no description";
-        var longDesc = ObjectManager.GetProperty(obj, "longDescription")?.AsString ?? "You see nothing special.";
+        var isGranting = flagSpec[0] == '+';
+        var flagName = flagSpec.Substring(1);
 
-        _commandProcessor.SendToPlayer($"=== Object #{obj.DbRef}: {name} ===");
-        _commandProcessor.SendToPlayer($"Class: {objClass?.Name ?? "unknown"}");
-        _commandProcessor.SendToPlayer($"Short description: {shortDesc}");
-        _commandProcessor.SendToPlayer($"Long description: {longDesc}");
-        _commandProcessor.SendToPlayer($"Location: {GetObjectName(obj.Location ?? "nowhere")}");
-        _commandProcessor.SendToPlayer($"GUID: {obj.Id}");
-        
-        // Show contents if any
-        if (obj.Contents?.Any() == true)
+        // Parse the flag
+        if (!Enum.TryParse<PermissionManager.Flag>(flagName, true, out var flag))
         {
-            _commandProcessor.SendToPlayer("Contents:");
-            foreach (var contentId in obj.Contents)
+            _commandProcessor.SendToPlayer($"Unknown flag: {flagName}");
+            _commandProcessor.SendToPlayer("Available flags: Admin, Programmer, Moderator");
+            return true;
+        }
+
+        // Find the target player
+        var targetPlayer = GameDatabase.Instance.Players.FindOne(p => 
+            p.Name.Equals(playerName, StringComparison.OrdinalIgnoreCase));
+        
+        if (targetPlayer == null)
+        {
+            _commandProcessor.SendToPlayer($"Player '{playerName}' not found.");
+            return true;
+        }
+
+        bool success;
+        if (isGranting)
+        {
+            success = PermissionManager.GrantFlag(targetPlayer, flag, _player);
+            if (success)
             {
-                var content = GameDatabase.Instance.GameObjects.FindById(contentId);
-                if (content != null)
+                _commandProcessor.SendToPlayer($"Granted {flag} flag to {targetPlayer.Name}.");
+            }
+            else
+            {
+                if (!PermissionManager.CanGrantFlag(_player, flag))
                 {
-                    var contentName = ObjectManager.GetProperty(content, "name")?.AsString ?? "unnamed";
-                    _commandProcessor.SendToPlayer($"  #{content.DbRef}: {contentName}");
+                    _commandProcessor.SendToPlayer($"You don't have permission to grant the {flag} flag.");
+                }
+                else
+                {
+                    _commandProcessor.SendToPlayer($"{targetPlayer.Name} already has the {flag} flag.");
+                }
+            }
+        }
+        else
+        {
+            success = PermissionManager.RemoveFlag(targetPlayer, flag, _player);
+            if (success)
+            {
+                _commandProcessor.SendToPlayer($"Removed {flag} flag from {targetPlayer.Name}.");
+            }
+            else
+            {
+                if (flag == PermissionManager.Flag.Admin && 
+                    targetPlayer.Name.Equals(PermissionManager.ORIGINAL_ADMIN_NAME, StringComparison.OrdinalIgnoreCase))
+                {
+                    _commandProcessor.SendToPlayer("Cannot remove Admin flag from the original admin player.");
+                }
+                else if (!PermissionManager.CanRemoveFlag(_player, flag))
+                {
+                    _commandProcessor.SendToPlayer($"You don't have permission to remove the {flag} flag.");
+                }
+                else
+                {
+                    _commandProcessor.SendToPlayer($"{targetPlayer.Name} doesn't have the {flag} flag.");
                 }
             }
         }
 
-        // Show verbs count
-        var verbs = VerbManager.GetVerbsOnObject(objectId);
-        if (verbs.Any())
+        return true;
+    }
+
+    /// <summary>
+    /// @flags [player] - Show flags for a player (or yourself if no player specified)
+    /// </summary>
+    private bool HandleFlagsCommand(string[] parts)
+    {
+        Player targetPlayer;
+        
+        if (parts.Length == 1)
         {
-            _commandProcessor.SendToPlayer($"Verbs: {verbs.Count} defined (use @verbs #{obj.DbRef} to list)");
+            // Show own flags
+            targetPlayer = _player;
+        }
+        else if (parts.Length == 2)
+        {
+            // Show another player's flags
+            var playerName = parts[1];
+            targetPlayer = GameDatabase.Instance.Players.FindOne(p => 
+                p.Name.Equals(playerName, StringComparison.OrdinalIgnoreCase));
+            
+            if (targetPlayer == null)
+            {
+                _commandProcessor.SendToPlayer($"Player '{playerName}' not found.");
+                return true;
+            }
+        }
+        else
+        {
+            _commandProcessor.SendToPlayer("Usage: @flags [player]");
+            return true;
         }
 
+        var flags = PermissionManager.GetPlayerFlags(targetPlayer);
+        var flagsString = PermissionManager.GetFlagsString(targetPlayer);
+        
+        if (targetPlayer == _player)
+        {
+            _commandProcessor.SendToPlayer($"Your flags: {flagsString}");
+        }
+        else
+        {
+            _commandProcessor.SendToPlayer($"{targetPlayer.Name}'s flags: {flagsString}");
+        }
+
+        if (flags.Any())
+        {
+            _commandProcessor.SendToPlayer("Flag details:");
+            foreach (var flag in flags)
+            {
+                var description = flag switch
+                {
+                    PermissionManager.Flag.Admin => "Full administrative privileges",
+                    PermissionManager.Flag.Programmer => "Can use programming commands like @program",
+                    PermissionManager.Flag.Moderator => "Moderation privileges",
+                    _ => "Unknown flag"
+                };
+                _commandProcessor.SendToPlayer($"  {flag}: {description}");
+            }
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// @update-permissions - Update existing player permissions to new flag system (admin only)
+    /// </summary>
+    private bool HandleUpdatePermissionsCommand(string[] parts)
+    {
+        // Check if player has Admin flag
+        if (!PermissionManager.HasFlag(_player, PermissionManager.Flag.Admin))
+        {
+            _commandProcessor.SendToPlayer("You need the Admin flag to use this command.");
+            return true;
+        }
+
+        _commandProcessor.SendToPlayer("Updating existing player permissions to new flag system...");
+
+        var allPlayers = GameDatabase.Instance.Players.FindAll().ToList();
+        int updatedCount = 0;
+
+        foreach (var player in allPlayers)
+        {
+            if (player.Permissions?.Any() == true)
+            {
+                bool needsUpdate = false;
+                var currentPermissions = new List<string>(player.Permissions);
+
+                // Convert old permission names to new flags
+                if (currentPermissions.Contains("admin"))
+                {
+                    currentPermissions.Remove("admin");
+                    if (!currentPermissions.Contains("admin"))
+                        currentPermissions.Add(PermissionManager.Flag.Admin.ToString().ToLower());
+                    needsUpdate = true;
+                }
+
+                if (currentPermissions.Contains("builder"))
+                {
+                    currentPermissions.Remove("builder");
+                    if (!currentPermissions.Contains("programmer"))
+                        currentPermissions.Add(PermissionManager.Flag.Programmer.ToString().ToLower());
+                    needsUpdate = true;
+                }
+
+                if (needsUpdate)
+                {
+                    player.Permissions = currentPermissions;
+                    GameDatabase.Instance.Players.Update(player);
+                    updatedCount++;
+                    
+                    var flags = PermissionManager.GetFlagsString(player);
+                    _commandProcessor.SendToPlayer($"Updated {player.Name}: flags = {flags}");
+                }
+            }
+        }
+
+        _commandProcessor.SendToPlayer($"Permission update complete. Updated {updatedCount} players.");
         return true;
     }
 }

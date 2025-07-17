@@ -21,14 +21,17 @@ namespace CSMOO.Server.Scripting
                     typeof(object).Assembly, // System
                     typeof(System.Collections.Generic.List<>).Assembly, // System.Collections.Generic
                     typeof(System.Linq.Enumerable).Assembly, // System.Linq
-                    typeof(GameDatabase).Assembly // Current assembly
+                    typeof(GameDatabase).Assembly, // Current assembly
+                    typeof(Builtins).Assembly // Builtins assembly
                 )
                 .WithImports(
                     "System",
                     "System.Collections.Generic",
                     "System.Linq",
+                    "System.Text",
                     "CSMOO.Server.Database",
-                    "CSMOO.Server.Commands"
+                    "CSMOO.Server.Commands",
+                    "CSMOO.Server.Scripting"
                 );
         }
 
@@ -50,6 +53,9 @@ namespace CSMOO.Server.Scripting
                     Args = ParseArguments(input),
                     Verb = verb.Name
                 };
+
+                // Set the current context for the Builtins class
+                Builtins.CurrentContext = globals;
 
                 // Initialize the object factory for enhanced script support
                 globals.InitializeObjectFactory();

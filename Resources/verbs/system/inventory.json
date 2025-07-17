@@ -5,6 +5,6 @@
   "description": "Show what you are carrying",
   "code": [
     "// Inventory command - show what the player is carrying",
-    "Helpers.ShowInventory();"
+    "Builtins.ShowInventory();"
   ]
 }

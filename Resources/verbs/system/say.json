@@ -7,14 +7,14 @@
     "// Say command - speak to others in the room",
     "if (Args.Count == 0)",
     "{",
-    "    notify(player, \"Say what?\");",
+    "    Builtins.Notify(Player, \"Say what?\");",
     "    return;",
     "}",
     "",
     "var message = string.Join(\" \", Args);",
-    "notify(player, $\"You say, \\\"{message}\\\"\");",
+    "Builtins.Notify(Player, $\"You say, \\\"{message}\\\"\");",
     "",
     "// Send to other players in the room",
-    "Helpers.SayToRoom($\"{player.Name} says, \\\"{message}\\\"\", true);"
+    "Builtins.SayToRoom($\"{Builtins.GetPlayerName(Player.Id)} says, \\\"{message}\\\"\", true);"
   ]
 }

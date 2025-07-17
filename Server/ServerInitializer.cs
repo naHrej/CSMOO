@@ -60,8 +60,9 @@ public static class ServerInitializer
         
         var startingRoom = RoomManager.GetStartingRoom();
         var admin = PlayerManager.CreatePlayer("admin", "password", startingRoom?.Id);
-        admin.Permissions.Add("admin");
-        admin.Permissions.Add("builder");
+        
+        // Initialize proper admin permissions using the permission system
+        PermissionManager.InitializeAdminPermissions(admin);
         
         // Set some admin-specific properties
         ObjectManager.SetProperty(admin, "level", 100);

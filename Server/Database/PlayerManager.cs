@@ -146,6 +146,14 @@ public static class PlayerManager
     }
 
     /// <summary>
+    /// Find a player by name (case-insensitive)
+    /// </summary>
+    public static Player? FindPlayerByName(string name)
+    {
+        return GameDatabase.Instance.Players.FindOne(p => p.Name.ToLower() == name.ToLower());
+    }
+
+    /// <summary>
     /// Changes a player's password
     /// </summary>
     public static void ChangePassword(string playerId, string newPassword)
