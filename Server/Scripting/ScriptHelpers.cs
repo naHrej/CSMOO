@@ -16,8 +16,8 @@ namespace CSMOO.Server.Scripting;
 /// </summary>
 public class ScriptHelpers
 {
-    private readonly Player _player;
-    private readonly CommandProcessor _commandProcessor;
+    public readonly Player _player;
+    public readonly CommandProcessor _commandProcessor;
 
     public ScriptHelpers(Player player, CommandProcessor commandProcessor)
     {
@@ -571,4 +571,59 @@ public class ScriptHelpers
     }
 
     #endregion
+
+    #region Verb Management
+
+    /// <summary>
+    /// Get information about a specific verb on an object
+    /// </summary>
+    public VerbInfo? GetVerbInfo(string objectSpec, string verbName)
+    {
+        var objectId = ResolveObject(objectSpec);
+        if (objectId == null)
+        {
+            return null;
+        }
+
+        var verb = VerbManager.GetVerbsOnObject(objectId)
+            .FirstOrDefault(v => v.Name.ToLower() == verbName.ToLower());
+
+        if (verb == null)
+        {
+            return null;
+        }
+
+        return new VerbInfo
+        {
+            ObjectId = objectId,
+            ObjectName = GetObjectName(objectId),
+            VerbName = verb.Name,
+            Aliases = verb.Aliases,
+            Pattern = verb.Pattern,
+            Description = verb.Description,
+            CreatedBy = verb.CreatedBy,
+            CreatedAt = verb.CreatedAt,
+            Code = verb.Code ?? "",
+            CodeLines = string.IsNullOrEmpty(verb.Code) ? new string[0] : verb.Code.Split('\n')
+        };
+    }
+
+    #endregion
+}
+
+/// <summary>
+/// Information about a verb for display purposes
+/// </summary>
+public class VerbInfo
+{
+    public string ObjectId { get; set; } = "";
+    public string ObjectName { get; set; } = "";
+    public string VerbName { get; set; } = "";
+    public string? Aliases { get; set; }
+    public string? Pattern { get; set; }
+    public string? Description { get; set; }
+    public string CreatedBy { get; set; } = "";
+    public DateTime CreatedAt { get; set; }
+    public string Code { get; set; } = "";
+    public string[] CodeLines { get; set; } = new string[0];
 }

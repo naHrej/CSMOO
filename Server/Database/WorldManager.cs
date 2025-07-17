@@ -304,8 +304,8 @@ public static class WorldManager
         {
             Scripting.VerbManager.CreateVerb(objectClass.Id, "look", "*", 
                 @"// Default look verb
-var name = ObjectManager.GetProperty(ThisObject, ""name"")?.ToString() ?? ""something"";
-var desc = ObjectManager.GetProperty(ThisObject, ""longDescription"")?.ToString() ?? ""You see nothing special."";
+var name = me.name?.ToString() ?? ""something"";
+var desc = me.longDescription?.ToString() ?? ""You see nothing special."";
 Say(desc);", "system");
         }
 
@@ -314,7 +314,7 @@ Say(desc);", "system");
         {
             Scripting.VerbManager.CreateVerb(playerClass.Id, "inventory", "", 
                 @"// Show player's inventory
-var items = ObjectManager.GetObjectsInLocation(ThisObject);
+var items = ObjectManager.GetObjectsInLocation(me);
 if (items.Count == 0)
 {
     Say(""You are not carrying anything."");
@@ -324,7 +324,8 @@ else
     Say(""You are carrying:"");
     foreach (var itemId in items)
     {
-        var name = ObjectManager.GetProperty(itemId, ""name"")?.ToString() ?? ""something"";
+        var itemObj = ObjectManager.GetObject(itemId);
+        var name = itemObj.name?.ToString() ?? ""something"";
         Say($""  {name}"");
     }
 }", "system");
@@ -343,15 +344,15 @@ else
         {
             Scripting.VerbManager.CreateVerb(itemClass.Id, "get", "*", 
                 @"// Default get verb for items
-var gettable = ObjectManager.GetProperty(ThisObject, ""gettable"")?.AsBoolean ?? false;
+var gettable = me.gettable?.AsBoolean ?? false;
 if (!gettable)
 {
     Say(""You can't take that."");
     return;
 }
 
-var name = ObjectManager.GetProperty(ThisObject, ""name"")?.ToString() ?? ""something"";
-ObjectManager.MoveObject(ThisObject, Player.Id);
+var name = me.name?.ToString() ?? ""something"";
+ObjectManager.MoveObject(me, player);
 Say($""You take the {name}."");", "system");
             
             // Add aliases for get
@@ -375,12 +376,13 @@ if (Args.Count == 0)
 }
 
 var itemName = string.Join("" "", Args).ToLower();
-var items = ObjectManager.GetObjectsInLocation(Player.Id);
+var items = ObjectManager.GetObjectsInLocation(player);
 string foundItemId = null;
 
 foreach (var itemId in items)
 {
-    var name = ObjectManager.GetProperty(itemId, ""name"")?.ToString()?.ToLower();
+    var itemObj = ObjectManager.GetObject(itemId);
+    var name = itemObj.name?.ToString()?.ToLower();
     if (name != null && name.Contains(itemName))
     {
         foundItemId = itemId;
@@ -394,8 +396,9 @@ if (foundItemId == null)
     return;
 }
 
-var itemFullName = ObjectManager.GetProperty(foundItemId, ""name"")?.ToString() ?? ""something"";
-ObjectManager.MoveObject(foundItemId, Player.Location);
+var foundItem = ObjectManager.GetObject(foundItemId);
+var itemFullName = foundItem.name?.ToString() ?? ""something"";
+ObjectManager.MoveObject(foundItemId, player.Location);
 Say($""You drop the {itemFullName}."");", "system");
         }
     }
@@ -460,7 +463,7 @@ if (Args.Count != 1)
 }
 
 var direction = Args[0].ToLower();
-var currentLocation = Helpers.GetCurrentLocation();
+var currentLocation = here;
 if (currentLocation == null)
 {
     Say(""You are not in any location."");
@@ -469,7 +472,7 @@ if (currentLocation == null)
 
 var exits = Helpers.GetExitsFromRoom(currentLocation);
 var exit = exits.FirstOrDefault(e => 
-    Helpers.GetProperty(e, ""direction"")?.AsString?.ToLower() == direction);
+    e.direction?.AsString?.ToLower() == direction);
 
 if (exit == null)
 {
@@ -477,7 +480,7 @@ if (exit == null)
     return;
 }
 
-var destination = Helpers.GetProperty(exit, ""destination"")?.AsString;
+var destination = exit.destination?.AsString;
 if (destination == null)
 {
     Say(""That exit doesn't lead anywhere."");
@@ -485,10 +488,10 @@ if (destination == null)
 }
 
 // Move the player
-if (Helpers.MoveObject(Player.Id, destination))
+if (Helpers.MoveObject(player, destination))
 {
-    Player.Location = destination;
-    GameDatabase.Instance.Players.Update(Player);
+    player.Location = destination;
+    GameDatabase.Instance.Players.Update(player);
     Say($""You go {direction}."");
     Helpers.ShowRoom();
 }
@@ -522,7 +525,7 @@ else
 
                 Scripting.VerbManager.CreateVerb(systemObjectId, dir, "", $@"
 // Direction shortcut for {fullDirection}
-var currentLocation = Helpers.GetCurrentLocation();
+var currentLocation = here;
 if (currentLocation == null)
 {{
     Say(""You are not in any location."");
@@ -531,7 +534,7 @@ if (currentLocation == null)
 
 var exits = Helpers.GetExitsFromRoom(currentLocation);
 var exit = exits.FirstOrDefault(e => 
-    Helpers.GetProperty(e, ""direction"")?.AsString?.ToLower() == ""{fullDirection}"");
+    e.direction?.AsString?.ToLower() == ""{fullDirection}"");
 
 if (exit == null)
 {{
@@ -539,7 +542,7 @@ if (exit == null)
     return;
 }}
 
-var destination = Helpers.GetProperty(exit, ""destination"")?.AsString;
+var destination = exit.destination?.AsString;
 if (destination == null)
 {{
     Say(""That exit doesn't lead anywhere."");
@@ -547,10 +550,10 @@ if (destination == null)
 }}
 
 // Move the player
-if (Helpers.MoveObject(Player.Id, destination))
+if (Helpers.MoveObject(player, destination))
 {{
-    Player.Location = destination;
-    GameDatabase.Instance.Players.Update(Player);
+    player.Location = destination;
+    GameDatabase.Instance.Players.Update(player);
     Say($""You go {fullDirection}."");
     Helpers.ShowRoom();
 }}
@@ -599,7 +602,7 @@ if (item == null)
     return;
 }
 
-var gettable = Helpers.GetProperty(item, ""gettable"")?.AsBoolean ?? false;
+var gettable = item.gettable?.AsBoolean ?? false;
 if (!gettable)
 {
     Say(""You can't take that."");
@@ -607,9 +610,9 @@ if (!gettable)
 }
 
 // Move item to player's inventory
-if (Helpers.MoveObject(item.Id, Player.Id))
+if (Helpers.MoveObject(item, player))
 {
-    var itemDesc = Helpers.GetProperty(item, ""shortDescription"")?.AsString ?? ""something"";
+    var itemDesc = item.shortDescription?.AsString ?? ""something"";
     Say($""You take {itemDesc}."");
 }
 else
@@ -647,7 +650,7 @@ if (item == null)
     return;
 }
 
-var currentLocation = Helpers.GetCurrentLocation();
+var currentLocation = here;
 if (currentLocation == null)
 {
     Say(""You are nowhere - you can't drop anything."");
@@ -655,9 +658,9 @@ if (currentLocation == null)
 }
 
 // Move item to current room
-if (Helpers.MoveObject(item.Id, currentLocation))
+if (Helpers.MoveObject(item, currentLocation))
 {
-    var itemDesc = Helpers.GetProperty(item, ""shortDescription"")?.AsString ?? ""something"";
+    var itemDesc = item.shortDescription?.AsString ?? ""something"";
     Say($""You drop {itemDesc}."");
 }
 else
@@ -682,7 +685,7 @@ var message = string.Join("" "", Args);
 Say($""You say, \""{message}\"""");
 
 // Send to other players in the room
-Helpers.SayToRoom($""{Player.Name} says, \""{message}\"""", true);
+Helpers.SayToRoom($""{player.Name} says, \""{message}\"""", true);
 ", "system");
         }
 
@@ -721,14 +724,14 @@ if (targetPlayer == null)
     return;
 }
 
-if (targetPlayer.Id == Player.Id)
+if (targetPlayer == player)
 {
     Say(""You can't tell yourself."");
     return;
 }
 
 // Send the message
-Helpers.SendToPlayer($""{Player.Name} tells you, \""{message}\"""", targetPlayer);
+Helpers.SendToPlayer($""{player.Name} tells you, \""{message}\"""", targetPlayer);
 Say($""You tell {targetPlayer.Name}, \""{message}\"""");
 ", "system");
         }
@@ -747,18 +750,82 @@ if (Args.Count == 0)
 var message = string.Join("" "", Args);
 var onlinePlayers = Helpers.GetOnlinePlayers();
 
-foreach (var player in onlinePlayers)
+foreach (var onlinePlayer in onlinePlayers)
 {
-    if (player.Id == Player.Id)
+    if (onlinePlayer == player)
     {
-        Helpers.SendToPlayer($""[OOC] You say, \""{message}\"""", player);
+        Helpers.SendToPlayer($""[OOC] You say, \""{message}\"""", onlinePlayer);
     }
     else
     {
-        Helpers.SendToPlayer($""[OOC] {Player.Name} says, \""{message}\"""", player);
+        Helpers.SendToPlayer($""[OOC] {player.Name} says, \""{message}\"""", onlinePlayer);
     }
 }
 ", "system");
+        }
+
+        // List command (replaces @list built-in command)
+        if (!existingVerbs.Exists(v => v.ObjectId == systemObjectId && v.Name == "list"))
+        {
+            Scripting.VerbManager.CreateVerb(systemObjectId, "list", "*", @"
+// List command - show verb code (@list <object>:<verb>)
+if (Args.Count != 1)
+{
+    Say(""Usage: list <object>:<verb>"");
+    return;
+}
+
+var verbSpec = Args[0];
+if (!verbSpec.Contains(':'))
+{
+    Say(""Verb specification must be in format <object>:<verb>"");
+    return;
+}
+
+// Split from the right to handle class:Object:verb syntax
+var lastColonIndex = verbSpec.LastIndexOf(':');
+var objectName = verbSpec.Substring(0, lastColonIndex);
+var verbName = verbSpec.Substring(lastColonIndex + 1);
+
+var verbInfo = Helpers.GetVerbInfo(objectName, verbName);
+if (verbInfo == null)
+{
+    Say($""Object '{objectName}' or verb '{verbName}' not found."");
+    return;
+}
+
+// Display verb information
+Say($""=== {verbInfo.ObjectName}:{verbInfo.VerbName} ==="");
+if (!string.IsNullOrEmpty(verbInfo.Aliases))
+    Say($""Aliases: {verbInfo.Aliases}"");
+if (!string.IsNullOrEmpty(verbInfo.Pattern))
+    Say($""Pattern: {verbInfo.Pattern}"");
+if (!string.IsNullOrEmpty(verbInfo.Description))
+    Say($""Description: {verbInfo.Description}"");
+
+Say($""Created by: {verbInfo.CreatedBy} on {verbInfo.CreatedAt:yyyy-MM-dd HH:mm}"");
+Say(""Code:"");
+
+if (verbInfo.CodeLines.Length == 0)
+{
+    Say(""  (no code)"");
+}
+else
+{
+    for (int i = 0; i < verbInfo.CodeLines.Length; i++)
+    {
+        Say($""{i + 1,3}: {verbInfo.CodeLines[i]}"");
+    }
+}
+", "system");
+
+            // Add @list as an alias for backwards compatibility
+            var listVerb = existingVerbs.FindOne(v => v.ObjectId == systemObjectId && v.Name == "list");
+            if (listVerb != null)
+            {
+                listVerb.Aliases = "@list";
+                existingVerbs.Update(listVerb);
+            }
         }
 
         Logger.Info("System commands created as verbs");
@@ -802,7 +869,7 @@ foreach (var player in onlinePlayers)
     }
 
     /// <summary>
-    /// Updates existing verbs to fix the 'this.id' syntax error
+    /// Updates existing verbs to use the new natural object-oriented syntax
     /// </summary>
     private static void MigrateVerbSyntax()
     {
@@ -813,20 +880,91 @@ foreach (var player in onlinePlayers)
         
         foreach (var verb in allVerbs)
         {
-            if (!string.IsNullOrEmpty(verb.Code) && verb.Code.Contains("this.id"))
+            if (string.IsNullOrEmpty(verb.Code)) continue;
+            
+            var oldCode = verb.Code;
+            var newCode = verb.Code;
+            
+            // Legacy migrations
+            if (newCode.Contains("this.id"))
             {
-                var oldCode = verb.Code;
-                verb.Code = verb.Code.Replace("this.id", "ThisObject");
-                verbCollection.Update(verb);
+                newCode = newCode.Replace("this.id", "ThisObject");
                 anyUpdated = true;
-                
-                Logger.Debug($"Updated verb '{verb.Name}' - replaced 'this.id' with 'ThisObject'");
+            }
+            
+            // Migrate to new natural syntax
+            if (newCode.Contains("ObjectManager.GetProperty(ThisObject,"))
+            {
+                newCode = System.Text.RegularExpressions.Regex.Replace(
+                    newCode, 
+                    @"ObjectManager\.GetProperty\(ThisObject,\s*""([^""]+)""\)",
+                    "me.$1");
+                anyUpdated = true;
+            }
+            
+            if (newCode.Contains("ObjectManager.SetProperty(ThisObject,"))
+            {
+                newCode = System.Text.RegularExpressions.Regex.Replace(
+                    newCode,
+                    @"ObjectManager\.SetProperty\(ThisObject,\s*""([^""]+)"",\s*([^)]+)\)",
+                    "me.$1 = $2");
+                anyUpdated = true;
+            }
+            
+            // Remove .Id references - treat objects as pure references
+            if (newCode.Contains("player.Id"))
+            {
+                newCode = newCode.Replace("player.Id", "player");
+                anyUpdated = true;
+            }
+            
+            if (newCode.Contains("me.Id"))
+            {
+                newCode = newCode.Replace("me.Id", "me");
+                anyUpdated = true;
+            }
+            
+            if (newCode.Contains("here.Id"))
+            {
+                newCode = newCode.Replace("here.Id", "here");
+                anyUpdated = true;
+            }
+            
+            if (newCode.Contains("this.Id"))
+            {
+                newCode = newCode.Replace("this.Id", "this");
+                anyUpdated = true;
+            }
+            
+            if (newCode.Contains("Player.Id"))
+            {
+                newCode = newCode.Replace("Player.Id", "player");
+                anyUpdated = true;
+            }
+            
+            if (newCode.Contains("Player.Name"))
+            {
+                newCode = newCode.Replace("Player.Name", "player.Name");
+                anyUpdated = true;
+            }
+            
+            if (newCode.Contains("Player.Location"))
+            {
+                newCode = newCode.Replace("Player.Location", "player.Location");
+                anyUpdated = true;
+            }
+            
+            if (newCode != oldCode)
+            {
+                verb.Code = newCode;
+                verbCollection.Update(verb);
+                Logger.Debug($"Updated verb '{verb.Name}' to use natural syntax");
             }
         }
         
         if (anyUpdated)
         {
-            Logger.Info("Verb syntax migration completed.");
+            Logger.Info("Verb syntax migration to natural OOP syntax completed.");
         }
     }
 }

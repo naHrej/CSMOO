@@ -37,7 +37,8 @@ public class ScriptEngine
                 "System.Linq",
                 "System.Collections.Generic",
                 "CSMOO.Server.Database",
-                "CSMOO.Server.Commands"
+                "CSMOO.Server.Commands",
+                "CSMOO.Server.Scripting"
             );
     }
 
@@ -49,7 +50,7 @@ public class ScriptEngine
         try
         {
             // Create script globals that provide access to game systems
-            var globals = new ScriptGlobals
+            var globals = new EnhancedScriptGlobals
             {
                 Player = player,
                 CommandProcessor = commandProcessor,
@@ -59,14 +60,23 @@ public class ScriptEngine
                 Helpers = player != null ? new ScriptHelpers(player, commandProcessor) : null
             };
 
+            // Initialize the object factory for natural syntax support
+            if (player != null)
+            {
+                globals.InitializeObjectFactory();
+            }
+
             // Remove curly braces if present (for "script { code }" syntax)
             if (code.StartsWith("{") && code.EndsWith("}"))
             {
                 code = code.Substring(1, code.Length - 2).Trim();
             }
 
+            // Preprocess the code to handle natural syntax
+            code = ScriptPreprocessor.Preprocess(code);
+
             // Execute the script
-            var script = CSharpScript.Create(code, _scriptOptions, typeof(ScriptGlobals));
+            var script = CSharpScript.Create(code, _scriptOptions, typeof(EnhancedScriptGlobals));
             var result = script.RunAsync(globals).GetAwaiter().GetResult();
 
             return result.ReturnValue?.ToString() ?? "";

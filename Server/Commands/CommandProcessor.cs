@@ -284,7 +284,7 @@ public class CommandProcessor
         SendToPlayer("Programming (LambdaMOO style):");
         SendToPlayer("  @program <object>:<verb>  - Create/edit a verb with multi-line code");
         SendToPlayer("  @verb <object> <name> [aliases] [pattern]  - Create a new verb");
-        SendToPlayer("  @list <object>:<verb>  - Show code for a verb");
+        SendToPlayer("  list <object>:<verb> (or @list)  - Show code for a verb");
         SendToPlayer("  @examine <object>  - Show detailed object information");
         SendToPlayer("  @verbs [object]  - List verbs on an object");
         SendToPlayer("  @rmverb <object>:<verb>  - Remove a verb");

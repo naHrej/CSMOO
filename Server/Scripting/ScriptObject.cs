@@ -1,0 +1,373 @@
+using System;
+using System.Collections.Generic;
+using System.Dynamic;
+using System.Linq;
+using CSMOO.Server.Database;
+using CSMOO.Server.Logging;
+using CSMOO.Server.Commands;
+using LiteDB;
+
+namespace CSMOO.Server.Scripting;
+
+/// <summary>
+/// Dynamic object wrapper that provides natural syntax for object property access and verb calls
+/// Supports syntax like: player.Name, player.Name = "value", player:verbname(args)
+/// </summary>
+public class ScriptObject : DynamicObject
+{
+    private readonly string _objectId;
+    private readonly Player _currentPlayer;
+    private readonly CommandProcessor _commandProcessor;
+    private readonly ScriptHelpers _helpers;
+
+    public ScriptObject(string objectId, Player currentPlayer, CommandProcessor commandProcessor, ScriptHelpers helpers)
+    {
+        _objectId = objectId;
+        _currentPlayer = currentPlayer;
+        _commandProcessor = commandProcessor;
+        _helpers = helpers;
+    }
+
+    /// <summary>
+    /// The object ID this wrapper represents
+    /// </summary>
+    public string ObjectId => _objectId;
+
+    /// <summary>
+    /// Get the actual GameObject
+    /// </summary>
+    public GameObject? GetGameObject()
+    {
+        return GameDatabase.Instance.GameObjects.FindById(_objectId);
+    }
+
+    /// <summary>
+    /// Handles property getting: player.Name
+    /// </summary>
+    public override bool TryGetMember(GetMemberBinder binder, out object? result)
+    {
+        var propertyName = binder.Name;
+        
+        try
+        {
+            var obj = GetGameObject();
+            if (obj == null)
+            {
+                throw new ArgumentException($"Object {_objectId} not found");
+            }
+
+            // Direct database lookup for the property
+            var propertyValue = ObjectManager.GetProperty(obj, propertyName);
+            
+            if (propertyValue == null)
+            {
+                throw new ArgumentException($"Property '{propertyName}' not found on object {_objectId}");
+            }
+            
+            // Convert BsonValue to appropriate C# type
+            result = propertyValue.RawValue;
+            return true;
+        }
+        catch (Exception ex)
+        {
+            // Let the error bubble up to the script engine
+            throw new InvalidOperationException($"Error accessing property '{propertyName}' on object {_objectId}: {ex.Message}", ex);
+        }
+    }
+
+    /// <summary>
+    /// Handles property setting: player.Name = "value"
+    /// </summary>
+    public override bool TrySetMember(SetMemberBinder binder, object? value)
+    {
+        var propertyName = binder.Name;
+        
+        try
+        {
+            var obj = GetGameObject();
+            if (obj == null)
+            {
+                throw new ArgumentException($"Object {_objectId} not found");
+            }
+
+            // Convert value to BsonValue
+            BsonValue bsonValue = value switch
+            {
+                null => BsonValue.Null,
+                string s => new BsonValue(s),
+                int i => new BsonValue(i),
+                long l => new BsonValue(l),
+                double d => new BsonValue(d),
+                float f => new BsonValue((double)f),
+                bool b => new BsonValue(b),
+                DateTime dt => new BsonValue(dt),
+                BsonValue bv => bv,
+                _ => new BsonValue(value.ToString() ?? "")
+            };
+
+            ObjectManager.SetProperty(obj, propertyName, bsonValue);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            // Let the error bubble up to the script engine
+            throw new InvalidOperationException($"Error setting property '{propertyName}' on object {_objectId}: {ex.Message}", ex);
+        }
+    }
+
+    /// <summary>
+    /// Handles method calls (verbs): player.getName() or dynamic property access
+    /// </summary>
+    public override bool TryInvokeMember(InvokeMemberBinder binder, object?[]? args, out object? result)
+    {
+        var verbName = binder.Name;
+        
+        try
+        {
+            // Direct database lookup for the verb
+            var verb = FindVerb(verbName);
+            if (verb == null)
+            {
+                throw new ArgumentException($"Verb '{verbName}' not found on object {_objectId}");
+            }
+
+            // Try to call the verb on this object
+            var verbResult = CallVerb(verbName, args);
+            result = verbResult;
+            return true;
+        }
+        catch (Exception ex)
+        {
+            // Let the error bubble up to the script engine
+            throw new InvalidOperationException($"Error calling verb '{verbName}' on object {_objectId}: {ex.Message}", ex);
+        }
+    }
+
+    /// <summary>
+    /// Call a verb on this object
+    /// </summary>
+    public string CallVerb(string verbName, params object?[]? args)
+    {
+        // Find the verb on this object or its class hierarchy
+        var verb = FindVerb(verbName);
+        if (verb == null)
+        {
+            throw new ArgumentException($"Verb '{verbName}' not found on object {_objectId}");
+        }
+
+        // Convert arguments to strings
+        var stringArgs = args?.Select(arg => arg?.ToString() ?? "").ToList() ?? new List<string>();
+        
+        // Create input string for the verb
+        var input = verbName;
+        if (stringArgs.Any())
+        {
+            input += " " + string.Join(" ", stringArgs);
+        }
+
+        // Execute the verb using the verb script engine
+        var scriptEngine = new VerbScriptEngine();
+        return scriptEngine.ExecuteVerb(verb, input, _currentPlayer, _commandProcessor, _objectId);
+    }
+
+    /// <summary>
+    /// Find a verb on this object or its class hierarchy
+    /// </summary>
+    private Verb? FindVerb(string verbName)
+    {
+        var verbs = GameDatabase.Instance.GetCollection<Verb>("verbs");
+        
+        // First try to find verb directly on this object
+        var verb = verbs.FindOne(v => v.ObjectId == _objectId && 
+            (v.Name.Equals(verbName, StringComparison.OrdinalIgnoreCase) ||
+             v.Aliases.Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                .Any(alias => alias.Equals(verbName, StringComparison.OrdinalIgnoreCase))));
+        
+        if (verb != null) return verb;
+
+        // If not found, try the object's class hierarchy
+        var obj = GetGameObject();
+        if (obj != null)
+        {
+            var objectClass = GameDatabase.Instance.ObjectClasses.FindById(obj.ClassId);
+            while (objectClass != null)
+            {
+                verb = verbs.FindOne(v => v.ObjectId == objectClass.Id && 
+                    (v.Name.Equals(verbName, StringComparison.OrdinalIgnoreCase) ||
+                     v.Aliases.Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                        .Any(alias => alias.Equals(verbName, StringComparison.OrdinalIgnoreCase))));
+                
+                if (verb != null) return verb;
+                
+                // Move up the class hierarchy
+                if (!string.IsNullOrEmpty(objectClass.ParentClassId))
+                {
+                    objectClass = GameDatabase.Instance.ObjectClasses.FindById(objectClass.ParentClassId);
+                }
+                else
+                {
+                    break;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// String representation
+    /// </summary>
+    public override string ToString()
+    {
+        var obj = GetGameObject();
+        if (obj == null) return $"ScriptObject({_objectId}) [INVALID]";
+        
+        var nameProperty = ObjectManager.GetProperty(obj, "name");
+        var shortDescProperty = ObjectManager.GetProperty(obj, "shortDescription");
+        
+        var name = nameProperty?.AsString;
+        var shortDesc = shortDescProperty?.AsString;
+        
+        return name ?? shortDesc ?? $"Object #{obj.DbRef}";
+    }
+}
+
+/// <summary>
+/// Factory for creating ScriptObject instances with natural syntax support
+/// </summary>
+public class ScriptObjectFactory
+{
+    private readonly Player _currentPlayer;
+    private readonly CommandProcessor _commandProcessor;
+    private readonly ScriptHelpers _helpers;
+
+    public ScriptObjectFactory(Player currentPlayer, CommandProcessor commandProcessor, ScriptHelpers helpers)
+    {
+        _currentPlayer = currentPlayer;
+        _commandProcessor = commandProcessor;
+        _helpers = helpers;
+    }
+
+    /// <summary>
+    /// Create a ScriptObject for the given object reference
+    /// Supports: "me", "here", "system", "#123", object names, etc.
+    /// </summary>
+    public dynamic? GetObject(string objectReference)
+    {
+        var objectId = _helpers.ResolveObject(objectReference);
+        if (objectId == null) return null;
+        
+        return new ScriptObject(objectId, _currentPlayer, _commandProcessor, _helpers);
+    }
+
+    /// <summary>
+    /// Create a ScriptObject for a direct object ID
+    /// </summary>
+    public dynamic? GetObjectById(string objectId)
+    {
+        var obj = GameDatabase.Instance.GameObjects.FindById(objectId);
+        if (obj == null) return null;
+        
+        return new ScriptObject(objectId, _currentPlayer, _commandProcessor, _helpers);
+    }
+}
+
+/// <summary>
+/// Enhanced script globals with natural object syntax support
+/// </summary>
+public class EnhancedScriptGlobals : ScriptGlobals
+{
+    private ScriptObjectFactory? _objectFactory;
+
+    /// <summary>
+    /// Initialize the object factory
+    /// </summary>
+    public void InitializeObjectFactory()
+    {
+        if (Player != null && CommandProcessor != null && Helpers != null)
+        {
+            _objectFactory = new ScriptObjectFactory(Player, CommandProcessor, Helpers);
+        }
+    }
+
+    /// <summary>
+    /// Get object with natural syntax: GetObject("player") or GetObject("#123")
+    /// Usage: var player = GetObject("me"); player.Name = "NewName"; player:sayHello();
+    /// </summary>
+    public new dynamic? GetObject(string objectReference)
+    {
+        return _objectFactory?.GetObject(objectReference);
+    }
+
+    /// <summary>
+    /// The player executing the verb
+    /// Usage: player.Name = "NewName"; player.Location = "room_id";
+    /// </summary>
+    public dynamic? player => _objectFactory?.GetObjectById(Player?.Id ?? "");
+
+    /// <summary>
+    /// The object this verb is running on (same as 'this')
+    /// Usage: me.Name = "New Name"; me:someVerb();
+    /// </summary>
+    public dynamic? me
+    {
+        get
+        {
+            if (this is VerbScriptGlobals verbGlobals && !string.IsNullOrEmpty(verbGlobals.ThisObject))
+            {
+                return _objectFactory?.GetObjectById(verbGlobals.ThisObject);
+            }
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// The current room (where the player is)
+    /// Usage: here.Name = "New Room Name"; here:look();
+    /// </summary>
+    public dynamic? here => _objectFactory?.GetObjectById(Player?.Location ?? "");
+
+    /// <summary>
+    /// The system object as a ScriptObject
+    /// Usage: system:who(); system.Name;
+    /// </summary>
+    public dynamic? system => _objectFactory?.GetObject("system");
+
+    /// <summary>
+    /// The object this verb is running on (same as 'me')
+    /// Usage: this.Name = "New Name"; this:someVerb();
+    /// </summary>
+    public dynamic? @this
+    {
+        get
+        {
+            if (this is VerbScriptGlobals verbGlobals && !string.IsNullOrEmpty(verbGlobals.ThisObject))
+            {
+                return _objectFactory?.GetObjectById(verbGlobals.ThisObject);
+            }
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Get object by DBREF number: obj(123) returns object #123
+    /// Usage: var target = obj(123); target.Name = "NewName";
+    /// </summary>
+    public dynamic? obj(int dbref)
+    {
+        return _objectFactory?.GetObject($"#{dbref}");
+    }
+
+    /// <summary>
+    /// Call a verb on an object with natural syntax
+    /// Usage: CallVerb("player", "getName", "arg1", "arg2")
+    /// Note: It's better to use the object syntax: GetObject("player"):getName("arg1", "arg2")
+    /// </summary>
+    public string CallVerb(string objectReference, string verbName, params object[] args)
+    {
+        dynamic? obj = GetObject(objectReference);
+        if (obj == null) return $"Object '{objectReference}' not found";
+        
+        return obj.CallVerb(verbName, args);
+    }
+}

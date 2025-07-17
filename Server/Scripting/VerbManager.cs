@@ -578,8 +578,14 @@ public class VerbScriptEngine
                 Verb = verb.Name
             };
 
+            // Initialize the object factory for natural syntax support
+            globals.InitializeObjectFactory();
+
+            // Preprocess the verb code to handle natural syntax
+            var processedCode = ScriptPreprocessor.Preprocess(verb.Code);
+
             var script = Microsoft.CodeAnalysis.CSharp.Scripting.CSharpScript.Create(
-                verb.Code, 
+                processedCode, 
                 _scriptOptions, 
                 typeof(VerbScriptGlobals));
             
@@ -602,7 +608,7 @@ public class VerbScriptEngine
 /// <summary>
 /// Enhanced script globals for verb execution
 /// </summary>
-public class VerbScriptGlobals : ScriptGlobals
+public class VerbScriptGlobals : EnhancedScriptGlobals
 {
     /// <summary>
     /// The object this verb is running on
@@ -643,7 +649,7 @@ public class VerbScriptGlobals : ScriptGlobals
     /// <summary>
     /// Send a message to all players in the same room as the current player
     /// </summary>
-    public void SayToRoom(string message, bool includePlayer = false)
+    public new void SayToRoom(string message, bool includePlayer = false)
     {
         if (Player?.Location == null) return;
 
@@ -682,7 +688,7 @@ public class VerbScriptGlobals : ScriptGlobals
     /// <summary>
     /// Call a verb on an object from within another verb
     /// </summary>
-    public object? CallVerb(string objectRef, string verbName, params object[] args)
+    public new object? CallVerb(string objectRef, string verbName, params object[] args)
     {
         try
         {
