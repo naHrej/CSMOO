@@ -36,6 +36,7 @@ public class ScriptEngine
                 "System",
                 "System.Linq",
                 "System.Collections.Generic",
+                "System.Text",
                 "CSMOO.Server.Database",
                 "CSMOO.Server.Commands",
                 "CSMOO.Server.Scripting"

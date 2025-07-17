@@ -1,0 +1,30 @@
+{
+  "name": "display_login",
+  "aliases": "",
+  "pattern": "",
+  "description": "Display the login banner for new connections.",
+  "code": [
+    "// Dynamic HTML login banner - styled with inline CSS for client compatibility",
+    "var banner = new StringBuilder();",
+    "",
+    "// Build the entire HTML as one continuous string",
+    "banner.Append(\"<div style=\\\"margin:0;padding:20px;font-family:monospace;background:linear-gradient(135deg,#1a1a2e,#16213e,#0f3460);color:#00ff88;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;\\\">\");",
+    "banner.Append(\"<div style=\\\"max-width:800px;text-align:center;padding:40px;border:2px solid #00ff88;border-radius:15px;background:#000000;box-shadow:0 0 30px #00ff88;\\\">\");",
+    "banner.Append(\"<div style=\\\"font-size:3.5rem;font-weight:bold;letter-spacing:8px;margin-bottom:20px;text-shadow:0 0 20px #00ff88;\\\">CSMOO</div>\");",
+    "banner.Append(\"<div style=\\\"font-size:1.2rem;color:#88ddff;margin-bottom:30px;letter-spacing:2px;\\\">Multi-User Object Oriented Server</div>\");",
+    "banner.Append(\"<div style=\\\"font-size:1rem;color:#ffaa00;margin-bottom:40px;padding:10px 20px;border:1px solid #ffaa00;border-radius:25px;display:inline-block;\\\">Version 1.0.0 (Dynamic!)</div>\");",
+    "banner.Append(\"<div style=\\\"font-size:1.3rem;margin-bottom:30px;color:#ffffff;\\\">*** Welcome to CSMOO! ***</div>\");",
+    "banner.Append(\"<div style=\\\"font-size:1.1rem;line-height:1.8;color:#cccccc;margin-bottom:20px;\\\">\");",
+    "banner.Append(\"<p>*** Enter the world of collaborative object-oriented programming and exploration! ***</p>\");",
+    "banner.Append(\"<p>&gt; To connect: <span style=\\\"color:#00ff88;font-weight:bold;background:#003322;padding:2px 8px;border-radius:4px;border:1px solid #00ff88;\\\">login &lt;username&gt; &lt;password&gt;</span></p>\");",
+    "banner.Append(\"<p>&gt; New player: <span style=\\\"color:#00ff88;font-weight:bold;background:#003322;padding:2px 8px;border-radius:4px;border:1px solid #00ff88;\\\">create player &lt;username&gt; &lt;password&gt;</span></p>\");",
+    "banner.Append(\"</div>\");",
+    "banner.Append(\"<div style=\\\"margin-top:40px;font-size:0.9rem;color:#888888;font-style:italic;\\\">\");",
+    "banner.Append(\"&gt;&gt; Powered by C# and imagination • Built with love for MUD enthusiasts &lt;&lt;\");",
+    "banner.Append(\"</div>\");",
+    "banner.Append(\"</div>\");",
+    "banner.Append(\"</div>\");",
+    "",
+    "return banner.ToString();"
+  ]
+}

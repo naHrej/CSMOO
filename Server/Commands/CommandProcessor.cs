@@ -84,15 +84,17 @@ public class CommandProcessor
 
         switch (command)
         {
+            case "con":
+            case "connect":
             case "login":
                 HandleLogin(parts);
                 break;
             case "create":
                 HandleCreatePlayer(parts);
                 break;
-            case "help":
-                SendPreLoginHelp();
-                break;
+            // case "help":
+            //     SendPreLoginHelp();
+            //     break;
             case "quit":
             case "exit":
                 SendToPlayer("Goodbye!");
@@ -209,9 +211,9 @@ public class CommandProcessor
             case "script":
                 HandleScript(input);
                 break;
-            case "help":
-                SendGameHelp();
-                break;
+            // case "help":
+            //     SendGameHelp();
+            //     break;
             case "quit":
             case "exit":
                 HandleQuit();
@@ -257,44 +259,54 @@ public class CommandProcessor
         _client.Close();
     }
 
-    private void SendPreLoginHelp()
+    /// <summary>
+    /// Displays the login banner by evaluating the system:display_login verb
+    /// </summary>
+    public void DisplayLoginBanner()
     {
-        SendToPlayer("=== CSMOO Login Help ===");
-        SendToPlayer("Commands:");
-        SendToPlayer("  login <username> <password>  - Login to an existing character");
-        SendToPlayer("  create player <username> <password>  - Create a new character");
-        SendToPlayer("  help  - Show this help");
-        SendToPlayer("  quit  - Exit the game");
-    }
+        try
+        {
+            // Find the system object first
+            var allObjects = GameDatabase.Instance.GameObjects.FindAll().ToList();
+            var systemObj = allObjects.FirstOrDefault(obj => 
+                obj.Properties.ContainsKey("isSystemObject") && obj.Properties["isSystemObject"].AsBoolean == true);
+            
+            if (systemObj != null)
+            {
+                // Try to find and execute the system:display_login verb
+                var verb = VerbManager.FindVerb(systemObj.Id, "display_login");
+                if (verb != null)
+                {
+                    var scriptEngine = new ScriptEngine();
+                    var result = scriptEngine.ExecuteScript(verb.Code, null, this);
+                    if (!string.IsNullOrEmpty(result))
+                    {
+                        SendToPlayer(result);
+                        return;
+                    }
+                }
+                else
+                {
+                    Logger.Warning("display_login verb not found on system object");
+                }
+            }
+            else
+            {
+                Logger.Warning("System object not found for login banner");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.Error($"Error displaying login banner from verb: {ex.Message}");
+        }
 
-    private void SendGameHelp()
-    {
-        SendToPlayer("=== CSMOO Game Commands ===");
-        SendToPlayer("Movement:");
-        SendToPlayer("  look, l  - Look around");
-        SendToPlayer("  go <direction>, <direction>  - Move in a direction (north, south, east, west)");
-        SendToPlayer("Items:");
-        SendToPlayer("  inventory, i  - Show your inventory");
-        SendToPlayer("  get <item>  - Pick up an item");
-        SendToPlayer("  drop <item>  - Drop an item");
-        SendToPlayer("Communication:");
-        SendToPlayer("  say <message>  - Say something to others in the room");
-        SendToPlayer("  who  - List online players");
-        SendToPlayer("Scripting:");
-        SendToPlayer("  script { C# code }  - Execute C# script");
-        SendToPlayer("Programming (LambdaMOO style):");
-        SendToPlayer("  @program <object>:<verb>  - Create/edit a verb with multi-line code");
-        SendToPlayer("  @verb <object> <name> [aliases] [pattern]  - Create a new verb");
-        SendToPlayer("  list <object>:<verb> (or @list)  - Show code for a verb");
-        SendToPlayer("  @examine <object>  - Show detailed object information");
-        SendToPlayer("  @verbs [object]  - List verbs on an object");
-        SendToPlayer("  @rmverb <object>:<verb>  - Remove a verb");
-        SendToPlayer("Objects: 'me' = you, 'here' = current room, 'system' = global");
-        SendToPlayer("         '#123' = object by DBREF number, 'name' = search by name");
-        SendToPlayer("         'class:ClassName' or 'ClassName.class' = reference a class definition");
-        SendToPlayer("Other:");
-        SendToPlayer("  help  - Show this help");
-        SendToPlayer("  quit  - Exit the game");
+        // Fallback to static banner if verb fails or doesn't exist
+        SendToPlayer("=== Welcome to CSMOO ===");
+        SendToPlayer("A Multi-User Shared Object-Oriented Environment");
+        SendToPlayer("");
+        SendToPlayer("Please login or create a new character.");
+        SendToPlayer("Type 'help' for assistance.");
+        SendToPlayer("");
     }
 
     public void SendToPlayer(string message, Guid? sessionGuid = null)

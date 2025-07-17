@@ -45,13 +45,8 @@ namespace CSMOO.Server
             
             var commandProcessor = new CommandProcessor(clientGuid, client);
             
-            // Send welcome message
-            commandProcessor.SendToPlayer("=== Welcome to CSMOO ===");
-            commandProcessor.SendToPlayer("A Multi-User Shared Object-Oriented Environment");
-            commandProcessor.SendToPlayer("");
-            commandProcessor.SendToPlayer("Please login or create a new character.");
-            commandProcessor.SendToPlayer("Type 'help' for assistance.");
-            commandProcessor.SendToPlayer("");
+            // Send dynamic login banner
+            commandProcessor.DisplayLoginBanner();
 
             try
             {
