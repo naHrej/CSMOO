@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang='en'>
+<head>
+    <meta charset='UTF-8'>
+    <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+    <title>CSMOO - Multi-User Object Oriented Server</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: 'Courier New', monospace;
+            background: linear-gradient(135deg, #1a1a2e, #16213e, #0f3460);
+            color: #00ff88;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        .container {
+            max-width: 800px;
+            text-align: center;
+            padding: 40px;
+            border: 2px solid #00ff88;
+            border-radius: 15px;
+            background: rgba(0, 0, 0, 0.7);
+            box-shadow: 0 0 30px rgba(0, 255, 136, 0.3);
+            backdrop-filter: blur(10px);
+        }
+        .logo {
+            font-size: 3.5rem;
+            font-weight: bold;
+            letter-spacing: 8px;
+            margin-bottom: 20px;
+            text-shadow: 0 0 20px #00ff88;
+            animation: glow 2s ease-in-out infinite alternate;
+        }
+        .subtitle {
+            font-size: 1.2rem;
+            color: #88ddff;
+            margin-bottom: 30px;
+            letter-spacing: 2px;
+        }
+        .version {
+            font-size: 1rem;
+            color: #ffaa00;
+            margin-bottom: 40px;
+            padding: 10px 20px;
+            border: 1px solid #ffaa00;
+            border-radius: 25px;
+            display: inline-block;
+        }
+        .welcome {
+            font-size: 1.3rem;
+            margin-bottom: 30px;
+            color: #ffffff;
+        }
+        .instructions {
+            font-size: 1.1rem;
+            line-height: 1.8;
+            color: #cccccc;
+            margin-bottom: 20px;
+        }
+        .command {
+            color: #00ff88;
+            font-weight: bold;
+            background: rgba(0, 255, 136, 0.1);
+            padding: 2px 8px;
+            border-radius: 4px;
+            border: 1px solid rgba(0, 255, 136, 0.3);
+        }
+        .footer {
+            margin-top: 40px;
+            font-size: 0.9rem;
+            color: #888888;
+            font-style: italic;
+        }
+        @keyframes glow {
+            from { text-shadow: 0 0 20px #00ff88, 0 0 30px #00ff88, 0 0 40px #00ff88; }
+            to { text-shadow: 0 0 30px #00ff88, 0 0 40px #00ff88, 0 0 50px #00ff88; }
+        }
+        .pulse {
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+    </style>
+</head>
+<body>
+    <div class='container'>
+        <div class='logo'>CSMOO</div>
+        <div class='subtitle'>Multi-User Object Oriented Server</div>
+        <div class='version'>Version 1.0.0 (Dynamic!)</div>
+        
+        <div class='welcome pulse'>Welcome to CSMOO!</div>
+        
+        <div class='instructions'>
+            <p>Enter the world of collaborative object-oriented programming and exploration!</p>
+            <p>To connect: <span class='command'>login &lt;username&gt; &lt;password&gt;</span></p>
+            <p>New player: <span class='command'>create player &lt;username&gt; &lt;password&gt;</span></p>
+        </div>
+        
+        <div class='footer'>
+            Powered by C# and imagination • Built with ❤️ for MUD enthusiasts
+        </div>
+    </div>
+</body>
+</html>

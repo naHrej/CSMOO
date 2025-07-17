@@ -142,7 +142,7 @@ public static class Builtins
     /// <summary>
     /// Find a player by partial name match
     /// </summary>
-    public static Player FindPlayerByPartialName(string partialName)
+    public static Player? FindPlayerByPartialName(string partialName)
     {
         return GameDatabase.Instance.Players.FindOne(p => 
             p.Name.StartsWith(partialName, StringComparison.OrdinalIgnoreCase));
@@ -151,7 +151,7 @@ public static class Builtins
     /// <summary>
     /// Find a player by ID
     /// </summary>
-    public static Player FindPlayerById(string playerId)
+    public static Player? FindPlayerById(string playerId)
     {
         return GameDatabase.Instance.Players.FindById(playerId);
     }
@@ -223,7 +223,7 @@ public static class Builtins
     /// <summary>
     /// Smart object resolution - finds players first, then objects by name
     /// </summary>
-    public static string ResolveObject(string objectName, Player currentPlayer)
+    public static string? ResolveObject(string objectName, Player currentPlayer)
     {
         if (string.IsNullOrEmpty(objectName)) return null;
         
@@ -273,7 +273,7 @@ public static class Builtins
     /// <summary>
     /// Find an object by name in the current room
     /// </summary>
-    public static GameObject FindObjectInRoom(string objectName, Player currentPlayer)
+    public static GameObject? FindObjectInRoom(string objectName, Player currentPlayer)
     {
         if (currentPlayer.Location == null) return null;
         
@@ -288,7 +288,7 @@ public static class Builtins
     /// <summary>
     /// Find an object by name in player's inventory
     /// </summary>
-    public static GameObject FindObjectInInventory(string objectName, Player currentPlayer)
+    public static GameObject? FindObjectInInventory(string objectName, Player currentPlayer)
     {
         var inventory = GetObjectsInLocation(currentPlayer.Id);
         return inventory.FirstOrDefault(obj =>
@@ -317,7 +317,7 @@ public static class Builtins
     /// <summary>
     /// Check if an object represents a player and return the player
     /// </summary>
-    public static Player GetPlayerFromObject(string objectId)
+    public static Player? GetPlayerFromObject(string objectId)
     {
         var playerIdProperty = GetProperty(objectId, "playerId");
         if (!string.IsNullOrEmpty(playerIdProperty))
@@ -355,7 +355,7 @@ public static class Builtins
     /// <summary>
     /// Send a message to all players in a room
     /// </summary>
-    public static void NotifyRoom(string roomId, string message, Player excludePlayer = null)
+    public static void NotifyRoom(string roomId, string message, Player? excludePlayer = null)
     {
         var playersInRoom = GetObjectsInLocation(roomId);
         foreach (var obj in playersInRoom)
@@ -408,7 +408,7 @@ public static class Builtins
     /// <summary>
     /// Get the class of an object
     /// </summary>
-    public static ObjectClass GetObjectClass(string objectId)
+    public static ObjectClass? GetObjectClass(string objectId)
     {
         var obj = FindObject(objectId);
         if (obj != null && !string.IsNullOrEmpty(obj.ClassId))
@@ -421,7 +421,7 @@ public static class Builtins
     /// <summary>
     /// Get current player from script context
     /// </summary>
-    public static Player GetCurrentPlayer()
+    public static Player? GetCurrentPlayer()
     {
         return CurrentContext?.Player;
     }
@@ -658,7 +658,10 @@ public static class Builtins
     /// </summary>
     public static VerbInfo? GetVerbInfo(string objectSpec, string verbName)
     {
-        var objectId = ResolveObject(objectSpec, GetCurrentPlayer());
+        var currentPlayer = GetCurrentPlayer();
+        if (currentPlayer == null) return null;
+        
+        var objectId = ResolveObject(objectSpec, currentPlayer);
         if (objectId == null)
         {
             return null;

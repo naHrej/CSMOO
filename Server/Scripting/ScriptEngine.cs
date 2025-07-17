@@ -30,6 +30,7 @@ public class ScriptEngine
                 typeof(Enumerable).Assembly,                // System.Linq
                 typeof(GameObject).Assembly,                // Our game objects
                 typeof(ObjectManager).Assembly,             // Our managers
+                typeof(HtmlAgilityPack.HtmlDocument).Assembly, // HtmlAgilityPack
                 Assembly.GetExecutingAssembly()             // Current assembly
             )
             .WithImports(
@@ -39,7 +40,8 @@ public class ScriptEngine
                 "System.Text",
                 "CSMOO.Server.Database",
                 "CSMOO.Server.Commands",
-                "CSMOO.Server.Scripting"
+                "CSMOO.Server.Scripting",
+                "HtmlAgilityPack"
             );
     }
 

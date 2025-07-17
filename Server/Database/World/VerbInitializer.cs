@@ -8,6 +8,15 @@ using CSMOO.Server.Logging;
 namespace CSMOO.Server.Database.World;
 
 /// <summary>
+/// Statistics for verb loading operations
+/// </summary>
+public struct VerbLoadStats
+{
+    public int Loaded { get; set; }
+    public int Skipped { get; set; }
+}
+
+/// <summary>
 /// Handles loading and initializing verbs from JSON definitions
 /// </summary>
 public static class VerbInitializer
@@ -23,10 +32,13 @@ public static class VerbInitializer
     {
         Logger.Info("Loading verb definitions from JSON files...");
 
-        LoadClassVerbs();
-        LoadSystemVerbs();
+        var classStats = LoadClassVerbs();
+        var systemStats = LoadSystemVerbs();
 
-        Logger.Info("Verb definitions loaded successfully");
+        var totalLoaded = classStats.Loaded + systemStats.Loaded;
+        var totalSkipped = classStats.Skipped + systemStats.Skipped;
+
+        Logger.Info($"Verb definitions loaded successfully - Created: {totalLoaded}, Skipped: {totalSkipped}");
     }
 
     /// <summary>
@@ -42,21 +54,26 @@ public static class VerbInitializer
         Logger.Debug("Cleared existing verb definitions");
 
         // Reload all verbs from JSON files
-        LoadClassVerbs();
-        LoadSystemVerbs();
+        var classStats = LoadClassVerbs();
+        var systemStats = LoadSystemVerbs();
 
-        Logger.Info("Verb definitions reloaded successfully");
+        var totalLoaded = classStats.Loaded + systemStats.Loaded;
+        var totalSkipped = classStats.Skipped + systemStats.Skipped;
+
+        Logger.Info($"Verb definitions reloaded successfully - Created: {totalLoaded}, Skipped: {totalSkipped}");
     }
 
     /// <summary>
     /// Load class-based verb definitions
     /// </summary>
-    private static void LoadClassVerbs()
+    private static VerbLoadStats LoadClassVerbs()
     {
+        var stats = new VerbLoadStats();
+        
         if (!Directory.Exists(ClassVerbsPath))
         {
             Logger.Debug($"Class verbs directory not found: {ClassVerbsPath}");
-            return;
+            return stats;
         }
 
         var jsonFiles = Directory.GetFiles(ClassVerbsPath, "*.json");
@@ -75,31 +92,37 @@ public static class VerbInitializer
                     continue;
                 }
 
-                CreateClassVerb(verbDef);
+                var verbStats = CreateClassVerb(verbDef);
+                stats.Loaded += verbStats.Loaded;
+                stats.Skipped += verbStats.Skipped;
             }
             catch (Exception ex)
             {
                 Logger.Error($"Error loading verb definition from {file}: {ex.Message}");
             }
         }
+        
+        return stats;
     }
 
     /// <summary>
     /// Load system verb definitions
     /// </summary>
-    private static void LoadSystemVerbs()
+    private static VerbLoadStats LoadSystemVerbs()
     {
+        var stats = new VerbLoadStats();
+        
         if (!Directory.Exists(SystemVerbsPath))
         {
             Logger.Debug($"System verbs directory not found: {SystemVerbsPath}");
-            return;
+            return stats;
         }
 
         var systemObjectId = GetOrCreateSystemObject();
         if (systemObjectId == null)
         {
             Logger.Error("Failed to create system object for system verbs");
-            return;
+            return stats;
         }
 
         var jsonFiles = Directory.GetFiles(SystemVerbsPath, "*.json");
@@ -118,25 +141,31 @@ public static class VerbInitializer
                     continue;
                 }
 
-                CreateSystemVerb(systemObjectId, verbDef);
+                var verbStats = CreateSystemVerb(systemObjectId, verbDef);
+                stats.Loaded += verbStats.Loaded;
+                stats.Skipped += verbStats.Skipped;
             }
             catch (Exception ex)
             {
                 Logger.Error($"Error loading verb definition from {file}: {ex.Message}");
             }
         }
+        
+        return stats;
     }
 
     /// <summary>
     /// Create a verb on a class from a definition
     /// </summary>
-    private static void CreateClassVerb(VerbDefinition verbDef)
+    private static VerbLoadStats CreateClassVerb(VerbDefinition verbDef)
     {
+        var stats = new VerbLoadStats();
+        
         var targetClass = GameDatabase.Instance.ObjectClasses.FindOne(c => c.Name == verbDef.TargetClass);
         if (targetClass == null)
         {
             Logger.Warning($"Target class '{verbDef.TargetClass}' not found for verb '{verbDef.Name}'");
-            return;
+            return stats;
         }
 
         var existingVerbs = GameDatabase.Instance.GetCollection<Verb>("verbs");
@@ -167,18 +196,23 @@ public static class VerbInitializer
             }
 
             Logger.Debug($"Created class verb '{verbDef.Name}' on {verbDef.TargetClass}");
+            stats.Loaded = 1;
         }
         else
         {
             Logger.Debug($"Class verb '{verbDef.Name}' on {verbDef.TargetClass} already exists, skipping");
+            stats.Skipped = 1;
         }
+        
+        return stats;
     }
 
     /// <summary>
     /// Create a system verb from a definition
     /// </summary>
-    private static void CreateSystemVerb(string systemObjectId, VerbDefinition verbDef)
+    private static VerbLoadStats CreateSystemVerb(string systemObjectId, VerbDefinition verbDef)
     {
+        var stats = new VerbLoadStats();
         var existingVerbs = GameDatabase.Instance.GetCollection<Verb>("verbs");
         
         // Only create if it doesn't already exist
@@ -207,11 +241,15 @@ public static class VerbInitializer
             }
 
             Logger.Debug($"Created system verb '{verbDef.Name}'");
+            stats.Loaded = 1;
         }
         else
         {
             Logger.Debug($"System verb '{verbDef.Name}' already exists, skipping");
+            stats.Skipped = 1;
         }
+        
+        return stats;
     }
 
     /// <summary>
