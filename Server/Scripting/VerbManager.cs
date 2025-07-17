@@ -569,6 +569,7 @@ public class VerbScriptEngine
                 ObjectManager = new ScriptObjectManager(),
                 WorldManager = new ScriptWorldManager(),
                 PlayerManager = new ScriptPlayerManager(),
+                Helpers = new ScriptHelpers(player, commandProcessor), // Add the helpers!
                 
                 // Verb-specific variables
                 ThisObject = thisObjectId,

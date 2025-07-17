@@ -1,0 +1,26 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": ".NET Core Launch (console)",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build",
+      "program": "${workspaceFolder}/bin/Debug/net9.0/CSMOO.dll",
+      "args": [],
+      "cwd": "${workspaceFolder}",
+      "stopAtEntry": false,
+      "console": "internalConsole",
+      "justMyCode": false,
+      "symbolOptions": {
+        "searchMicrosoftSymbolServer": true
+      },
+      "logging": {
+        "moduleLoad": false
+      },
+      "env": {
+        "DOTNET_JIT_OPT": "0"
+      }
+    }
+  ]
+}

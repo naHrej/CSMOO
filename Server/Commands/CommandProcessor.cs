@@ -121,7 +121,7 @@ public class CommandProcessor
             _programmingCommands = new ProgrammingCommands(this, _player!);
             SendToPlayer($"Welcome back, {_player?.Name}!");
             SendToPlayer("");
-            ShowRoom();
+            SendToPlayer("Type 'look' to see your surroundings.");
         }
         else
         {
@@ -152,7 +152,7 @@ public class CommandProcessor
             
             SendToPlayer($"Welcome to CSMOO, {username}! Your character has been created.");
             SendToPlayer("");
-            ShowRoom();
+            SendToPlayer("Type 'look' to see your surroundings.");
         }
         catch (Exception ex)
         {
@@ -197,7 +197,7 @@ public class CommandProcessor
             return;
         }
 
-        // Fall back to built-in commands
+        // Fall back to essential built-in commands only
         var parts = input.Split(' ', StringSplitOptions.RemoveEmptyEntries);
         if (parts.Length == 0) return;
 
@@ -205,47 +205,6 @@ public class CommandProcessor
 
         switch (command)
         {
-            case "look":
-            case "l":
-                HandleLook(parts);
-                break;
-            case "go":
-            case "move":
-                HandleMove(parts);
-                break;
-            case "north":
-            case "n":
-                HandleMove(new[] { "go", "north" });
-                break;
-            case "south":
-            case "s":
-                HandleMove(new[] { "go", "south" });
-                break;
-            case "east":
-            case "e":
-                HandleMove(new[] { "go", "east" });
-                break;
-            case "west":
-            case "w":
-                HandleMove(new[] { "go", "west" });
-                break;
-            case "inventory":
-            case "i":
-                HandleInventory();
-                break;
-            case "get":
-            case "take":
-                HandleGet(parts);
-                break;
-            case "drop":
-                HandleDrop(parts);
-                break;
-            case "say":
-                HandleSay(input);
-                break;
-            case "who":
-                HandleWho();
-                break;
             case "script":
                 HandleScript(input);
                 break;
@@ -259,187 +218,6 @@ public class CommandProcessor
             default:
                 SendToPlayer($"Unknown command: {command}. Type 'help' for available commands.");
                 break;
-        }
-    }
-
-    private void HandleLook(string[] parts)
-    {
-        if (parts.Length == 1)
-        {
-            ShowRoom();
-        }
-        else
-        {
-            // Look at specific object
-            var target = string.Join(" ", parts.Skip(1));
-            LookAtObject(target);
-        }
-    }
-
-    private void HandleMove(string[] parts)
-    {
-        if (parts.Length != 2)
-        {
-            SendToPlayer("Usage: go <direction>");
-            return;
-        }
-
-        var direction = parts[1].ToLower();
-        if (_player?.Location == null)
-        {
-            SendToPlayer("You are not in any location.");
-            return;
-        }
-
-        var exits = WorldManager.GetExitsFromRoom(_player.Location);
-        var exit = exits.FirstOrDefault(e => 
-            ObjectManager.GetProperty(e, "direction")?.AsString?.ToLower() == direction);
-
-        if (exit == null)
-        {
-            SendToPlayer($"There is no exit {direction}.");
-            return;
-        }
-
-        var destination = ObjectManager.GetProperty(exit, "destination")?.AsString;
-        if (destination == null)
-        {
-            SendToPlayer("That exit doesn't lead anywhere.");
-            return;
-        }
-
-        // Move the player
-        ObjectManager.MoveObject(_player.Id, destination);
-        _player.Location = destination;
-        GameDatabase.Instance.Players.Update(_player);
-
-        SendToPlayer($"You go {direction}.");
-        ShowRoom();
-    }
-
-    private void HandleInventory()
-    {
-        if (_player == null) return;
-
-        var playerGameObject = GameDatabase.Instance.GameObjects.FindById(_player.Id);
-        if (playerGameObject?.Contents == null || !playerGameObject.Contents.Any())
-        {
-            SendToPlayer("You are carrying nothing.");
-            return;
-        }
-
-        SendToPlayer("You are carrying:");
-        foreach (var itemId in playerGameObject.Contents)
-        {
-            var item = GameDatabase.Instance.GameObjects.FindById(itemId);
-            if (item != null)
-            {
-                var name = ObjectManager.GetProperty(item, "shortDescription")?.AsString ?? "something";
-                SendToPlayer($"  {name}");
-            }
-        }
-    }
-
-    private void HandleGet(string[] parts)
-    {
-        if (parts.Length < 2)
-        {
-            SendToPlayer("Get what?");
-            return;
-        }
-
-        var itemName = string.Join(" ", parts.Skip(1)).ToLower();
-        if (_player?.Location == null) return;
-
-        var roomObjects = ObjectManager.GetObjectsInLocation(_player.Location);
-        var item = roomObjects.FirstOrDefault(obj =>
-        {
-            var name = ObjectManager.GetProperty(obj, "name")?.AsString?.ToLower();
-            var shortDesc = ObjectManager.GetProperty(obj, "shortDescription")?.AsString?.ToLower();
-            return name?.Contains(itemName) == true || shortDesc?.Contains(itemName) == true;
-        });
-
-        if (item == null)
-        {
-            SendToPlayer("There is no such item here.");
-            return;
-        }
-
-        var gettable = ObjectManager.GetProperty(item, "gettable")?.AsBoolean ?? false;
-        if (!gettable)
-        {
-            SendToPlayer("You can't take that.");
-            return;
-        }
-
-        // Move item to player's inventory
-        ObjectManager.MoveObject(item.Id, _player.Id);
-        var itemDesc = ObjectManager.GetProperty(item, "shortDescription")?.AsString ?? "something";
-        SendToPlayer($"You take {itemDesc}.");
-    }
-
-    private void HandleDrop(string[] parts)
-    {
-        if (parts.Length < 2)
-        {
-            SendToPlayer("Drop what?");
-            return;
-        }
-
-        var itemName = string.Join(" ", parts.Skip(1)).ToLower();
-        if (_player?.Location == null) return;
-
-        var playerGameObject = GameDatabase.Instance.GameObjects.FindById(_player.Id);
-        if (playerGameObject?.Contents == null) return;
-
-        var item = playerGameObject.Contents
-            .Select(id => GameDatabase.Instance.GameObjects.FindById(id))
-            .FirstOrDefault(obj =>
-            {
-                if (obj == null) return false;
-                var name = ObjectManager.GetProperty(obj, "name")?.AsString?.ToLower();
-                var shortDesc = ObjectManager.GetProperty(obj, "shortDescription")?.AsString?.ToLower();
-                return name?.Contains(itemName) == true || shortDesc?.Contains(itemName) == true;
-            });
-
-        if (item == null)
-        {
-            SendToPlayer("You don't have that item.");
-            return;
-        }
-
-        // Move item to current room
-        ObjectManager.MoveObject(item.Id, _player.Location);
-        var itemDesc = ObjectManager.GetProperty(item, "shortDescription")?.AsString ?? "something";
-        SendToPlayer($"You drop {itemDesc}.");
-    }
-
-    private void HandleSay(string input)
-    {
-        var message = input.Substring(4).Trim(); // Remove "say "
-        if (string.IsNullOrEmpty(message))
-        {
-            SendToPlayer("Say what?");
-            return;
-        }
-
-        SendToPlayer($"You say, \"{message}\"");
-        
-        // Send to other players in the room
-        var playersInRoom = GetPlayersInRoom(_player?.Location);
-        foreach (var otherPlayer in playersInRoom.Where(p => p.Id != _player?.Id))
-        {
-            SendToPlayer($"{_player?.Name} says, \"{message}\"", otherPlayer.SessionGuid);
-        }
-    }
-
-    private void HandleWho()
-    {
-        var onlinePlayers = PlayerManager.GetOnlinePlayers();
-        SendToPlayer("Online players:");
-        foreach (var player in onlinePlayers)
-        {
-            SendToPlayer($"  {player.Name}");
         }
     }
 
@@ -476,91 +254,6 @@ public class CommandProcessor
             PlayerManager.DisconnectPlayer(_player.Id);
         }
         _client.Close();
-    }
-
-    private void ShowRoom()
-    {
-        if (_player?.Location == null)
-        {
-            SendToPlayer("You are nowhere.");
-            return;
-        }
-
-        var room = GameDatabase.Instance.GameObjects.FindById(_player.Location);
-        if (room == null)
-        {
-            SendToPlayer("You are in a void.");
-            return;
-        }
-
-        var name = ObjectManager.GetProperty(room, "name")?.AsString ?? "Unknown Room";
-        var longDesc = ObjectManager.GetProperty(room, "longDescription")?.AsString ?? "You see nothing special.";
-
-        SendToPlayer($"=== {name} ===");
-        SendToPlayer(longDesc);
-
-        // Show exits
-        var exits = WorldManager.GetExitsFromRoom(_player.Location);
-        if (exits.Any())
-        {
-            var exitNames = exits.Select(e => ObjectManager.GetProperty(e, "direction")?.AsString).Where(d => d != null);
-            SendToPlayer($"Exits: {string.Join(", ", exitNames)}");
-        }
-
-        // Show objects
-        var objects = ObjectManager.GetObjectsInLocation(_player.Location)
-            .Where(obj => obj.ClassId != GameDatabase.Instance.ObjectClasses.FindOne(c => c.Name == "Exit")?.Id)
-            .Where(obj => obj.ClassId != GameDatabase.Instance.ObjectClasses.FindOne(c => c.Name == "Player")?.Id);
-
-        foreach (var obj in objects)
-        {
-            var visible = ObjectManager.GetProperty(obj, "visible")?.AsBoolean ?? true;
-            if (visible)
-            {
-                var shortDesc = ObjectManager.GetProperty(obj, "shortDescription")?.AsString ?? "something";
-                SendToPlayer($"You see {shortDesc} here.");
-            }
-        }
-
-        // Show other players
-        var otherPlayers = GetPlayersInRoom(_player.Location).Where(p => p.Id != _player.Id);
-        foreach (var otherPlayer in otherPlayers)
-        {
-            SendToPlayer($"{otherPlayer.Name} is here.");
-        }
-    }
-
-    private void LookAtObject(string target)
-    {
-        if (_player?.Location == null) return;
-
-        target = target.ToLower();
-        var objects = ObjectManager.GetObjectsInLocation(_player.Location);
-        
-        var targetObject = objects.FirstOrDefault(obj =>
-        {
-            var name = ObjectManager.GetProperty(obj, "name")?.AsString?.ToLower();
-            var shortDesc = ObjectManager.GetProperty(obj, "shortDescription")?.AsString?.ToLower();
-            return name?.Contains(target) == true || shortDesc?.Contains(target) == true;
-        });
-
-        if (targetObject == null)
-        {
-            SendToPlayer("You don't see that here.");
-            return;
-        }
-
-        var longDesc = ObjectManager.GetProperty(targetObject, "longDescription")?.AsString ?? "You see nothing special.";
-        SendToPlayer(longDesc);
-    }
-
-    private List<Player> GetPlayersInRoom(string? roomId)
-    {
-        if (roomId == null) return new List<Player>();
-        
-        return PlayerManager.GetOnlinePlayers()
-            .Where(p => p.Location == roomId)
-            .ToList();
     }
 
     private void SendPreLoginHelp()

@@ -55,7 +55,8 @@ public class ScriptEngine
                 CommandProcessor = commandProcessor,
                 ObjectManager = new ScriptObjectManager(),
                 WorldManager = new ScriptWorldManager(),
-                PlayerManager = new ScriptPlayerManager()
+                PlayerManager = new ScriptPlayerManager(),
+                Helpers = player != null ? new ScriptHelpers(player, commandProcessor) : null
             };
 
             // Remove curly braces if present (for "script { code }" syntax)
@@ -91,13 +92,61 @@ public class ScriptGlobals
     public ScriptObjectManager ObjectManager { get; set; } = new ScriptObjectManager();
     public ScriptWorldManager WorldManager { get; set; } = new ScriptWorldManager();
     public ScriptPlayerManager PlayerManager { get; set; } = new ScriptPlayerManager();
+    public ScriptHelpers? Helpers { get; set; }
 
     /// <summary>
     /// Send a message to the current player
     /// </summary>
     public void Say(string message)
     {
-        CommandProcessor?.SendToPlayer(message);
+        if (Helpers != null)
+        {
+            Helpers.Say(message);
+        }
+        else
+        {
+            CommandProcessor?.SendToPlayer(message);
+        }
+    }
+
+    /// <summary>
+    /// Send a message to all players in the current room
+    /// </summary>
+    public void SayToRoom(string message, bool excludeSelf = true)
+    {
+        Helpers?.SayToRoom(message, excludeSelf);
+    }
+
+    /// <summary>
+    /// Get online players
+    /// </summary>
+    public List<Player> GetOnlinePlayers()
+    {
+        return Helpers?.GetOnlinePlayers() ?? new List<Player>();
+    }
+
+    /// <summary>
+    /// Resolve an object name to an object ID
+    /// </summary>
+    public string? ResolveObject(string objectName)
+    {
+        return Helpers?.ResolveObject(objectName);
+    }
+
+    /// <summary>
+    /// Get an object by ID
+    /// </summary>
+    public GameObject? GetObject(string objectId)
+    {
+        return Helpers?.GetObject(objectId);
+    }
+
+    /// <summary>
+    /// Find an object by name
+    /// </summary>
+    public string? FindObjectByName(string name)
+    {
+        return Helpers?.FindObjectByName(name);
     }
 
     /// <summary>
@@ -116,11 +165,55 @@ public class ScriptGlobals
     /// </summary>
     public void SetProperty(string objectId, string propertyName, object value)
     {
-        var obj = GameDatabase.Instance.GameObjects.FindById(objectId);
-        if (obj != null)
-        {
-            Database.ObjectManager.SetProperty(obj, propertyName, new BsonValue(value));
-        }
+        Helpers?.SetProperty(objectId, propertyName, value);
+    }
+
+    /// <summary>
+    /// Move an object to a new location
+    /// </summary>
+    public bool MoveObject(string objectId, string destinationId)
+    {
+        return Helpers?.MoveObject(objectId, destinationId) ?? false;
+    }
+
+    /// <summary>
+    /// Show the current room
+    /// </summary>
+    public void ShowRoom()
+    {
+        Helpers?.ShowRoom();
+    }
+
+    /// <summary>
+    /// Look at an object
+    /// </summary>
+    public void LookAtObject(string target)
+    {
+        Helpers?.LookAtObject(target);
+    }
+
+    /// <summary>
+    /// Show player's inventory
+    /// </summary>
+    public void ShowInventory()
+    {
+        Helpers?.ShowInventory();
+    }
+
+    /// <summary>
+    /// Find an item in player's inventory
+    /// </summary>
+    public GameObject? FindItemInInventory(string itemName)
+    {
+        return Helpers?.FindItemInInventory(itemName);
+    }
+
+    /// <summary>
+    /// Find an item in the current room
+    /// </summary>
+    public GameObject? FindItemInRoom(string itemName)
+    {
+        return Helpers?.FindItemInRoom(itemName);
     }
 
     /// <summary>

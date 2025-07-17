@@ -19,6 +19,7 @@ public static class WorldManager
     {
         CreateCoreClasses();
         CreateDefaultVerbs();
+        CreateSystemCommands(); // Add system commands as verbs
         MigrateVerbSyntax();  // Fix any existing verbs with broken syntax
         CreateStartingRoom();
     }
@@ -397,6 +398,407 @@ var itemFullName = ObjectManager.GetProperty(foundItemId, ""name"")?.ToString() 
 ObjectManager.MoveObject(foundItemId, Player.Location);
 Say($""You drop the {itemFullName}."");", "system");
         }
+    }
+
+    /// <summary>
+    /// Creates system commands as verbs using the new ScriptHelpers
+    /// </summary>
+    private static void CreateSystemCommands()
+    {
+        // Get or create the system object
+        var systemObjectId = GetOrCreateSystemObject();
+        if (systemObjectId == null)
+        {
+            Logger.Error("Failed to create system object for system commands");
+            return;
+        }
+
+        var existingVerbs = GameDatabase.Instance.GetCollection<Verb>("verbs");
+
+        // Look command
+        if (!existingVerbs.Exists(v => v.ObjectId == systemObjectId && v.Name == "look"))
+        {
+            Scripting.VerbManager.CreateVerb(systemObjectId, "look", "*", @"
+// Look command - shows room or looks at specific object
+if (Args.Count == 0)
+{
+    // Just 'look' - show the room
+    Helpers.ShowRoom();
+}
+else if (Args.Count >= 2 && Args[0].ToLower() == ""at"")
+{
+    // 'look at something'
+    var target = string.Join("" "", Args.Skip(1));
+    Helpers.LookAtObject(target);
+}
+else
+{
+    // 'look something'
+    var target = string.Join("" "", Args);
+    Helpers.LookAtObject(target);
+}
+", "system");
+
+            // Add 'l' as an alias for look
+            var lookVerb = existingVerbs.FindOne(v => v.ObjectId == systemObjectId && v.Name == "look");
+            if (lookVerb != null)
+            {
+                lookVerb.Aliases = "l";
+                existingVerbs.Update(lookVerb);
+            }
+        }
+
+        // Go command
+        if (!existingVerbs.Exists(v => v.ObjectId == systemObjectId && v.Name == "go"))
+        {
+            Scripting.VerbManager.CreateVerb(systemObjectId, "go", "*", @"
+// Go command - move in a direction
+if (Args.Count != 1)
+{
+    Say(""Usage: go <direction>"");
+    return;
+}
+
+var direction = Args[0].ToLower();
+var currentLocation = Helpers.GetCurrentLocation();
+if (currentLocation == null)
+{
+    Say(""You are not in any location."");
+    return;
+}
+
+var exits = Helpers.GetExitsFromRoom(currentLocation);
+var exit = exits.FirstOrDefault(e => 
+    Helpers.GetProperty(e, ""direction"")?.AsString?.ToLower() == direction);
+
+if (exit == null)
+{
+    Say($""There is no exit {direction}."");
+    return;
+}
+
+var destination = Helpers.GetProperty(exit, ""destination"")?.AsString;
+if (destination == null)
+{
+    Say(""That exit doesn't lead anywhere."");
+    return;
+}
+
+// Move the player
+if (Helpers.MoveObject(Player.Id, destination))
+{
+    Player.Location = destination;
+    GameDatabase.Instance.Players.Update(Player);
+    Say($""You go {direction}."");
+    Helpers.ShowRoom();
+}
+else
+{
+    Say(""You can't go that way."");
+}
+", "system");
+        }
+
+        // Add direction shortcuts
+        var directions = new[] { "north", "south", "east", "west", "n", "s", "e", "w", "northeast", "northwest", "southeast", "southwest", "ne", "nw", "se", "sw", "up", "down", "u", "d" };
+        foreach (var dir in directions)
+        {
+            if (!existingVerbs.Exists(v => v.ObjectId == systemObjectId && v.Name == dir))
+            {
+                var fullDirection = dir switch
+                {
+                    "n" => "north",
+                    "s" => "south", 
+                    "e" => "east",
+                    "w" => "west",
+                    "ne" => "northeast",
+                    "nw" => "northwest", 
+                    "se" => "southeast",
+                    "sw" => "southwest",
+                    "u" => "up",
+                    "d" => "down",
+                    _ => dir
+                };
+
+                Scripting.VerbManager.CreateVerb(systemObjectId, dir, "", $@"
+// Direction shortcut for {fullDirection}
+var currentLocation = Helpers.GetCurrentLocation();
+if (currentLocation == null)
+{{
+    Say(""You are not in any location."");
+    return;
+}}
+
+var exits = Helpers.GetExitsFromRoom(currentLocation);
+var exit = exits.FirstOrDefault(e => 
+    Helpers.GetProperty(e, ""direction"")?.AsString?.ToLower() == ""{fullDirection}"");
+
+if (exit == null)
+{{
+    Say($""There is no exit {fullDirection}."");
+    return;
+}}
+
+var destination = Helpers.GetProperty(exit, ""destination"")?.AsString;
+if (destination == null)
+{{
+    Say(""That exit doesn't lead anywhere."");
+    return;
+}}
+
+// Move the player
+if (Helpers.MoveObject(Player.Id, destination))
+{{
+    Player.Location = destination;
+    GameDatabase.Instance.Players.Update(Player);
+    Say($""You go {fullDirection}."");
+    Helpers.ShowRoom();
+}}
+else
+{{
+    Say(""You can't go that way."");
+}}
+", "system");
+            }
+        }
+
+        // Inventory command
+        if (!existingVerbs.Exists(v => v.ObjectId == systemObjectId && v.Name == "inventory"))
+        {
+            Scripting.VerbManager.CreateVerb(systemObjectId, "inventory", "", @"
+// Inventory command - show what the player is carrying
+Helpers.ShowInventory();
+", "system");
+
+            // Add aliases for inventory
+            var invVerb = existingVerbs.FindOne(v => v.ObjectId == systemObjectId && v.Name == "inventory");
+            if (invVerb != null)
+            {
+                invVerb.Aliases = "i inv";
+                existingVerbs.Update(invVerb);
+            }
+        }
+
+        // Get command
+        if (!existingVerbs.Exists(v => v.ObjectId == systemObjectId && v.Name == "get"))
+        {
+            Scripting.VerbManager.CreateVerb(systemObjectId, "get", "*", @"
+// Get command - pick up an item
+if (Args.Count == 0)
+{
+    Say(""Get what?"");
+    return;
+}
+
+var itemName = string.Join("" "", Args);
+var item = Helpers.FindItemInRoom(itemName);
+
+if (item == null)
+{
+    Say(""There is no such item here."");
+    return;
+}
+
+var gettable = Helpers.GetProperty(item, ""gettable"")?.AsBoolean ?? false;
+if (!gettable)
+{
+    Say(""You can't take that."");
+    return;
+}
+
+// Move item to player's inventory
+if (Helpers.MoveObject(item.Id, Player.Id))
+{
+    var itemDesc = Helpers.GetProperty(item, ""shortDescription"")?.AsString ?? ""something"";
+    Say($""You take {itemDesc}."");
+}
+else
+{
+    Say(""You can't take that."");
+}
+", "system");
+
+            // Add aliases for get
+            var getVerb = existingVerbs.FindOne(v => v.ObjectId == systemObjectId && v.Name == "get");
+            if (getVerb != null)
+            {
+                getVerb.Aliases = "take grab";
+                existingVerbs.Update(getVerb);
+            }
+        }
+
+        // Drop command
+        if (!existingVerbs.Exists(v => v.ObjectId == systemObjectId && v.Name == "drop"))
+        {
+            Scripting.VerbManager.CreateVerb(systemObjectId, "drop", "*", @"
+// Drop command - drop an item from inventory
+if (Args.Count == 0)
+{
+    Say(""Drop what?"");
+    return;
+}
+
+var itemName = string.Join("" "", Args);
+var item = Helpers.FindItemInInventory(itemName);
+
+if (item == null)
+{
+    Say(""You don't have that item."");
+    return;
+}
+
+var currentLocation = Helpers.GetCurrentLocation();
+if (currentLocation == null)
+{
+    Say(""You are nowhere - you can't drop anything."");
+    return;
+}
+
+// Move item to current room
+if (Helpers.MoveObject(item.Id, currentLocation))
+{
+    var itemDesc = Helpers.GetProperty(item, ""shortDescription"")?.AsString ?? ""something"";
+    Say($""You drop {itemDesc}."");
+}
+else
+{
+    Say(""You can't drop that."");
+}
+", "system");
+        }
+
+        // Say command
+        if (!existingVerbs.Exists(v => v.ObjectId == systemObjectId && v.Name == "say"))
+        {
+            Scripting.VerbManager.CreateVerb(systemObjectId, "say", "*", @"
+// Say command - speak to others in the room
+if (Args.Count == 0)
+{
+    Say(""Say what?"");
+    return;
+}
+
+var message = string.Join("" "", Args);
+Say($""You say, \""{message}\"""");
+
+// Send to other players in the room
+Helpers.SayToRoom($""{Player.Name} says, \""{message}\"""", true);
+", "system");
+        }
+
+        // Who command
+        if (!existingVerbs.Exists(v => v.ObjectId == systemObjectId && v.Name == "who"))
+        {
+            Scripting.VerbManager.CreateVerb(systemObjectId, "who", "", @"
+// Who command - list online players
+var onlinePlayers = Helpers.GetOnlinePlayers();
+Say(""Online players:"");
+foreach (var player in onlinePlayers)
+{
+    Say($""  {player.Name}"");
+}
+", "system");
+        }
+
+        // Tell command (like 'tell player message')
+        if (!existingVerbs.Exists(v => v.ObjectId == systemObjectId && v.Name == "tell"))
+        {
+            Scripting.VerbManager.CreateVerb(systemObjectId, "tell", "* *", @"
+// Tell command - send private message to another player
+if (Args.Count < 2)
+{
+    Say(""Usage: tell <player> <message>"");
+    return;
+}
+
+var targetPlayerName = Args[0];
+var message = string.Join("" "", Args.Skip(1));
+
+var targetPlayer = Helpers.FindPlayerByName(targetPlayerName);
+if (targetPlayer == null)
+{
+    Say($""Player '{targetPlayerName}' is not online."");
+    return;
+}
+
+if (targetPlayer.Id == Player.Id)
+{
+    Say(""You can't tell yourself."");
+    return;
+}
+
+// Send the message
+Helpers.SendToPlayer($""{Player.Name} tells you, \""{message}\"""", targetPlayer);
+Say($""You tell {targetPlayer.Name}, \""{message}\"""");
+", "system");
+        }
+
+        // OOC command (Out of Character chat)
+        if (!existingVerbs.Exists(v => v.ObjectId == systemObjectId && v.Name == "ooc"))
+        {
+            Scripting.VerbManager.CreateVerb(systemObjectId, "ooc", "*", @"
+// OOC command - out of character chat to all online players
+if (Args.Count == 0)
+{
+    Say(""Say what OOC?"");
+    return;
+}
+
+var message = string.Join("" "", Args);
+var onlinePlayers = Helpers.GetOnlinePlayers();
+
+foreach (var player in onlinePlayers)
+{
+    if (player.Id == Player.Id)
+    {
+        Helpers.SendToPlayer($""[OOC] You say, \""{message}\"""", player);
+    }
+    else
+    {
+        Helpers.SendToPlayer($""[OOC] {Player.Name} says, \""{message}\"""", player);
+    }
+}
+", "system");
+        }
+
+        Logger.Info("System commands created as verbs");
+    }
+
+    /// <summary>
+    /// Gets or creates the system object for holding global verbs
+    /// </summary>
+    private static string? GetOrCreateSystemObject()
+    {
+        // Get all objects and filter in memory (LiteDB doesn't support ContainsKey in expressions)
+        var allObjects = GameDatabase.Instance.GameObjects.FindAll();
+        var systemObj = allObjects.FirstOrDefault(obj => 
+            obj.Properties.ContainsKey("isSystemObject") && obj.Properties["isSystemObject"].AsBoolean == true);
+        
+        if (systemObj == null)
+        {
+            // System object doesn't exist, create it
+            Logger.Debug("System object not found, creating it...");
+            // Use Container class instead of abstract Object class
+            var containerClass = GameDatabase.Instance.ObjectClasses.FindOne(c => c.Name == "Container");
+            if (containerClass != null)
+            {
+                systemObj = ObjectManager.CreateInstance(containerClass.Id);
+                ObjectManager.SetProperty(systemObj, "name", "System");
+                ObjectManager.SetProperty(systemObj, "shortDescription", "the system object");
+                ObjectManager.SetProperty(systemObj, "longDescription", "This is the system object that holds global verbs and functions.");
+                ObjectManager.SetProperty(systemObj, "isSystemObject", true);
+                ObjectManager.SetProperty(systemObj, "gettable", false); // Don't allow players to pick up the system
+                Logger.Debug($"Created system object with ID: {systemObj.Id}");
+            }
+            else
+            {
+                Logger.Error("Could not find Container class to create system object!");
+                return null;
+            }
+        }
+        
+        Logger.Debug($"System object ID: {systemObj?.Id}");
+        return systemObj?.Id;
     }
 
     /// <summary>
