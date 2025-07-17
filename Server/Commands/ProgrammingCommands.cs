@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using CSMOO.Server.Database;
+using CSMOO.Server.Database.Models;
 using CSMOO.Server.Scripting;
 using CSMOO.Server.Logging;
 
@@ -142,7 +143,9 @@ public class ProgrammingCommands
         _commandProcessor.SendToPlayer("  ThisObject - ID of the object this verb is on");
         _commandProcessor.SendToPlayer("  Input - the complete command input");
         _commandProcessor.SendToPlayer("  Args - list of arguments");
-        _commandProcessor.SendToPlayer("  Say(message) - send message to player");
+        _commandProcessor.SendToPlayer("  notify(player, message) - send message to specific player");
+        _commandProcessor.SendToPlayer("  notify(me, message) - send message to current player");
+        _commandProcessor.SendToPlayer("  GetPlayer(name) - get player object by name for notify()");
         _commandProcessor.SendToPlayer("  SayToRoom(message) - send message to all in room");
 
         return true;
@@ -330,7 +333,7 @@ public class ProgrammingCommands
             return true;
         }
 
-        var allVerbs = VerbManager.GetAllVerbsOnObject(objectId);
+        var allVerbs = VerbResolver.GetAllVerbsOnObject(objectId);
         
         _commandProcessor.SendToPlayer($"=== Verbs on {GetObjectName(objectId)} ===");
         if (!allVerbs.Any())

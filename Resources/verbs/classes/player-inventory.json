@@ -1,0 +1,25 @@
+{
+  "targetClass": "Player",
+  "name": "inventory", 
+  "aliases": "i inv",
+  "pattern": "",
+  "description": "Show what you are carrying",
+  "code": [
+    "// Show player's inventory",
+    "var items = ObjectManager.GetObjectsInLocation(player.Id);",
+    "if (items.Count == 0)",
+    "{",
+    "    notify(player, \"You are not carrying anything.\");",
+    "}",
+    "else",
+    "{",
+    "    notify(player, \"You are carrying:\");",
+    "    foreach (var itemId in items)",
+    "    {",
+    "        var itemObj = ObjectManager.GetObject(itemId);",
+    "        var name = ObjectManager.GetProperty(itemObj, \"name\")?.AsString ?? \"something\";",
+    "        notify(player, $\"  {name}\");",
+    "    }",
+    "}"
+  ]
+}

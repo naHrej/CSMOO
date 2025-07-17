@@ -1,0 +1,26 @@
+{
+  "name": "look",
+  "aliases": "l",
+  "pattern": "*",
+  "description": "Look around the room or at a specific object",
+  "code": [
+    "// Look command - shows room or looks at specific object",
+    "if (Args.Count == 0)",
+    "{",
+    "    // Just 'look' - show the room",
+    "    Helpers.ShowRoom();",
+    "}",
+    "else if (Args.Count >= 2 && Args[0].ToLower() == \"at\")",
+    "{",
+    "    // 'look at something'",
+    "    var target = string.Join(\" \", Args.Skip(1));",
+    "    Helpers.LookAtObject(target);",
+    "}",
+    "else",
+    "{",
+    "    // 'look something'",
+    "    var target = string.Join(\" \", Args);",
+    "    Helpers.LookAtObject(target);",
+    "}"
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "name": "ooc",
+  "aliases": "",
+  "pattern": "*",
+  "description": "Out of character chat to all online players",
+  "code": [
+    "// OOC command - out of character chat to all online players",
+    "if (Args.Count == 0)",
+    "{",
+    "    notify(player, \"Say what OOC?\");",
+    "    return;",
+    "}",
+    "",
+    "var message = string.Join(\" \", Args);",
+    "var onlinePlayers = Helpers.GetOnlinePlayers();",
+    "",
+    "foreach (var onlinePlayer in onlinePlayers)",
+    "{",
+    "    if (onlinePlayer == player)",
+    "    {",
+    "        Helpers.SendToPlayer($\"[OOC] You say, \\\"{message}\\\"\", onlinePlayer);",
+    "    }",
+    "    else",
+    "    {",
+    "        Helpers.SendToPlayer($\"[OOC] {player.Name} says, \\\"{message}\\\"\", onlinePlayer);",
+    "    }",
+    "}"
+  ]
+}

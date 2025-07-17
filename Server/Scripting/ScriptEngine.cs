@@ -120,6 +120,21 @@ public class ScriptGlobals
     }
 
     /// <summary>
+    /// Send a message to a specific player
+    /// </summary>
+    public void notify(Player targetPlayer, string message)
+    {
+        if (Helpers != null)
+        {
+            Helpers.notify(targetPlayer, message);
+        }
+        else
+        {
+            CommandProcessor?.SendToPlayer(message, targetPlayer.SessionGuid);
+        }
+    }
+
+    /// <summary>
     /// Send a message to all players in the current room
     /// </summary>
     public void SayToRoom(string message, bool excludeSelf = true)

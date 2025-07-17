@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Text.Json;
+using CSMOO.Server.Logging;
 
 namespace CSMOO.Server.Configuration;
 
@@ -61,8 +62,8 @@ public class Config
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error loading config file: {ex.Message}");
-            Console.WriteLine("Using default configuration.");
+            Logger.Error($"Error loading config file: {ex.Message}");
+            Logger.Info("Using default configuration.");
             return new Config();
         }
     }
@@ -85,7 +86,7 @@ public class Config
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error saving config file: {ex.Message}");
+            Logger.Error($"Error saving config file: {ex.Message}");
         }
     }
 }

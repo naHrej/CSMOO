@@ -1,0 +1,15 @@
+{
+  "name": "who",
+  "aliases": "",
+  "pattern": "",
+  "description": "List all online players",
+  "code": [
+    "// Who command - list online players",
+    "var onlinePlayers = Helpers.GetOnlinePlayers();",
+    "notify(player, \"Online players:\");",
+    "foreach (var onlinePlayer in onlinePlayers)",
+    "{",
+    "    notify(player, $\"  {onlinePlayer.Name}\");",
+    "}"
+  ]
+}

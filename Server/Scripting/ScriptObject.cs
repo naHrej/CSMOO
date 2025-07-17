@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Dynamic;
 using System.Linq;
 using CSMOO.Server.Database;
+using CSMOO.Server.Database.Models;
 using CSMOO.Server.Logging;
 using CSMOO.Server.Commands;
 using LiteDB;
@@ -284,9 +285,20 @@ public class EnhancedScriptGlobals : ScriptGlobals
     /// </summary>
     public void InitializeObjectFactory()
     {
-        if (Player != null && CommandProcessor != null && Helpers != null)
+        // Check for Helpers in both base and derived class
+        ScriptHelpers? helpers = null;
+        if (this is VerbScriptGlobals verbGlobals)
         {
-            _objectFactory = new ScriptObjectFactory(Player, CommandProcessor, Helpers);
+            helpers = verbGlobals.Helpers;
+        }
+        else
+        {
+            helpers = Helpers;
+        }
+        
+        if (Player != null && CommandProcessor != null && helpers != null)
+        {
+            _objectFactory = new ScriptObjectFactory(Player, CommandProcessor, helpers);
         }
     }
 

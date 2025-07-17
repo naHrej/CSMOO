@@ -1,0 +1,253 @@
+using System.Linq;
+using System.IO;
+using System.Text.Json;
+using LiteDB;
+using CSMOO.Server.Database.Models;
+using CSMOO.Server.Logging;
+
+namespace CSMOO.Server.Database.World;
+
+/// <summary>
+/// Handles loading and initializing verbs from JSON definitions
+/// </summary>
+public static class VerbInitializer
+{
+    private static readonly string VerbsPath = Path.Combine("resources", "verbs");
+    private static readonly string SystemVerbsPath = Path.Combine(VerbsPath, "system");
+    private static readonly string ClassVerbsPath = Path.Combine(VerbsPath, "classes");
+
+    /// <summary>
+    /// Loads and creates all verbs from JSON definitions
+    /// </summary>
+    public static void LoadAndCreateVerbs()
+    {
+        Logger.Info("Loading verb definitions from JSON files...");
+
+        LoadClassVerbs();
+        LoadSystemVerbs();
+
+        Logger.Info("Verb definitions loaded successfully");
+    }
+
+    /// <summary>
+    /// Hot reload all verb definitions (removes old, loads new)
+    /// </summary>
+    public static void ReloadVerbs()
+    {
+        Logger.Info("Hot reloading verb definitions...");
+
+        // Clear existing verb definitions from database
+        var verbs = GameDatabase.Instance.GetCollection<Verb>("verbs");
+        verbs.DeleteAll();
+        Logger.Debug("Cleared existing verb definitions");
+
+        // Reload all verbs from JSON files
+        LoadClassVerbs();
+        LoadSystemVerbs();
+
+        Logger.Info("Verb definitions reloaded successfully");
+    }
+
+    /// <summary>
+    /// Load class-based verb definitions
+    /// </summary>
+    private static void LoadClassVerbs()
+    {
+        if (!Directory.Exists(ClassVerbsPath))
+        {
+            Logger.Debug($"Class verbs directory not found: {ClassVerbsPath}");
+            return;
+        }
+
+        var jsonFiles = Directory.GetFiles(ClassVerbsPath, "*.json");
+        Logger.Debug($"Found {jsonFiles.Length} class verb definition files");
+
+        foreach (var file in jsonFiles)
+        {
+            try
+            {
+                var json = File.ReadAllText(file);
+                var verbDef = System.Text.Json.JsonSerializer.Deserialize<VerbDefinition>(json);
+                
+                if (verbDef == null || string.IsNullOrEmpty(verbDef.Name) || string.IsNullOrEmpty(verbDef.TargetClass))
+                {
+                    Logger.Warning($"Invalid verb definition in {file}");
+                    continue;
+                }
+
+                CreateClassVerb(verbDef);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error($"Error loading verb definition from {file}: {ex.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Load system verb definitions
+    /// </summary>
+    private static void LoadSystemVerbs()
+    {
+        if (!Directory.Exists(SystemVerbsPath))
+        {
+            Logger.Debug($"System verbs directory not found: {SystemVerbsPath}");
+            return;
+        }
+
+        var systemObjectId = GetOrCreateSystemObject();
+        if (systemObjectId == null)
+        {
+            Logger.Error("Failed to create system object for system verbs");
+            return;
+        }
+
+        var jsonFiles = Directory.GetFiles(SystemVerbsPath, "*.json");
+        Logger.Debug($"Found {jsonFiles.Length} system verb definition files");
+
+        foreach (var file in jsonFiles)
+        {
+            try
+            {
+                var json = File.ReadAllText(file);
+                var verbDef = System.Text.Json.JsonSerializer.Deserialize<VerbDefinition>(json);
+                
+                if (verbDef == null || string.IsNullOrEmpty(verbDef.Name))
+                {
+                    Logger.Warning($"Invalid verb definition in {file}");
+                    continue;
+                }
+
+                CreateSystemVerb(systemObjectId, verbDef);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error($"Error loading verb definition from {file}: {ex.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Create a verb on a class from a definition
+    /// </summary>
+    private static void CreateClassVerb(VerbDefinition verbDef)
+    {
+        var targetClass = GameDatabase.Instance.ObjectClasses.FindOne(c => c.Name == verbDef.TargetClass);
+        if (targetClass == null)
+        {
+            Logger.Warning($"Target class '{verbDef.TargetClass}' not found for verb '{verbDef.Name}'");
+            return;
+        }
+
+        var existingVerbs = GameDatabase.Instance.GetCollection<Verb>("verbs");
+        
+        // Only create if it doesn't already exist
+        if (!existingVerbs.Exists(v => v.ObjectId == targetClass.Id && v.Name == verbDef.Name))
+        {
+            var verb = Scripting.VerbManager.CreateVerb(
+                targetClass.Id, 
+                verbDef.Name, 
+                verbDef.Pattern, 
+                verbDef.GetCodeString(), 
+                "system"
+            );
+
+            // Set aliases if provided
+            if (!string.IsNullOrEmpty(verbDef.Aliases))
+            {
+                verb.Aliases = verbDef.Aliases;
+                existingVerbs.Update(verb);
+            }
+
+            // Set description if provided
+            if (!string.IsNullOrEmpty(verbDef.Description))
+            {
+                verb.Description = verbDef.Description;
+                existingVerbs.Update(verb);
+            }
+
+            Logger.Debug($"Created class verb '{verbDef.Name}' on {verbDef.TargetClass}");
+        }
+        else
+        {
+            Logger.Debug($"Class verb '{verbDef.Name}' on {verbDef.TargetClass} already exists, skipping");
+        }
+    }
+
+    /// <summary>
+    /// Create a system verb from a definition
+    /// </summary>
+    private static void CreateSystemVerb(string systemObjectId, VerbDefinition verbDef)
+    {
+        var existingVerbs = GameDatabase.Instance.GetCollection<Verb>("verbs");
+        
+        // Only create if it doesn't already exist
+        if (!existingVerbs.Exists(v => v.ObjectId == systemObjectId && v.Name == verbDef.Name))
+        {
+            var verb = Scripting.VerbManager.CreateVerb(
+                systemObjectId, 
+                verbDef.Name, 
+                verbDef.Pattern, 
+                verbDef.GetCodeString(), 
+                "system"
+            );
+
+            // Set aliases if provided
+            if (!string.IsNullOrEmpty(verbDef.Aliases))
+            {
+                verb.Aliases = verbDef.Aliases;
+                existingVerbs.Update(verb);
+            }
+
+            // Set description if provided
+            if (!string.IsNullOrEmpty(verbDef.Description))
+            {
+                verb.Description = verbDef.Description;
+                existingVerbs.Update(verb);
+            }
+
+            Logger.Debug($"Created system verb '{verbDef.Name}'");
+        }
+        else
+        {
+            Logger.Debug($"System verb '{verbDef.Name}' already exists, skipping");
+        }
+    }
+
+    /// <summary>
+    /// Gets or creates the system object for holding global verbs
+    /// </summary>
+    private static string? GetOrCreateSystemObject()
+    {
+        // Get all objects and filter in memory (LiteDB doesn't support ContainsKey in expressions)
+        var allObjects = GameDatabase.Instance.GameObjects.FindAll().ToList();
+        var systemObj = allObjects.FirstOrDefault(obj => 
+            obj.Properties.ContainsKey("isSystemObject") && obj.Properties["isSystemObject"].AsBoolean == true);
+        
+        if (systemObj == null)
+        {
+            // System object doesn't exist, create it
+            Logger.Debug("System object not found, creating it...");
+            // Use Container class instead of abstract Object class
+            var containerClass = GameDatabase.Instance.ObjectClasses.FindOne(c => c.Name == "Container");
+            if (containerClass != null)
+            {
+                systemObj = ObjectManager.CreateInstance(containerClass.Id);
+                ObjectManager.SetProperty(systemObj, "name", "System");
+                ObjectManager.SetProperty(systemObj, "shortDescription", "the system object");
+                ObjectManager.SetProperty(systemObj, "longDescription", "This is the system object that holds global verbs and functions.");
+                ObjectManager.SetProperty(systemObj, "isSystemObject", true);
+                ObjectManager.SetProperty(systemObj, "gettable", false); // Don't allow players to pick up the system
+                Logger.Debug($"Created system object with ID: {systemObj.Id}");
+            }
+            else
+            {
+                Logger.Error("Could not find Container class to create system object!");
+                return null;
+            }
+        }
+        
+        Logger.Debug($"System object ID: {systemObj?.Id}");
+        return systemObj?.Id;
+    }
+}

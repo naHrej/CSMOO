@@ -1,268 +1,190 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using LiteDB;
+using CSMOO.Server.Database.Managers;
 using CSMOO.Server.Logging;
 
 namespace CSMOO.Server.Database;
 
 /// <summary>
-/// Manages the object-oriented inheritance system and object lifecycle
+/// Main facade for object management, delegating to specialized managers
 /// </summary>
 public static class ObjectManager
 {
+    #region Class Management (delegated to ClassManager)
+    
     /// <summary>
     /// Creates a new object class definition
     /// </summary>
     public static ObjectClass CreateClass(string name, string? parentClassId = null, string description = "")
-    {
-        var objectClass = new ObjectClass
-        {
-            Id = Guid.NewGuid().ToString(),
-            Name = name,
-            ParentClassId = parentClassId,
-            Description = description,
-            Properties = new BsonDocument(),
-            Methods = new BsonDocument()
-        };
-
-        GameDatabase.Instance.ObjectClasses.Insert(objectClass);
-        return objectClass;
-    }
-
-    /// <summary>
-    /// Creates an instance of a class with full inheritance chain
-    /// </summary>
-    public static GameObject CreateInstance(string classId, string? location = null)
-    {
-        var objectClass = GameDatabase.Instance.ObjectClasses.FindById(classId);
-        if (objectClass == null)
-            throw new ArgumentException($"Class with ID {classId} not found");
-
-        if (objectClass.IsAbstract)
-            throw new InvalidOperationException($"Cannot instantiate abstract class {objectClass.Name}");
-
-        // Get the full inheritance chain
-        var inheritanceChain = GetInheritanceChain(classId);
-        
-        // Merge properties from the inheritance chain (parent first, child last)
-        var mergedProperties = new BsonDocument();
-        foreach (var classInChain in inheritanceChain)
-        {
-            MergeProperties(mergedProperties, classInChain.Properties);
-        }
-
-        var gameObject = new GameObject
-        {
-            Id = Guid.NewGuid().ToString(),
-            DbRef = GetNextDbRef(),
-            ClassId = classId,
-            Properties = mergedProperties,
-            Location = location
-        };
-
-        GameDatabase.Instance.GameObjects.Insert(gameObject);
-        
-        // If placed in a location, update the container's contents
-        if (location != null)
-        {
-            AddToLocation(gameObject.Id, location);
-        }
-
-        return gameObject;
-    }
+        => ClassManager.CreateClass(name, parentClassId, description);
 
     /// <summary>
     /// Gets the full inheritance chain for a class (from root to target class)
     /// </summary>
     public static List<ObjectClass> GetInheritanceChain(string classId)
-    {
-        var chain = new List<ObjectClass>();
-        var currentClass = GameDatabase.Instance.ObjectClasses.FindById(classId);
-        
-        while (currentClass != null)
-        {
-            chain.Insert(0, currentClass); // Insert at beginning to maintain parent->child order
-            
-            if (currentClass.ParentClassId == null)
-                break;
-                
-            currentClass = GameDatabase.Instance.ObjectClasses.FindById(currentClass.ParentClassId);
-        }
+        => ClassManager.GetInheritanceChain(classId);
 
-        return chain;
-    }
+    /// <summary>
+    /// Checks if a class inherits from another class (directly or indirectly)
+    /// </summary>
+    public static bool InheritsFrom(string childClassId, string parentClassId)
+        => ClassManager.InheritsFrom(childClassId, parentClassId);
+
+    /// <summary>
+    /// Gets all classes that inherit from a given class
+    /// </summary>
+    public static List<ObjectClass> GetSubclasses(string parentClassId, bool recursive = true)
+        => ClassManager.GetSubclasses(parentClassId, recursive);
+
+    /// <summary>
+    /// Deletes a class and optionally its subclasses
+    /// </summary>
+    public static bool DeleteClass(string classId, bool deleteSubclasses = false)
+        => ClassManager.DeleteClass(classId, deleteSubclasses);
+
+    /// <summary>
+    /// Updates a class definition
+    /// </summary>
+    public static bool UpdateClass(ObjectClass objectClass)
+        => ClassManager.UpdateClass(objectClass);
+
+    /// <summary>
+    /// Finds classes by name (case-insensitive)
+    /// </summary>
+    public static List<ObjectClass> FindClassesByName(string name, bool exactMatch = false)
+        => ClassManager.FindClassesByName(name, exactMatch);
+
+    #endregion
+
+    #region Instance Management (delegated to InstanceManager)
+
+    /// <summary>
+    /// Creates an instance of a class with full inheritance chain
+    /// </summary>
+    public static GameObject CreateInstance(string classId, string? location = null)
+        => InstanceManager.CreateInstance(classId, location);
+
+    /// <summary>
+    /// Destroys an object instance
+    /// </summary>
+    public static bool DestroyInstance(string objectId)
+        => InstanceManager.DestroyInstance(objectId);
+
+    /// <summary>
+    /// Moves an object to a new location
+    /// </summary>
+    public static bool MoveObject(string objectId, string? newLocationId)
+        => InstanceManager.MoveObject(objectId, newLocationId);
+
+    /// <summary>
+    /// Moves an object to a new location (alternative signature)
+    /// </summary>
+    public static bool MoveObject(GameObject gameObject, string? newLocationId)
+        => InstanceManager.MoveObject(gameObject, newLocationId);
+
+    /// <summary>
+    /// Gets all objects in a specific location
+    /// </summary>
+    public static List<GameObject> GetObjectsInLocation(string? locationId)
+        => InstanceManager.GetObjectsInLocation(locationId);
+
+    /// <summary>
+    /// Gets all objects of a specific class type (including inheritance)
+    /// </summary>
+    public static List<GameObject> FindObjectsByClass(string classId, bool includeSubclasses = true)
+        => InstanceManager.FindObjectsByClass(classId, includeSubclasses);
+
+    /// <summary>
+    /// Migrates objects to have DbRefs if they don't already have them
+    /// </summary>
+    public static void MigrateDbRefs()
+        => InstanceManager.MigrateDbRefs();
+
+    /// <summary>
+    /// Finds an object by its DbRef number
+    /// </summary>
+    public static GameObject? FindByDbRef(int dbRef)
+        => InstanceManager.FindByDbRef(dbRef);
+
+    /// <summary>
+    /// Gets basic statistics about objects in the database
+    /// </summary>
+    public static Dictionary<string, int> GetObjectStatistics()
+        => InstanceManager.GetObjectStatistics();
+
+    /// <summary>
+    /// Gets an object by ID
+    /// </summary>
+    public static GameObject? GetObject(string objectId)
+        => GameDatabase.Instance.GameObjects.FindById(objectId);
+
+    #endregion
+
+    #region Property Management (delegated to PropertyManager)
 
     /// <summary>
     /// Gets a property value from an object, checking inheritance chain if not found on instance
     /// </summary>
     public static BsonValue? GetProperty(GameObject gameObject, string propertyName)
+        => PropertyManager.GetProperty(gameObject, propertyName);
+
+    /// <summary>
+    /// Gets a property value by object ID
+    /// </summary>
+    public static BsonValue? GetProperty(string objectId, string propertyName)
     {
-        // First check the instance properties
-        if (gameObject.Properties.ContainsKey(propertyName))
-            return gameObject.Properties[propertyName];
-
-        // Then check the class inheritance chain
-        var inheritanceChain = GetInheritanceChain(gameObject.ClassId);
-        foreach (var objectClass in inheritanceChain.AsEnumerable().Reverse()) // Child to parent order
-        {
-            if (objectClass.Properties.ContainsKey(propertyName))
-                return objectClass.Properties[propertyName];
-        }
-
-        return null;
+        var gameObject = GetObject(objectId);
+        return gameObject == null ? null : PropertyManager.GetProperty(gameObject, propertyName);
     }
 
     /// <summary>
-    /// Sets a property on an object instance
+    /// Sets a property value on an object instance
     /// </summary>
     public static void SetProperty(GameObject gameObject, string propertyName, BsonValue value)
-    {
-        gameObject.Properties[propertyName] = value;
-        gameObject.ModifiedAt = DateTime.UtcNow;
-        GameDatabase.Instance.GameObjects.Update(gameObject);
-    }
+        => PropertyManager.SetProperty(gameObject, propertyName, value);
 
     /// <summary>
-    /// Moves an object to a new location
+    /// Sets a property value by object ID
     /// </summary>
-    public static void MoveObject(string objectId, string? newLocation)
-    {
-        var gameObject = GameDatabase.Instance.GameObjects.FindById(objectId);
-        if (gameObject == null)
-            throw new ArgumentException($"Object with ID {objectId} not found");
-
-        // Remove from old location
-        if (gameObject.Location != null)
-        {
-            RemoveFromLocation(objectId, gameObject.Location);
-        }
-
-        // Add to new location
-        if (newLocation != null)
-        {
-            AddToLocation(objectId, newLocation);
-        }
-
-        // Update the object
-        gameObject.Location = newLocation;
-        gameObject.ModifiedAt = DateTime.UtcNow;
-        GameDatabase.Instance.GameObjects.Update(gameObject);
-    }
+    public static bool SetProperty(string objectId, string propertyName, BsonValue value)
+        => PropertyManager.SetProperty(objectId, propertyName, value);
 
     /// <summary>
-    /// Gets all objects in a location
+    /// Removes a property from an object instance
     /// </summary>
-    public static List<GameObject> GetObjectsInLocation(string locationId)
-    {
-        return GameDatabase.Instance.GameObjects
-            .Find(obj => obj.Location == locationId)
-            .ToList();
-    }
+    public static bool RemoveProperty(GameObject gameObject, string propertyName)
+        => PropertyManager.RemoveProperty(gameObject, propertyName);
 
     /// <summary>
-    /// Finds objects by class type (including inheritance)
+    /// Removes a property by object ID
     /// </summary>
-    public static List<GameObject> FindObjectsByClass(string classId, bool includeSubclasses = true)
-    {
-        if (!includeSubclasses)
-        {
-            return GameDatabase.Instance.GameObjects
-                .Find(obj => obj.ClassId == classId)
-                .ToList();
-        }
-
-        // Find all classes that inherit from the specified class
-        var allClasses = GameDatabase.Instance.ObjectClasses.FindAll().ToList();
-        var targetClassIds = new HashSet<string> { classId };
-
-        bool foundNewClasses;
-        do
-        {
-            foundNewClasses = false;
-            foreach (var objectClass in allClasses)
-            {
-                if (objectClass.ParentClassId != null && 
-                    targetClassIds.Contains(objectClass.ParentClassId) && 
-                    !targetClassIds.Contains(objectClass.Id))
-                {
-                    targetClassIds.Add(objectClass.Id);
-                    foundNewClasses = true;
-                }
-            }
-        } while (foundNewClasses);
-
-        return GameDatabase.Instance.GameObjects
-            .Find(obj => targetClassIds.Contains(obj.ClassId))
-            .ToList();
-    }
+    public static bool RemoveProperty(string objectId, string propertyName)
+        => PropertyManager.RemoveProperty(objectId, propertyName);
 
     /// <summary>
-    /// Gets the next available DBREF number
+    /// Checks if an object has a property (including inherited properties)
     /// </summary>
-    private static int GetNextDbRef()
-    {
-        var allObjects = GameDatabase.Instance.GameObjects.FindAll();
-        if (allObjects.Any())
-        {
-            return allObjects.Max(o => o.DbRef) + 1;
-        }
-        return 1; // Start at 1 like traditional MUDs
-    }
+    public static bool HasProperty(GameObject gameObject, string propertyName)
+        => PropertyManager.HasProperty(gameObject, propertyName);
 
     /// <summary>
-    /// Assigns DBREFs to objects that don't have them (for migration)
+    /// Gets all property names from an object (including inherited properties)
     /// </summary>
-    public static void MigrateDbRefs()
-    {
-        var allObjects = GameDatabase.Instance.GameObjects.FindAll();
-        var objectsNeedingDbRef = allObjects.Where(o => o.DbRef == 0).ToList();
-        
-        if (objectsNeedingDbRef.Any())
-        {
-            Logger.Info($"Migrating {objectsNeedingDbRef.Count} objects to have DBREFs...");
-            int nextDbRef = allObjects.Where(o => o.DbRef > 0).Any() ? allObjects.Max(o => o.DbRef) + 1 : 1;
-            
-            foreach (var obj in objectsNeedingDbRef)
-            {
-                obj.DbRef = nextDbRef++;
-                GameDatabase.Instance.GameObjects.Update(obj);
-            }
-            
-            Logger.Info($"Migration complete. Next DBREF will be #{nextDbRef}");
-        }
-    }
+    public static string[] GetAllPropertyNames(GameObject gameObject)
+        => PropertyManager.GetAllPropertyNames(gameObject);
 
-    private static void MergeProperties(BsonDocument target, BsonDocument source)
-    {
-        foreach (var kvp in source)
-        {
-            target[kvp.Key] = kvp.Value;
-        }
-    }
+    /// <summary>
+    /// Gets the effective value of a property (resolved through inheritance)
+    /// </summary>
+    public static T? GetPropertyValue<T>(GameObject gameObject, string propertyName, T? defaultValue = default)
+        => PropertyManager.GetPropertyValue(gameObject, propertyName, defaultValue);
 
-    private static void AddToLocation(string objectId, string locationId)
-    {
-        var location = GameDatabase.Instance.GameObjects.FindById(locationId);
-        if (location != null)
-        {
-            if (!location.Contents.Contains(objectId))
-            {
-                location.Contents.Add(objectId);
-                location.ModifiedAt = DateTime.UtcNow;
-                GameDatabase.Instance.GameObjects.Update(location);
-            }
-        }
-    }
+    /// <summary>
+    /// Sets a strongly-typed property value
+    /// </summary>
+    public static void SetPropertyValue<T>(GameObject gameObject, string propertyName, T value)
+        => PropertyManager.SetPropertyValue(gameObject, propertyName, value);
 
-    private static void RemoveFromLocation(string objectId, string locationId)
-    {
-        var location = GameDatabase.Instance.GameObjects.FindById(locationId);
-        if (location != null)
-        {
-            location.Contents.Remove(objectId);
-            location.ModifiedAt = DateTime.UtcNow;
-            GameDatabase.Instance.GameObjects.Update(location);
-        }
-    }
+    #endregion
 }

@@ -7,6 +7,7 @@ using System.Linq;
 using CSMOO.Server.Database;
 using CSMOO.Server.Session;
 using CSMOO.Server.Scripting;
+using CSMOO.Server.Logging;
 
 namespace CSMOO.Server.Commands;
 
@@ -58,14 +59,14 @@ public class CommandProcessor
         {
             SendToPlayer($"Null reference error: {ex.Message}");
             SendToPlayer($"Stack trace: {ex.StackTrace}");
-            Console.WriteLine($"Null reference error in command processing: {ex.Message}");
-            Console.WriteLine($"Stack trace: {ex.StackTrace}");
+            Logger.Error($"Null reference error in command processing: {ex.Message}");
+            Logger.Error($"Stack trace: {ex.StackTrace}");
         }
         catch (Exception ex)
         {
             SendToPlayer($"Error processing command: {ex.Message}");
-            Console.WriteLine($"Error in command processing: {ex.Message}");
-            Console.WriteLine($"Stack trace: {ex.StackTrace}");
+            Logger.Error($"Error in command processing: {ex.Message}");
+            Logger.Error($"Stack trace: {ex.StackTrace}");
         }
     }
 
@@ -192,7 +193,7 @@ public class CommandProcessor
         }
 
         // Try to execute as a verb first
-        if (VerbManager.TryExecuteVerb(input, _player, this))
+        if (VerbResolver.TryExecuteVerb(input, _player, this))
         {
             return;
         }

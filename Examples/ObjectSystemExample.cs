@@ -1,5 +1,6 @@
 using System;
 using CSMOO.Server.Database;
+using CSMOO.Server.Logging;
 
 namespace CSMOO.Examples;
 
@@ -10,7 +11,7 @@ public static class ObjectSystemExample
 {
     public static void RunExample()
     {
-        Console.WriteLine("=== Object-Oriented MUSH System Example ===\n");
+        Logger.Info("=== Object-Oriented MUSH System Example ===\n");
 
         // Create a weapon class that inherits from Item
         var itemClass = GameDatabase.Instance.ObjectClasses.FindOne(c => c.Name == "Item");
@@ -37,32 +38,32 @@ public static class ObjectSystemExample
         ObjectManager.SetProperty(sword, "damage", 25); // This specific sword does more damage
         ObjectManager.SetProperty(sword, "value", 1000);
 
-        Console.WriteLine("Created inheritance chain: Object -> Item -> Weapon -> Sword");
-        Console.WriteLine($"Sword instance: {ObjectManager.GetProperty(sword, "name")}");
+        Logger.Info("Created inheritance chain: Object -> Item -> Weapon -> Sword");
+        Logger.Info($"Sword instance: {ObjectManager.GetProperty(sword, "name")}");
         
         // Demonstrate inheritance - sword gets properties from all parent classes
-        Console.WriteLine("\nInherited Properties:");
-        Console.WriteLine($"- gettable (from Object): {ObjectManager.GetProperty(sword, "gettable")}");
-        Console.WriteLine($"- weight (from Item): {ObjectManager.GetProperty(sword, "weight")}");
-        Console.WriteLine($"- weaponType (from Weapon): {ObjectManager.GetProperty(sword, "weaponType")}");
-        Console.WriteLine($"- damage (overridden): {ObjectManager.GetProperty(sword, "damage")}");
-        Console.WriteLine($"- value (instance-specific): {ObjectManager.GetProperty(sword, "value")}");
+        Logger.Info("\nInherited Properties:");
+        Logger.Info($"- gettable (from Object): {ObjectManager.GetProperty(sword, "gettable")}");
+        Logger.Info($"- weight (from Item): {ObjectManager.GetProperty(sword, "weight")}");
+        Logger.Info($"- weaponType (from Weapon): {ObjectManager.GetProperty(sword, "weaponType")}");
+        Logger.Info($"- damage (overridden): {ObjectManager.GetProperty(sword, "damage")}");
+        Logger.Info($"- value (instance-specific): {ObjectManager.GetProperty(sword, "value")}");
 
         // Show how you can find all weapons (including swords)
         var allWeapons = ObjectManager.FindObjectsByClass(weaponClass.Id, includeSubclasses: true);
-        Console.WriteLine($"\nFound {allWeapons.Count} weapon(s) in the world (including subclasses)");
+        Logger.Info($"\nFound {allWeapons.Count} weapon(s) in the world (including subclasses)");
 
         // Create a room and place the sword there
         var startingRoom = WorldManager.GetStartingRoom();
         if (startingRoom != null)
         {
             ObjectManager.MoveObject(sword.Id, startingRoom.Id);
-            Console.WriteLine($"\nMoved {ObjectManager.GetProperty(sword, "name")} to {ObjectManager.GetProperty(startingRoom, "name")}");
+            Logger.Info($"\nMoved {ObjectManager.GetProperty(sword, "name")} to {ObjectManager.GetProperty(startingRoom, "name")}");
             
             var roomContents = ObjectManager.GetObjectsInLocation(startingRoom.Id);
-            Console.WriteLine($"Room now contains {roomContents.Count} objects");
+            Logger.Info($"Room now contains {roomContents.Count} objects");
         }
 
-        Console.WriteLine("\n=== Example Complete ===");
+        Logger.Info("\n=== Example Complete ===");
     }
 }

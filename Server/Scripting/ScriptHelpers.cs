@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using CSMOO.Server.Database;
+using CSMOO.Server.Database.Models;
 using CSMOO.Server.Commands;
 using CSMOO.Server.Session;
 using CSMOO.Server.Logging;
@@ -33,6 +34,30 @@ public class ScriptHelpers
     public void Say(string message)
     {
         _commandProcessor.SendToPlayer(message);
+    }
+
+    /// <summary>
+    /// Send a message to a specific player
+    /// </summary>
+    public void notify(Player targetPlayer, string message)
+    {
+        if (targetPlayer?.SessionGuid != null)
+        {
+            _commandProcessor.SendToPlayer(message, targetPlayer.SessionGuid);
+        }
+    }
+
+    /// <summary>
+    /// Send a message to a specific player by GameObject (for scripting)
+    /// </summary>
+    public void notify(GameObject playerObj, string message)
+    {
+        // Convert GameObject to Player
+        var player = GameDatabase.Instance.Players.FindById(playerObj.Id);
+        if (player?.SessionGuid != null)
+        {
+            _commandProcessor.SendToPlayer(message, player.SessionGuid);
+        }
     }
 
     /// <summary>
@@ -292,6 +317,50 @@ public class ScriptHelpers
 
     #endregion
 
+    #region Player Management
+
+    /// <summary>
+    /// Update a player's property in both the database and in-memory object
+    /// </summary>
+    public void UpdatePlayerProperty(Player player, string propertyName, object value)
+    {
+        // Update the database record
+        var playerRecord = GameDatabase.Instance.Players.FindById(player.Id);
+        if (playerRecord != null)
+        {
+            // Use reflection to set the property on the database record
+            var property = typeof(Player).GetProperty(propertyName);
+            if (property != null && property.CanWrite)
+            {
+                property.SetValue(playerRecord, value);
+                GameDatabase.Instance.Players.Update(playerRecord);
+                
+                // Also update the in-memory object
+                property.SetValue(player, value);
+                
+                Logger.Debug($"Updated player {player.Id} property '{propertyName}' to '{value}'");
+            }
+            else
+            {
+                Logger.Warning($"Property '{propertyName}' not found or not writable on Player class");
+            }
+        }
+        else
+        {
+            Logger.Error($"Player record not found in database for ID: {player.Id}");
+        }
+    }
+
+    /// <summary>
+    /// Update a player's location in both the database and in-memory object
+    /// </summary>
+    public void UpdatePlayerLocation(Player player, string newLocation)
+    {
+        UpdatePlayerProperty(player, "Location", newLocation);
+    }
+
+    #endregion
+
     #region Room and Movement
 
     /// <summary>
@@ -301,29 +370,29 @@ public class ScriptHelpers
     {
         if (_player?.Location == null)
         {
-            Say("You are nowhere.");
+            if (_player != null) notify(_player, "You are nowhere.");
             return;
         }
 
         var room = GameDatabase.Instance.GameObjects.FindById(_player.Location);
         if (room == null)
         {
-            Say("You are in a void.");
+            notify(_player, "You are in a void.");
             return;
         }
 
         var name = ObjectManager.GetProperty(room, "name")?.AsString ?? "Unknown Room";
         var longDesc = ObjectManager.GetProperty(room, "longDescription")?.AsString ?? "You see nothing special.";
 
-        Say($"=== {name} ===");
-        Say(longDesc);
+        notify(_player, $"=== {name} ===");
+        notify(_player, longDesc);
 
         // Show exits
         var exits = WorldManager.GetExitsFromRoom(_player.Location);
         if (exits.Any())
         {
             var exitNames = exits.Select(e => ObjectManager.GetProperty(e, "direction")?.AsString).Where(d => d != null);
-            Say($"Exits: {string.Join(", ", exitNames)}");
+            notify(_player, $"Exits: {string.Join(", ", exitNames)}");
         }
 
         // Show objects
@@ -337,7 +406,7 @@ public class ScriptHelpers
             if (visible)
             {
                 var shortDesc = ObjectManager.GetProperty(obj, "shortDescription")?.AsString ?? "something";
-                Say($"You see {shortDesc} here.");
+                notify(_player, $"You see {shortDesc} here.");
             }
         }
 
@@ -345,7 +414,7 @@ public class ScriptHelpers
         var otherPlayers = GetPlayersInRoom(_player.Location).Where(p => p.Id != _player.Id);
         foreach (var otherPlayer in otherPlayers)
         {
-            Say($"{otherPlayer.Name} is here.");
+            notify(_player, $"{otherPlayer.Name} is here.");
         }
     }
 
@@ -368,12 +437,12 @@ public class ScriptHelpers
 
         if (targetObject == null)
         {
-            Say("You don't see that here.");
+            notify(_player, "You don't see that here.");
             return;
         }
 
         var longDesc = ObjectManager.GetProperty(targetObject, "longDescription")?.AsString ?? "You see nothing special.";
-        Say(longDesc);
+        notify(_player, longDesc);
     }
 
     /// <summary>
@@ -405,6 +474,40 @@ public class ScriptHelpers
         catch (Exception ex)
         {
             Logger.Error($"Failed to move object {objectId} to {destinationId}: {ex.Message}");
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Move a player to a new location
+    /// </summary>
+    public bool MoveObject(Player playerObj, string destinationId)
+    {
+        try
+        {
+            ObjectManager.MoveObject(playerObj.Id, destinationId);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Logger.Error($"Failed to move player {playerObj.Id} to {destinationId}: {ex.Message}");
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Move a game object to a new location
+    /// </summary>
+    public bool MoveObject(GameObject gameObj, string destinationId)
+    {
+        try
+        {
+            ObjectManager.MoveObject(gameObj.Id, destinationId);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Logger.Error($"Failed to move object {gameObj.Id} to {destinationId}: {ex.Message}");
             return false;
         }
     }
@@ -478,18 +581,18 @@ public class ScriptHelpers
         var playerGameObject = GameDatabase.Instance.GameObjects.FindById(_player.Id);
         if (playerGameObject?.Contents == null || !playerGameObject.Contents.Any())
         {
-            Say("You are carrying nothing.");
+            notify(_player, "You are carrying nothing.");
             return;
         }
 
-        Say("You are carrying:");
+        notify(_player, "You are carrying:");
         foreach (var itemId in playerGameObject.Contents)
         {
             var item = GameDatabase.Instance.GameObjects.FindById(itemId);
             if (item != null)
             {
                 var name = ObjectManager.GetProperty(item, "shortDescription")?.AsString ?? "something";
-                Say($"  {name}");
+                notify(_player, $"  {name}");
             }
         }
     }

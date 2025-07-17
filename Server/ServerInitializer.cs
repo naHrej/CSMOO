@@ -1,5 +1,6 @@
 using System;
 using CSMOO.Server.Database;
+using CSMOO.Server.Database.World;
 using CSMOO.Server.Logging;
 
 namespace CSMOO.Server;
@@ -25,7 +26,7 @@ public static class ServerInitializer
             
             // Initialize the world structure
             Logger.Info("Initializing world...");
-            WorldManager.InitializeWorld();
+            WorldInitializer.InitializeWorld();
             
             // Migrate existing objects to have DBREFs
             ObjectManager.MigrateDbRefs();
@@ -34,7 +35,7 @@ public static class ServerInitializer
             CreateDefaultAdminIfNeeded();
             
             Logger.Info("Server initialization complete!");
-            PrintWorldStats();
+            WorldInitializer.PrintWorldStatistics();
         }
         catch (Exception ex)
         {
@@ -57,7 +58,7 @@ public static class ServerInitializer
 
         Logger.Info("No players found. Creating default admin player...");
         
-        var startingRoom = WorldManager.GetStartingRoom();
+        var startingRoom = RoomManager.GetStartingRoom();
         var admin = PlayerManager.CreatePlayer("admin", "password", startingRoom?.Id);
         admin.Permissions.Add("admin");
         admin.Permissions.Add("builder");
@@ -72,24 +73,6 @@ public static class ServerInitializer
             "The all-powerful administrator of this realm. They have the ability to create and modify the world itself.");
 
         Logger.Info("Default admin player created (username: admin, password: password)");
-    }
-
-    /// <summary>
-    /// Prints statistics about the current world state
-    /// </summary>
-    private static void PrintWorldStats()
-    {
-        var classCount = GameDatabase.Instance.ObjectClasses.Count();
-        var objectCount = GameDatabase.Instance.GameObjects.Count();
-        var playerCount = GameDatabase.Instance.Players.Count();
-        var roomCount = WorldManager.GetAllRooms().Count;
-
-        Logger.Game("\n=== World Statistics ===");
-        Logger.Game($"Object Classes: {classCount}");
-        Logger.Game($"Game Objects: {objectCount}");
-        Logger.Game($"Players: {playerCount}");
-        Logger.Game($"Rooms: {roomCount}");
-        Logger.Game("========================\n");
     }
 
     /// <summary>

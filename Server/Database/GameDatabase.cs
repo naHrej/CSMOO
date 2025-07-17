@@ -31,14 +31,13 @@ public class GameDatabase : IDisposable
         players.EnsureIndex(x => x.Name);
         players.EnsureIndex(x => x.SessionGuid);
         
-        var verbs = _database.GetCollection<Scripting.Verb>("verbs");
+        var verbs = _database.GetCollection<Database.Models.Verb>("verbs");
         verbs.EnsureIndex(x => x.Id);
         verbs.EnsureIndex(x => x.ObjectId);
         verbs.EnsureIndex(x => x.Name);
         
-        var functions = _database.GetCollection<Scripting.GameFunction>("functions");
+        var functions = _database.GetCollection<Database.Models.GameFunction>("functions");
         functions.EnsureIndex(x => x.Id);
-        functions.EnsureIndex(x => x.ObjectId);
         functions.EnsureIndex(x => x.Name);
     }
 

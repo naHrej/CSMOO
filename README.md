@@ -12,11 +12,20 @@ A modern, LambdaMOO-style multi-user virtual environment with full C# scripting 
 - **Object-oriented programming** in-game with classes, inheritance, and polymorphism
 
 ### **Advanced Verb System**
+- **JSON-based verb definitions** - Modern, flexible verb storage and hot-reloading
 - **In-game C# programming** - Write and execute C# code directly in the virtual world
 - **Verb inheritance** - Objects inherit verbs from their class hierarchy
 - **Method overriding** - Instance verbs can override class verbs
 - **Inter-verb communication** - Call verbs on other objects as functions
 - **Pattern matching** - Sophisticated command parsing and routing
+- **Hot reload support** - Update verb definitions without server restart (`@verbreload`)
+
+### **Natural Movement System**
+- **Unprefixed movement** - Type `north`, `south`, `n`, `s` directly without `go` prefix
+- **Dynamic exit discovery** - Automatically detects available exits from room data
+- **Abbreviation support** - Common direction shortcuts (`n` → `north`, `se` → `southeast`)
+- **Custom exit names** - Supports non-standard exit names and aliases
+- **Intelligent fallback** - Falls back to existing `go` verb for consistency
 
 ### **Object Addressing & Navigation**
 - **DBREF system** - Easy numeric object references (#1, #2, #3, etc.)
@@ -213,10 +222,14 @@ login admin password
 look
 exits
 
+# Try natural movement (new!)
+north     # or just 'n'
+south     # or just 's'
+
 # Create your first object
 @create MyFirstObject
 
-# Program it with C# code
+# Program it with C# code (or use JSON files)
 @program #3:greet
 Say($"Hello, {Player.GetProperty("name")}!");
 return "Welcome to CSMOO!";
@@ -224,6 +237,9 @@ return "Welcome to CSMOO!";
 
 # Test your creation
 greet
+
+# Hot reload verb definitions (new!)
+@verbreload
 ```
 
 ## 🎯 Use Cases
@@ -247,11 +263,13 @@ greet
 
 ## 📚 Documentation
 
-See the `Examples/` directory for:
-- Object system examples
-- Advanced verb programming patterns
-- Inheritance and polymorphism demos
-- Inter-object communication samples
+- **PROG_GUIDE.md** - Comprehensive verb programming guide
+- **Examples/** directory for:
+  - Object system examples  
+  - Advanced verb programming patterns
+  - Inheritance and polymorphism demos
+  - Inter-object communication samples
+  - JSON verb definition examples
 
 ## 🤝 Contributing
 
