@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.RegularExpressions;
 using HtmlAgilityPack;
 
 namespace CSMOO.Server.Scripting;
@@ -166,6 +167,121 @@ public static class Html
         public static string FlexDirection(string direction) => $"flex-direction: {direction}";
         public static string AlignItems(string align) => $"align-items: {align}";
         public static string JustifyContent(string justify) => $"justify-content: {justify}";
+
+        /// <summary>
+        /// Process LESS-like CSS with variables and basic nesting
+        /// </summary>
+        public static string ProcessLess(string lessCSS, Dictionary<string, string>? variables = null)
+        {
+            variables ??= new Dictionary<string, string>();
+            
+            // Replace variables (format: @variableName)
+            foreach (var kvp in variables)
+            {
+                lessCSS = lessCSS.Replace($"@{kvp.Key}", kvp.Value);
+            }
+            
+            // Process simple nesting (one level deep for MUD compatibility)
+            lessCSS = ProcessSimpleNesting(lessCSS);
+            
+            // Remove extra whitespace and normalize
+            lessCSS = Regex.Replace(lessCSS, @"\s+", " ").Trim();
+            
+            return lessCSS;
+        }
+
+        /// <summary>
+        /// Create a LESS-style CSS builder with variables support
+        /// </summary>
+        public static LessBuilder Less()
+        {
+            return new LessBuilder();
+        }
+
+        private static string ProcessSimpleNesting(string css)
+        {
+            // Simple nesting processor - handles basic cases like:
+            // .container { color: red; .nested { background: blue; } }
+            // Converts to: .container { color: red; } .container .nested { background: blue; }
+            
+            var result = css;
+            var nestedPattern = @"([^{}]+)\s*\{\s*([^{}]*?)\s*([^{}]+\s*\{[^{}]*\})\s*([^{}]*?)\s*\}";
+            
+            while (Regex.IsMatch(result, nestedPattern))
+            {
+                result = Regex.Replace(result, nestedPattern, match =>
+                {
+                    var parent = match.Groups[1].Value.Trim();
+                    var parentProps = match.Groups[2].Value.Trim();
+                    var nestedRule = match.Groups[3].Value.Trim();
+                    var remainingProps = match.Groups[4].Value.Trim();
+                    
+                    // Extract nested selector and properties
+                    var nestedMatch = Regex.Match(nestedRule, @"([^{]+)\s*\{\s*([^}]*)\s*\}");
+                    if (nestedMatch.Success)
+                    {
+                        var nestedSelector = nestedMatch.Groups[1].Value.Trim();
+                        var nestedProps = nestedMatch.Groups[2].Value.Trim();
+                        
+                        var parentRule = string.IsNullOrEmpty(parentProps + remainingProps) 
+                            ? "" 
+                            : $"{parent} {{ {parentProps} {remainingProps} }}";
+                        var expandedNested = $"{parent} {nestedSelector} {{ {nestedProps} }}";
+                        
+                        return string.IsNullOrEmpty(parentRule) ? expandedNested : $"{parentRule} {expandedNested}";
+                    }
+                    
+                    return match.Value;
+                });
+            }
+            
+            return result;
+        }
+    }
+
+    /// <summary>
+    /// LESS-style CSS builder with variables and nesting support
+    /// </summary>
+    public class LessBuilder
+    {
+        private readonly Dictionary<string, string> _variables = new();
+        private readonly List<string> _rules = new();
+
+        public LessBuilder Variable(string name, string value)
+        {
+            _variables[name] = value;
+            return this;
+        }
+
+        public LessBuilder Rule(string selector, string properties)
+        {
+            _rules.Add($"{selector} {{ {properties} }}");
+            return this;
+        }
+
+        public LessBuilder Rule(string selector, params (string property, string value)[] properties)
+        {
+            var props = string.Join("; ", properties.Select(p => $"{p.property}: {p.value}"));
+            return Rule(selector, props);
+        }
+
+        public LessBuilder NestedRule(string parentSelector, string childSelector, string properties)
+        {
+            _rules.Add($"{parentSelector} {{ {childSelector} {{ {properties} }} }}");
+            return this;
+        }
+
+        public LessBuilder NestedRule(string parentSelector, string childSelector, params (string property, string value)[] properties)
+        {
+            var props = string.Join("; ", properties.Select(p => $"{p.property}: {p.value}"));
+            return NestedRule(parentSelector, childSelector, props);
+        }
+
+        public string Build()
+        {
+            var combined = string.Join(" ", _rules);
+            return Style.ProcessLess(combined, _variables);
+        }
     }
 
     /// <summary>
@@ -182,6 +298,16 @@ public static class Html
     public static HtmlNode WithStyle(this HtmlNode node, string style)
     {
         node.SetAttributeValue("style", style);
+        return node;
+    }
+
+    /// <summary>
+    /// Extension method to apply LESS-style CSS with variables and nesting
+    /// </summary>
+    public static HtmlNode WithLessStyle(this HtmlNode node, string lessCSS, Dictionary<string, string>? variables = null)
+    {
+        var processedCSS = Style.ProcessLess(lessCSS, variables);
+        node.SetAttributeValue("style", processedCSS);
         return node;
     }
 
