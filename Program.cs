@@ -10,6 +10,10 @@ namespace CSMOO
         {
             try
             {
+                // Enable Unicode support for console output
+                Console.OutputEncoding = System.Text.Encoding.UTF8;
+                Console.InputEncoding = System.Text.Encoding.UTF8;
+                
                 // Load configuration
                 var config = Config.Instance;
                 
