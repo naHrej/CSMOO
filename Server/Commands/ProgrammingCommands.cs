@@ -589,6 +589,8 @@ public class ProgrammingCommands
     /// </summary>
     private bool HandleListVerb(string verbSpec)
     {
+        const string fugueEditPrefix = "FugueEdit > ";
+
         // Split from the right to handle class:Object:verb syntax
         var lastColonIndex = verbSpec.LastIndexOf(':');
         var objectName = verbSpec.Substring(0, lastColonIndex);
@@ -597,7 +599,7 @@ public class ProgrammingCommands
         var objectId = ResolveObject(objectName);
         if (objectId == null)
         {
-            _commandProcessor.SendToPlayer($"Object '{objectName}' not found.");
+            _commandProcessor.SendToPlayer($"{fugueEditPrefix}// Object '{objectName}' not found.");
             return true;
         }
 
@@ -606,33 +608,35 @@ public class ProgrammingCommands
 
         if (verb == null)
         {
-            _commandProcessor.SendToPlayer($"Verb '{verbName}' not found on {GetObjectName(objectId)}.");
+            _commandProcessor.SendToPlayer($"{fugueEditPrefix}// Verb '{verbName}' not found on {GetObjectName(objectId)}.");
             return true;
         }
 
-        _commandProcessor.SendToPlayer($"=== {GetObjectName(objectId)}:{verb.Name} ===");
+        _commandProcessor.SendToPlayer($"{fugueEditPrefix}// === {GetObjectName(objectId)}:{verb.Name} ===");
         if (!string.IsNullOrEmpty(verb.Aliases))
-            _commandProcessor.SendToPlayer($"Aliases: {verb.Aliases}");
+            _commandProcessor.SendToPlayer($"{fugueEditPrefix}// Aliases: {verb.Aliases}");
         if (!string.IsNullOrEmpty(verb.Pattern))
-            _commandProcessor.SendToPlayer($"Pattern: {verb.Pattern}");
+            _commandProcessor.SendToPlayer($"{fugueEditPrefix}// Pattern: {verb.Pattern}");
         if (!string.IsNullOrEmpty(verb.Description))
-            _commandProcessor.SendToPlayer($"Description: {verb.Description}");
+            _commandProcessor.SendToPlayer($"{fugueEditPrefix}// Description: {verb.Description}");
         
-        _commandProcessor.SendToPlayer($"Created by: {verb.CreatedBy} on {verb.CreatedAt:yyyy-MM-dd HH:mm}");
-        _commandProcessor.SendToPlayer("Code:");
+        _commandProcessor.SendToPlayer($"{fugueEditPrefix}// Created by: {verb.CreatedBy} on {verb.CreatedAt:yyyy-MM-dd HH:mm}");
+        _commandProcessor.SendToPlayer($"{fugueEditPrefix}// Code:");
 
         if (string.IsNullOrEmpty(verb.Code))
         {
-            _commandProcessor.SendToPlayer("  (no code)");
+            _commandProcessor.SendToPlayer($"{fugueEditPrefix}//   (no code)");
         }
         else
         {
             var lines = verb.Code.Split('\n');
             for (int i = 0; i < lines.Length; i++)
             {
-                _commandProcessor.SendToPlayer($"{i + 1,3}: {lines[i]}");
+                _commandProcessor.SendToPlayer($"{fugueEditPrefix}{lines[i]}");
             }
         }
+
+        _commandProcessor.SendToPlayer($"{fugueEditPrefix}.");
 
         return true;
     }
