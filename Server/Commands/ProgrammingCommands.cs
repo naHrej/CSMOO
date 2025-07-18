@@ -698,7 +698,6 @@ public class ProgrammingCommands
         _commandProcessor.SendToPlayer($"{progDataPrefix}Created by: {function.CreatedBy} on {function.CreatedAt:yyyy-MM-dd HH:mm}");
         _commandProcessor.SendToPlayer($"{progDataPrefix}Modified: {function.ModifiedAt:yyyy-MM-dd HH:mm}");
 
-        _commandProcessor.SendToPlayer($"{progEditPrefix}// @program {dbref}.{function.Name}()");
         // Function code
         if (string.IsNullOrEmpty(function.Code))
         {
