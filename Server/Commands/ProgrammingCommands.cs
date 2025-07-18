@@ -589,7 +589,10 @@ public class ProgrammingCommands
     /// </summary>
     private bool HandleListVerb(string verbSpec)
     {
-        const string fugueEditPrefix = "FugueEdit > ";
+        const string progStartPrefix = "ProgStart > ";
+        const string progDataPrefix = "ProgData > ";
+        const string progEditPrefix = "ProgEdit > ";
+        const string progEndPrefix = "ProgEnd > ";
 
         // Split from the right to handle class:Object:verb syntax
         var lastColonIndex = verbSpec.LastIndexOf(':');
@@ -599,7 +602,9 @@ public class ProgrammingCommands
         var objectId = ResolveObject(objectName);
         if (objectId == null)
         {
-            _commandProcessor.SendToPlayer($"{fugueEditPrefix}// Object '{objectName}' not found.");
+            // Optionally prepare for creating a new verb
+            _commandProcessor.SendToPlayer($"{progStartPrefix}@verb {objectName} {verbName}");
+            _commandProcessor.SendToPlayer($"{progEndPrefix}.");
             return true;
         }
 
@@ -608,35 +613,41 @@ public class ProgrammingCommands
 
         if (verb == null)
         {
-            _commandProcessor.SendToPlayer($"{fugueEditPrefix}// Verb '{verbName}' not found on {GetObjectName(objectId)}.");
+            // Optionally prepare for creating a new verb
+            _commandProcessor.SendToPlayer($"{progStartPrefix}@verb {objectName} {verbName}");
+            _commandProcessor.SendToPlayer($"{progEndPrefix}.");
             return true;
         }
 
-        _commandProcessor.SendToPlayer($"{fugueEditPrefix}// === {GetObjectName(objectId)}:{verb.Name} ===");
-        if (!string.IsNullOrEmpty(verb.Aliases))
-            _commandProcessor.SendToPlayer($"{fugueEditPrefix}// Aliases: {verb.Aliases}");
-        if (!string.IsNullOrEmpty(verb.Pattern))
-            _commandProcessor.SendToPlayer($"{fugueEditPrefix}// Pattern: {verb.Pattern}");
-        if (!string.IsNullOrEmpty(verb.Description))
-            _commandProcessor.SendToPlayer($"{fugueEditPrefix}// Description: {verb.Description}");
-        
-        _commandProcessor.SendToPlayer($"{fugueEditPrefix}// Created by: {verb.CreatedBy} on {verb.CreatedAt:yyyy-MM-dd HH:mm}");
-        _commandProcessor.SendToPlayer($"{fugueEditPrefix}// Code:");
+        // Start of the listing
+        _commandProcessor.SendToPlayer($"{progStartPrefix}@program {GetObjectName(objectId)}:{verb.Name}");
 
+        // Verb metadata
+        if (!string.IsNullOrEmpty(verb.Aliases))
+            _commandProcessor.SendToPlayer($"{progDataPrefix}Aliases: {verb.Aliases}");
+        if (!string.IsNullOrEmpty(verb.Pattern))
+            _commandProcessor.SendToPlayer($"{progDataPrefix}Pattern: {verb.Pattern}");
+        if (!string.IsNullOrEmpty(verb.Description))
+            _commandProcessor.SendToPlayer($"{progDataPrefix}Description: {verb.Description}");
+
+        _commandProcessor.SendToPlayer($"{progDataPrefix}Created by: {verb.CreatedBy} on {verb.CreatedAt:yyyy-MM-dd HH:mm}");
+
+        // Verb code
         if (string.IsNullOrEmpty(verb.Code))
         {
-            _commandProcessor.SendToPlayer($"{fugueEditPrefix}//   (no code)");
+            _commandProcessor.SendToPlayer($"{progEditPrefix}(no code)");
         }
         else
         {
             var lines = verb.Code.Split('\n');
-            for (int i = 0; i < lines.Length; i++)
+            foreach (var line in lines)
             {
-                _commandProcessor.SendToPlayer($"{fugueEditPrefix}{lines[i]}");
+                _commandProcessor.SendToPlayer($"{progEditPrefix}{line}");
             }
         }
 
-        _commandProcessor.SendToPlayer($"{fugueEditPrefix}.");
+        // End of the listing
+        _commandProcessor.SendToPlayer($"{progEndPrefix}.");
 
         return true;
     }
@@ -666,7 +677,6 @@ public class ProgrammingCommands
         
         _commandProcessor.SendToPlayer($"Created by: {function.CreatedBy} on {function.CreatedAt:yyyy-MM-dd HH:mm}");
         _commandProcessor.SendToPlayer($"Modified: {function.ModifiedAt:yyyy-MM-dd HH:mm}");
-        _commandProcessor.SendToPlayer("Code:");
 
         if (string.IsNullOrEmpty(function.Code))
         {
