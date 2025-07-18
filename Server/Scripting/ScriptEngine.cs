@@ -266,6 +266,70 @@ public class ScriptGlobals
         
         return [.. Database.ObjectManager.FindObjectsByClass(objectClass.Id).Select(obj => obj.Id)];
     }
+
+    /// <summary>
+    /// Call a function on an object (e.g., CallFunction("player", "getName"), CallFunction("system", "display_login"))
+    /// </summary>
+    public object? CallFunction(string objectRef, string functionName, params object?[] parameters)
+    {
+        if (Player == null)
+            throw new InvalidOperationException("No player context available for function calls.");
+
+        var objectId = FunctionResolver.ResolveObjectReference(objectRef, Player.Id, Player.Location ?? "");
+        if (objectId == null)
+        {
+            throw new ArgumentException($"Object '{objectRef}' not found.");
+        }
+
+        var function = FunctionResolver.FindFunction(objectId, functionName);
+        if (function == null)
+        {
+            throw new ArgumentException($"Function '{functionName}' not found on object '{objectRef}'.");
+        }
+
+        var engine = new FunctionScriptEngine();
+        return engine.ExecuteFunction(function, parameters, Player, CommandProcessor);
+    }
+
+    /// <summary>
+    /// Convenience method to call functions on the system object
+    /// </summary>
+    public object? System(string functionName, params object?[] parameters)
+    {
+        return CallFunction("system", functionName, parameters);
+    }
+
+    /// <summary>
+    /// Convenience method to call functions on the calling player
+    /// </summary>
+    public object? Me(string functionName, params object?[] parameters)
+    {
+        return CallFunction("player", functionName, parameters);
+    }
+
+    /// <summary>
+    /// Convenience method to call functions on the current room
+    /// </summary>
+    public object? Here(string functionName, params object?[] parameters)
+    {
+        return CallFunction("here", functionName, parameters);
+    }
+
+    /// <summary>
+    /// Call a function on a specific object by DBREF
+    /// </summary>
+    public object? Object(int dbref, string functionName, params object?[] parameters)
+    {
+        return CallFunction($"#{dbref}", functionName, parameters);
+    }
+
+    /// <summary>
+    /// Call a function on a class
+    /// </summary>
+    public object? Class(string className, string functionName, params object?[] parameters)
+    {
+        return CallFunction($"class:{className}", functionName, parameters);
+    }
 }
 
 /// <summary>

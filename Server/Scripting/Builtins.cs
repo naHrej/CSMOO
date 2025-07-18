@@ -234,6 +234,37 @@ public static class Builtins
                 return currentPlayer.Id;
             case "here":
                 return currentPlayer.Location;
+            case "system":
+                // Find the system object
+                var allObjects = GameDatabase.Instance.GameObjects.FindAll();
+                var systemObj = allObjects.FirstOrDefault(obj => 
+                    (obj.Properties.ContainsKey("name") && obj.Properties["name"].AsString == "system") ||
+                    (obj.Properties.ContainsKey("isSystemObject") && obj.Properties["isSystemObject"].AsBoolean == true));
+                return systemObj?.Id;
+        }
+        
+        // Check if it's a DBREF (starts with # followed by digits)
+        if (objectName.StartsWith("#") && int.TryParse(objectName.Substring(1), out int dbref))
+        {
+            var obj = GameDatabase.Instance.GameObjects.FindOne(o => o.DbRef == dbref);
+            return obj?.Id;
+        }
+        
+        // Check if it's a class reference (starts with "class:" or ends with ".class")
+        if (objectName.StartsWith("class:", StringComparison.OrdinalIgnoreCase))
+        {
+            var className = objectName.Substring(6); // Remove "class:" prefix
+            var objectClass = GameDatabase.Instance.ObjectClasses.FindOne(c => 
+                c.Name.Equals(className, StringComparison.OrdinalIgnoreCase));
+            return objectClass?.Id;
+        }
+        
+        if (objectName.EndsWith(".class", StringComparison.OrdinalIgnoreCase))
+        {
+            var className = objectName.Substring(0, objectName.Length - 6); // Remove ".class" suffix
+            var objectClass = GameDatabase.Instance.ObjectClasses.FindOne(c => 
+                c.Name.Equals(className, StringComparison.OrdinalIgnoreCase));
+            return objectClass?.Id;
         }
         
         // Try to find a player first
@@ -267,7 +298,16 @@ public static class Builtins
             return objName.StartsWith(objectName, StringComparison.OrdinalIgnoreCase);
         });
         
-        return inventoryObject?.Id;
+        if (inventoryObject != null)
+        {
+            return inventoryObject.Id;
+        }
+        
+        // If not found as an object, try as a class name
+        var directClass = GameDatabase.Instance.ObjectClasses.FindOne(c => 
+            c.Name.Equals(objectName, StringComparison.OrdinalIgnoreCase));
+        
+        return directClass?.Id;
     }
     
     /// <summary>
@@ -308,6 +348,22 @@ public static class Builtins
     public static List<Verb> GetVerbsOnObject(string objectId)
     {
         return VerbManager.GetVerbsOnObject(objectId);
+    }
+
+    /// <summary>
+    /// Get all functions on an object
+    /// </summary>
+    public static List<Function> GetFunctionsOnObject(string objectId)
+    {
+        return FunctionResolver.GetFunctionsForObject(objectId, true);
+    }
+
+    /// <summary>
+    /// Find a specific function on an object (with inheritance)
+    /// </summary>
+    public static Function? FindFunction(string objectId, string functionName)
+    {
+        return FunctionResolver.FindFunction(objectId, functionName);
     }
     
     #endregion

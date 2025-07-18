@@ -286,7 +286,8 @@ public class ScriptHelpers
         // Get all objects and filter in memory (LiteDB doesn't support ContainsKey in expressions)
         var allObjects = GameDatabase.Instance.GameObjects.FindAll();
         var systemObj = allObjects.FirstOrDefault(obj => 
-            obj.Properties.ContainsKey("isSystemObject") && obj.Properties["isSystemObject"].AsBoolean == true);
+            (obj.Properties.ContainsKey("name") && obj.Properties["name"].AsString == "system") ||
+            (obj.Properties.ContainsKey("isSystemObject") && obj.Properties["isSystemObject"].AsBoolean == true));
         
         if (systemObj == null)
         {

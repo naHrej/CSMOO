@@ -129,6 +129,12 @@ namespace CSMOO.Server.Scripting
         {
             try
             {
+                // Prevent calling system programming commands from scripts
+                if (objectRef.Equals("system", StringComparison.OrdinalIgnoreCase) && verbName.StartsWith("@"))
+                {
+                    throw new InvalidOperationException($"Cannot call system programming command '{verbName}' from within a script. Programming commands must be executed directly from the command line.");
+                }
+
                 // Resolve the object reference (supports class:Object syntax, #123 DBREFs, etc.)
                 var objectId = ResolveObjectFromScript(objectRef);
                 if (objectId == null)
@@ -239,7 +245,8 @@ namespace CSMOO.Server.Scripting
         {
             var allObjects = GameDatabase.Instance.GameObjects.FindAll();
             var systemObj = allObjects.FirstOrDefault(obj => 
-                obj.Properties.ContainsKey("isSystemObject") && obj.Properties["isSystemObject"].AsBoolean == true);
+                (obj.Properties.ContainsKey("name") && obj.Properties["name"].AsString == "system") ||
+                (obj.Properties.ContainsKey("isSystemObject") && obj.Properties["isSystemObject"].AsBoolean == true));
             return systemObj?.Id ?? "";
         }
 
@@ -254,7 +261,7 @@ namespace CSMOO.Server.Scripting
         /// <summary>
         /// Call a verb on the player object (me)
         /// </summary>
-        public object? Me(string verbName, params object[] args)
+        public new object? Me(string verbName, params object[] args)
         {
             return CallVerb("me", verbName, args);
         }
@@ -262,7 +269,7 @@ namespace CSMOO.Server.Scripting
         /// <summary>
         /// Call a verb on the current room (here)
         /// </summary>
-        public object? Here(string verbName, params object[] args)
+        public new object? Here(string verbName, params object[] args)
         {
             return CallVerb("here", verbName, args);
         }
@@ -270,7 +277,7 @@ namespace CSMOO.Server.Scripting
         /// <summary>
         /// Call a verb on the system object
         /// </summary>
-        public object? System(string verbName, params object[] args)
+        public new object? System(string verbName, params object[] args)
         {
             return CallVerb("system", verbName, args);
         }
@@ -278,7 +285,7 @@ namespace CSMOO.Server.Scripting
         /// <summary>
         /// Call a verb on an object by DBREF
         /// </summary>
-        public object? Object(int dbref, string verbName, params object[] args)
+        public new object? Object(int dbref, string verbName, params object[] args)
         {
             return CallVerb($"#{dbref}", verbName, args);
         }
@@ -286,7 +293,7 @@ namespace CSMOO.Server.Scripting
         /// <summary>
         /// Call a verb on a class
         /// </summary>
-        public object? Class(string className, string verbName, params object[] args)
+        public new object? Class(string className, string verbName, params object[] args)
         {
             return CallVerb($"class:{className}", verbName, args);
         }

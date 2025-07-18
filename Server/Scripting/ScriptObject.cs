@@ -117,30 +117,40 @@ public class ScriptObject : DynamicObject
     }
 
     /// <summary>
-    /// Handles method calls (verbs): player.getName() or dynamic property access
+    /// Handles method calls (verbs and functions): player.getName() or dynamic property access
     /// </summary>
     public override bool TryInvokeMember(InvokeMemberBinder binder, object?[]? args, out object? result)
     {
-        var verbName = binder.Name;
+        var methodName = binder.Name;
         
         try
         {
-            // Direct database lookup for the verb
-            var verb = FindVerb(verbName);
-            if (verb == null)
+            // First try to find a verb
+            var verb = FindVerb(methodName);
+            if (verb != null)
             {
-                throw new ArgumentException($"Verb '{verbName}' not found on object {_objectId}");
+                // Try to call the verb on this object
+                var verbResult = CallVerb(methodName, args);
+                result = verbResult;
+                return true;
             }
 
-            // Try to call the verb on this object
-            var verbResult = CallVerb(verbName, args);
-            result = verbResult;
-            return true;
+            // If no verb found, try to find a function
+            var function = FindFunction(methodName);
+            if (function != null)
+            {
+                // Try to call the function on this object
+                var functionResult = CallFunction(methodName, args);
+                result = functionResult;
+                return true;
+            }
+
+            throw new ArgumentException($"Verb or function '{methodName}' not found on object {_objectId}");
         }
         catch (Exception ex)
         {
             // Let the error bubble up to the script engine
-            throw new InvalidOperationException($"Error calling verb '{verbName}' on object {_objectId}: {ex.Message}", ex);
+            throw new InvalidOperationException($"Error calling '{methodName}' on object {_objectId}: {ex.Message}", ex);
         }
     }
 
@@ -172,6 +182,23 @@ public class ScriptObject : DynamicObject
     }
 
     /// <summary>
+    /// Call a function on this object
+    /// </summary>
+    public object? CallFunction(string functionName, params object?[]? args)
+    {
+        // Find the function on this object or its class hierarchy
+        var function = FindFunction(functionName);
+        if (function == null)
+        {
+            throw new ArgumentException($"Function '{functionName}' not found on object {_objectId}");
+        }
+
+        // Execute the function using the function script engine
+        var functionEngine = new FunctionScriptEngine();
+        return functionEngine.ExecuteFunction(function, args ?? new object[0], _currentPlayer, _commandProcessor, _objectId);
+    }
+
+    /// <summary>
     /// Find a verb on this object or its class hierarchy
     /// </summary>
     private Verb? FindVerb(string verbName)
@@ -179,8 +206,10 @@ public class ScriptObject : DynamicObject
         var verbs = GameDatabase.Instance.GetCollection<Verb>("verbs");
         
         // First try to find verb directly on this object
-        var verb = verbs.FindOne(v => v.ObjectId == _objectId && 
-            (v.Name.Equals(verbName, StringComparison.OrdinalIgnoreCase) ||
+        var objectVerbs = verbs.Find(v => v.ObjectId == _objectId).ToList();
+        var verb = objectVerbs.FirstOrDefault(v => 
+            v.Name.Equals(verbName, StringComparison.OrdinalIgnoreCase) ||
+            (!string.IsNullOrEmpty(v.Aliases) && 
              v.Aliases.Split(' ', StringSplitOptions.RemoveEmptyEntries)
                 .Any(alias => alias.Equals(verbName, StringComparison.OrdinalIgnoreCase))));
         
@@ -193,8 +222,10 @@ public class ScriptObject : DynamicObject
             var objectClass = GameDatabase.Instance.ObjectClasses.FindById(obj.ClassId);
             while (objectClass != null)
             {
-                verb = verbs.FindOne(v => v.ObjectId == objectClass.Id && 
-                    (v.Name.Equals(verbName, StringComparison.OrdinalIgnoreCase) ||
+                var classVerbs = verbs.Find(v => v.ObjectId == objectClass.Id).ToList();
+                verb = classVerbs.FirstOrDefault(v => 
+                    v.Name.Equals(verbName, StringComparison.OrdinalIgnoreCase) ||
+                    (!string.IsNullOrEmpty(v.Aliases) && 
                      v.Aliases.Split(' ', StringSplitOptions.RemoveEmptyEntries)
                         .Any(alias => alias.Equals(verbName, StringComparison.OrdinalIgnoreCase))));
                 
@@ -213,6 +244,15 @@ public class ScriptObject : DynamicObject
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// Find a function on this object or its class hierarchy
+    /// </summary>
+    private Function? FindFunction(string functionName)
+    {
+        // Use the existing FunctionResolver to find the function
+        return FunctionResolver.FindFunction(_objectId, functionName);
     }
 
     /// <summary>

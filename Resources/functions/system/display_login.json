@@ -1,8 +1,9 @@
 {
   "name": "display_login",
-  "aliases": "",
-  "pattern": "",
-  "description": "Display the login banner for new connections.",
+  "returnType": "string",
+  "parameters": [],
+  "parameterNames": [],
+  "description": "Display the login banner for new connections",
   "code": [
     "// Dynamic HTML login banner using LESS CSS functionality",
     "",

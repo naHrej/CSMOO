@@ -2,15 +2,20 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": ".NET Core Launch (console)",
+      "name": "🔥 CSMOO with Hot Reload",
       "type": "coreclr",
       "request": "launch",
       "preLaunchTask": "build",
-      "program": "${workspaceFolder}/bin/Debug/net9.0/CSMOO.dll",
-      "args": [],
+      "program": "dotnet",
+      "args": [
+        "watch",
+        "run",
+        "--project",
+        "${workspaceFolder}/CSMOO.csproj"
+      ],
       "cwd": "${workspaceFolder}",
       "stopAtEntry": false,
-      "console": "internalConsole",
+      "console": "integratedTerminal",
       "justMyCode": false,
       "symbolOptions": {
         "searchMicrosoftSymbolServer": true
@@ -19,6 +24,52 @@
         "moduleLoad": false
       },
       "env": {
+        "DOTNET_ENVIRONMENT": "Development",
+        "DOTNET_JIT_OPT": "0",
+        "DOTNET_WATCH_RESTART_ON_RUDE_EDIT": "true"
+      },
+      "requireExactSource": false
+    },
+    {
+      "name": "🚀 CSMOO (Standard)",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build",
+      "program": "${workspaceFolder}/bin/Debug/net9.0/CSMOO.dll",
+      "args": [],
+      "cwd": "${workspaceFolder}",
+      "stopAtEntry": false,
+      "console": "integratedTerminal",
+      "justMyCode": false,
+      "symbolOptions": {
+        "searchMicrosoftSymbolServer": true
+      },
+      "logging": {
+        "moduleLoad": false
+      },
+      "env": {
+        "DOTNET_JIT_OPT": "0"
+      }
+    },
+    {
+      "name": "🐛 CSMOO (Debug Mode)",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build",
+      "program": "${workspaceFolder}/bin/Debug/net9.0/CSMOO.dll",
+      "args": [],
+      "cwd": "${workspaceFolder}",
+      "stopAtEntry": false,
+      "console": "integratedTerminal",
+      "justMyCode": false,
+      "symbolOptions": {
+        "searchMicrosoftSymbolServer": true
+      },
+      "logging": {
+        "moduleLoad": false
+      },
+      "env": {
+        "DOTNET_ENVIRONMENT": "Development",
         "DOTNET_JIT_OPT": "0"
       }
     }

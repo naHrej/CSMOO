@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using CSMOO.Server.Database;
 using CSMOO.Server.Database.Models;
+using CSMOO.Server.Database.Managers;
 using CSMOO.Server.Scripting;
 using CSMOO.Server.Logging;
 
@@ -21,6 +22,7 @@ public class ProgrammingCommands
     private bool _isInProgrammingMode = false;
     private readonly StringBuilder _currentCode = new StringBuilder();
     private string _currentVerbId = string.Empty;
+    private string _currentFunctionId = string.Empty;
 
     public ProgrammingCommands(CommandProcessor commandProcessor, Player player)
     {
@@ -54,6 +56,7 @@ public class ProgrammingCommands
             "@list" => HandleListCommand(parts),
             "@edit" => HandleEditCommand(parts),
             "@verbs" => HandleVerbsCommand(parts),
+            "@funcs" => HandleFuncsCommand(parts),
             "@rmverb" => HandleRemoveVerbCommand(parts),
             "@flag" => HandleFlagCommand(parts),
             "@flags" => HandleFlagsCommand(parts),
@@ -63,14 +66,19 @@ public class ProgrammingCommands
             "@remove" when parts.Length > 1 && parts[1] == "verb" => HandleRemoveVerbByIdCommand(parts),
             "@cleanup" when parts.Length > 1 && parts[1] == "player" => HandleCleanupPlayerCommand(parts),
             "@cleanup" => HandleCleanupCommand(parts),
+            "@func" => HandleFuncCommand(parts),
             "@function" => HandleFunctionCommand(parts),
             "@functions" => HandleFunctionsCommand(parts),
+            "@funcreload" => HandleFuncReloadCommand(parts),
+            "@reload" => HandleReloadCommand(parts),
+            "@hotreload" => HandleHotReloadCommand(parts),
+            "@corehot" => HandleCoreHotReloadCommand(parts),
             _ => false
         };
     }
 
     /// <summary>
-    /// @program <object>:<verb> - Start programming a verb
+    /// @program <object>:<verb> or function:<functionId> - Start programming a verb or function
     /// </summary>
     private bool HandleProgramCommand(string[] parts)
     {
@@ -83,18 +91,46 @@ public class ProgrammingCommands
 
         if (parts.Length != 2)
         {
-            _commandProcessor.SendToPlayer("Usage: @program <object>:<verb>");
+            _commandProcessor.SendToPlayer("Usage: @program <object>:<verb> or @program f:<object>:<function>");
             _commandProcessor.SendToPlayer("Example: @program here:test or @program me:inventory");
+            _commandProcessor.SendToPlayer("Example: @program f:system:test_params");
             return true;
         }
 
-        var verbSpec = parts[1];
-        if (!verbSpec.Contains(':'))
+        var spec = parts[1];
+        if (!spec.Contains(':'))
         {
-            _commandProcessor.SendToPlayer("Verb specification must be in format <object>:<verb>");
+            _commandProcessor.SendToPlayer("Specification must be in format <object>:<verb> or f:<object>:<function>");
             return true;
         }
 
+        // Check if this is a function specification (f:object:function)
+        if (spec.StartsWith("f:"))
+        {
+            var functionSpec = spec.Substring(2); // Remove "f:" prefix
+            if (!functionSpec.Contains(':'))
+            {
+                _commandProcessor.SendToPlayer("Function specification must be in format f:<object>:<function>");
+                return true;
+            }
+            return HandleProgramFunctionByName(functionSpec);
+        }
+        // Legacy support for function:id format
+        else if (spec.StartsWith("function:"))
+        {
+            return HandleProgramFunction(spec.Substring(9)); // Remove "function:" prefix
+        }
+        else
+        {
+            return HandleProgramVerb(spec);
+        }
+    }
+
+    /// <summary>
+    /// Handle programming a verb
+    /// </summary>
+    private bool HandleProgramVerb(string verbSpec)
+    {
         // Handle class syntax (split from right for class:Object:verb)
         var lastColonIndex = verbSpec.LastIndexOf(':');
         var objectName = verbSpec.Substring(0, lastColonIndex);
@@ -127,6 +163,7 @@ public class ProgrammingCommands
         // Enter programming mode
         _isInProgrammingMode = true;
         _currentVerbId = verb.Id;
+        _currentFunctionId = string.Empty; // Clear function ID
         _currentCode.Clear(); // Always start with empty code - @program replaces existing code
         
         Logger.Debug($"Entering programming mode for verb ID: {_currentVerbId}");
@@ -162,6 +199,106 @@ public class ProgrammingCommands
     }
 
     /// <summary>
+    /// Handle programming a function
+    /// </summary>
+    private bool HandleProgramFunction(string functionId)
+    {
+        // Find the function
+        var functions = GameDatabase.Instance.GetCollection<Function>("functions");
+        var function = functions.FindById(functionId);
+        
+        if (function == null)
+        {
+            _commandProcessor.SendToPlayer($"Function with ID '{functionId}' not found.");
+            return true;
+        }
+
+        _commandProcessor.SendToPlayer($"Editing function '{function.Name}' on {GetObjectName(function.ObjectId)}.");
+        
+        // Show function signature
+        var paramString = string.Join(", ", function.ParameterTypes.Zip(function.ParameterNames, (type, name) => $"{type} {name}"));
+        _commandProcessor.SendToPlayer($"Function signature: {function.ReturnType} {function.Name}({paramString})");
+        
+        Logger.Debug($"Editing function: ID={function.Id}, Name={function.Name}, CurrentCodeLength={function.Code?.Length ?? 0}");
+
+        // Enter programming mode
+        _isInProgrammingMode = true;
+        _currentVerbId = string.Empty; // Clear verb ID
+        _currentFunctionId = function.Id;
+        _currentCode.Clear(); // Always start with empty code - @program replaces existing code
+        
+        Logger.Debug($"Entering programming mode for function ID: {_currentFunctionId}");
+        
+        if (!string.IsNullOrEmpty(function.Code))
+        {
+            _commandProcessor.SendToPlayer("Existing code (will be replaced):");
+            var lines = function.Code.Split('\n');
+            for (int i = 0; i < lines.Length; i++)
+            {
+                _commandProcessor.SendToPlayer($"{i + 1}: {lines[i]}");
+            }
+            _commandProcessor.SendToPlayer("--- End of existing code ---");
+        }
+        else
+        {
+            _commandProcessor.SendToPlayer("No existing code.");
+        }
+
+        _commandProcessor.SendToPlayer("Enter your NEW C# code (will replace any existing code).");
+        _commandProcessor.SendToPlayer("Type '.' on a line by itself to save, or '.abort' to cancel without changes.");
+        _commandProcessor.SendToPlayer("Programming mode active. Available variables:");
+        
+        // Show function parameters as available variables
+        for (int i = 0; i < function.ParameterNames.Length; i++)
+        {
+            _commandProcessor.SendToPlayer($"  {function.ParameterTypes[i]} {function.ParameterNames[i]} - function parameter");
+        }
+        
+        _commandProcessor.SendToPlayer("  Player - the player calling the function");
+        _commandProcessor.SendToPlayer("  CallingObjectId - ID of the object that called this function");
+        _commandProcessor.SendToPlayer("  Say(message) - send message to calling player");
+        _commandProcessor.SendToPlayer("  CallFunction(obj, func, args) - call another function");
+
+        return true;
+    }
+
+    /// <summary>
+    /// Handle programming a function by object:function name
+    /// </summary>
+    private bool HandleProgramFunctionByName(string functionSpec)
+    {
+        // Split from the right to handle class:Object:function syntax  
+        var lastColonIndex = functionSpec.LastIndexOf(':');
+        if (lastColonIndex == -1)
+        {
+            _commandProcessor.SendToPlayer("Function specification must be in format <object>:<function>");
+            return true;
+        }
+
+        var objectName = functionSpec.Substring(0, lastColonIndex);
+        var functionName = functionSpec.Substring(lastColonIndex + 1);
+
+        // Resolve object
+        var objectId = ResolveObject(objectName);
+        if (string.IsNullOrEmpty(objectId))
+        {
+            _commandProcessor.SendToPlayer($"Object '{objectName}' not found.");
+            return true;
+        }
+
+        // Find function on object
+        var function = FunctionResolver.FindFunction(objectId, functionName);
+        if (function == null)
+        {
+            _commandProcessor.SendToPlayer($"Function '{functionName}' not found on object '{objectName}'.");
+            return true;
+        }
+
+        // Use the existing HandleProgramFunction method
+        return HandleProgramFunction(function.Id);
+    }
+
+    /// <summary>
     /// Handle @script command - multi-line script execution for testing
     /// </summary>
     private bool HandleScriptCommand(string[] parts)
@@ -169,6 +306,7 @@ public class ProgrammingCommands
         // Enter programming mode for script testing
         _isInProgrammingMode = true;
         _currentVerbId = string.Empty; // No verb ID for script mode
+        _currentFunctionId = string.Empty; // No function ID for script mode
         _currentCode.Clear();
         
         Logger.Debug("Entering script mode for testing");
@@ -228,7 +366,7 @@ public class ProgrammingCommands
                     Logger.Error($"Script execution exception: {ex}");
                 }
             }
-            else
+            else if (!string.IsNullOrEmpty(_currentVerbId))
             {
                 // Verb programming mode - save the code
                 Logger.Debug($"Saving verb code. VerbId: {_currentVerbId}, Code length: {code.Length}");
@@ -251,10 +389,37 @@ public class ProgrammingCommands
                     _commandProcessor.SendToPlayer("ERROR: Could not verify that code was saved!");
                 }
             }
+            else if (!string.IsNullOrEmpty(_currentFunctionId))
+            {
+                // Function programming mode - save the code
+                Logger.Debug($"Saving function code. FunctionId: {_currentFunctionId}, Code length: {code.Length}");
+                Logger.Debug($"Code content: '{code}'");
+                
+                var functions = GameDatabase.Instance.GetCollection<Function>("functions");
+                var function = functions.FindById(_currentFunctionId);
+                
+                if (function != null)
+                {
+                    function.Code = code;
+                    function.ModifiedAt = DateTime.UtcNow;
+                    functions.Update(function);
+                    
+                    Logger.Debug($"Verification: Saved code length: {function.Code?.Length ?? 0}");
+                    _commandProcessor.SendToPlayer("Function programming complete.");
+                    _commandProcessor.SendToPlayer($"Code saved ({code.Split('\n').Length} lines).");
+                    _commandProcessor.SendToPlayer($"Verified: Code length is {function.Code?.Length ?? 0} characters.");
+                }
+                else
+                {
+                    Logger.Error($"Could not find function with ID {_currentFunctionId} after saving!");
+                    _commandProcessor.SendToPlayer("ERROR: Could not find function to save code to!");
+                }
+            }
             
             _isInProgrammingMode = false;
             _currentCode.Clear();
             _currentVerbId = string.Empty;
+            _currentFunctionId = string.Empty;
             return true;
         }
 
@@ -266,6 +431,7 @@ public class ProgrammingCommands
             _isInProgrammingMode = false;
             _currentCode.Clear();
             _currentVerbId = string.Empty;
+            _currentFunctionId = string.Empty;
             return true;
         }
 
@@ -324,23 +490,50 @@ public class ProgrammingCommands
     }
 
     /// <summary>
-    /// @list <object>:<verb> - Show the code for a verb
+    /// @list <object>:<verb> or function:<functionId> - Show the code for a verb or function
     /// </summary>
     private bool HandleListCommand(string[] parts)
     {
         if (parts.Length != 2)
         {
-            _commandProcessor.SendToPlayer("Usage: @list <object>:<verb>");
+            _commandProcessor.SendToPlayer("Usage: @list <object>:<verb> or @list f:<object>:<function>");
             return true;
         }
 
-        var verbSpec = parts[1];
-        if (!verbSpec.Contains(':'))
+        var spec = parts[1];
+        if (!spec.Contains(':'))
         {
-            _commandProcessor.SendToPlayer("Verb specification must be in format <object>:<verb>");
+            _commandProcessor.SendToPlayer("Specification must be in format <object>:<verb> or f:<object>:<function>");
             return true;
         }
 
+        // Check if this is a function specification (f:object:function)
+        if (spec.StartsWith("f:"))
+        {
+            var functionSpec = spec.Substring(2); // Remove "f:" prefix
+            if (!functionSpec.Contains(':'))
+            {
+                _commandProcessor.SendToPlayer("Function specification must be in format f:<object>:<function>");
+                return true;
+            }
+            return HandleListFunctionByName(functionSpec);
+        }
+        // Legacy support for function:id format
+        else if (spec.StartsWith("function:"))
+        {
+            return HandleListFunction(spec.Substring(9)); // Remove "function:" prefix
+        }
+        else
+        {
+            return HandleListVerb(spec);
+        }
+    }
+
+    /// <summary>
+    /// Handle listing a verb
+    /// </summary>
+    private bool HandleListVerb(string verbSpec)
+    {
         // Split from the right to handle class:Object:verb syntax
         var lastColonIndex = verbSpec.LastIndexOf(':');
         var objectName = verbSpec.Substring(0, lastColonIndex);
@@ -390,6 +583,85 @@ public class ProgrammingCommands
     }
 
     /// <summary>
+    /// Handle listing a function
+    /// </summary>
+    private bool HandleListFunction(string functionId)
+    {
+        var functions = GameDatabase.Instance.GetCollection<Function>("functions");
+        var function = functions.FindById(functionId);
+        
+        if (function == null)
+        {
+            _commandProcessor.SendToPlayer($"Function with ID '{functionId}' not found.");
+            return true;
+        }
+
+        var paramString = string.Join(", ", function.ParameterTypes.Zip(function.ParameterNames, (type, name) => $"{type} {name}"));
+        
+        _commandProcessor.SendToPlayer($"=== Function {function.Name} ===");
+        _commandProcessor.SendToPlayer($"Signature: {function.ReturnType} {function.Name}({paramString})");
+        _commandProcessor.SendToPlayer($"Object: {GetObjectName(function.ObjectId)}");
+        _commandProcessor.SendToPlayer($"Permissions: {function.Permissions}");
+        if (!string.IsNullOrEmpty(function.Description))
+            _commandProcessor.SendToPlayer($"Description: {function.Description}");
+        
+        _commandProcessor.SendToPlayer($"Created by: {function.CreatedBy} on {function.CreatedAt:yyyy-MM-dd HH:mm}");
+        _commandProcessor.SendToPlayer($"Modified: {function.ModifiedAt:yyyy-MM-dd HH:mm}");
+        _commandProcessor.SendToPlayer("Code:");
+
+        if (string.IsNullOrEmpty(function.Code))
+        {
+            _commandProcessor.SendToPlayer("  (no code)");
+        }
+        else
+        {
+            var lines = function.Code.Split('\n');
+            for (int i = 0; i < lines.Length; i++)
+            {
+                _commandProcessor.SendToPlayer($"{i + 1,3}: {lines[i]}");
+            }
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Handle listing a function by object:function name
+    /// </summary>
+    private bool HandleListFunctionByName(string functionSpec)
+    {
+        // Split from the right to handle class:Object:function syntax  
+        var lastColonIndex = functionSpec.LastIndexOf(':');
+        if (lastColonIndex == -1)
+        {
+            _commandProcessor.SendToPlayer("Function specification must be in format <object>:<function>");
+            return true;
+        }
+
+        var objectName = functionSpec.Substring(0, lastColonIndex);
+        var functionName = functionSpec.Substring(lastColonIndex + 1);
+
+        // Resolve object
+        var objectId = ResolveObject(objectName);
+        if (string.IsNullOrEmpty(objectId))
+        {
+            _commandProcessor.SendToPlayer($"Object '{objectName}' not found.");
+            return true;
+        }
+
+        // Find function on object
+        var function = FunctionResolver.FindFunction(objectId, functionName);
+        if (function == null)
+        {
+            _commandProcessor.SendToPlayer($"Function '{functionName}' not found on object '{objectName}'.");
+            return true;
+        }
+
+        // Use the existing HandleListFunction method
+        return HandleListFunction(function.Id);
+    }
+
+    /// <summary>
     /// @edit <object>:<verb> - Edit an existing verb
     /// </summary>
     private bool HandleEditCommand(string[] parts)
@@ -406,7 +678,7 @@ public class ProgrammingCommands
     }
 
     /// <summary>
-    /// @verbs <object> - List all verbs on an object
+    /// @verbs <object> - List all verbs and functions on an object
     /// </summary>
     private bool HandleVerbsCommand(string[] parts)
     {
@@ -420,17 +692,17 @@ public class ProgrammingCommands
         }
 
         var allVerbs = VerbResolver.GetAllVerbsOnObject(objectId);
+        var allFunctions = FunctionResolver.GetAllFunctionsOnObject(objectId);
         
-        _commandProcessor.SendToPlayer($"=== Verbs on {GetObjectName(objectId)} ===");
-        if (!allVerbs.Any())
+        _commandProcessor.SendToPlayer($"=== Verbs and Functions on {GetObjectName(objectId)} ===");
+        
+        // Show verbs
+        if (allVerbs.Any())
         {
-            _commandProcessor.SendToPlayer("No verbs defined.");
-        }
-        else
-        {
+            _commandProcessor.SendToPlayer("Verbs:");
             foreach (var (verb, source) in allVerbs.OrderBy(v => v.verb.Name))
             {
-                var info = $"{verb.Name}";
+                var info = $"  {verb.Name}";
                 if (!string.IsNullOrEmpty(verb.Aliases))
                     info += $" ({verb.Aliases})";
                 if (!string.IsNullOrEmpty(verb.Pattern))
@@ -442,8 +714,87 @@ public class ProgrammingCommands
                 if (source != "instance")
                     info += $" (from {source})";
                 
-                _commandProcessor.SendToPlayer($"  {info}");
+                _commandProcessor.SendToPlayer(info);
             }
+        }
+        
+        // Show functions
+        if (allFunctions.Any())
+        {
+            _commandProcessor.SendToPlayer("Functions:");
+            foreach (var (function, source) in allFunctions.OrderBy(f => f.function.Name))
+            {
+                var paramString = string.Join(", ", function.ParameterTypes.Zip(function.ParameterNames, (type, name) => $"{type} {name}"));
+                var info = $"  {function.ReturnType} {function.Name}({paramString})";
+                
+                if (!string.IsNullOrEmpty(function.Description))
+                    info += $" - {function.Description}";
+                
+                if (function.Permissions != "public")
+                    info += $" [{function.Permissions}]";
+                
+                // Show where the function comes from
+                if (source != "instance")
+                    info += $" (from {source})";
+                
+                info += $" (ID: {function.Id})";
+                
+                _commandProcessor.SendToPlayer(info);
+            }
+        }
+        
+        if (!allVerbs.Any() && !allFunctions.Any())
+        {
+            _commandProcessor.SendToPlayer("No verbs or functions defined.");
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// @funcs <object> - List all functions on an object
+    /// </summary>
+    private bool HandleFuncsCommand(string[] parts)
+    {
+        var objectName = parts.Length > 1 ? parts[1] : "here";
+        var objectId = ResolveObject(objectName);
+        
+        if (objectId == null)
+        {
+            _commandProcessor.SendToPlayer($"Object '{objectName}' not found.");
+            return true;
+        }
+
+        var allFunctions = FunctionResolver.GetAllFunctionsOnObject(objectId);
+        
+        _commandProcessor.SendToPlayer($"=== Functions on {GetObjectName(objectId)} ===");
+        
+        // Show functions
+        if (allFunctions.Any())
+        {
+            foreach (var (function, source) in allFunctions.OrderBy(f => f.function.Name))
+            {
+                var paramString = string.Join(", ", function.ParameterTypes.Zip(function.ParameterNames, (type, name) => $"{type} {name}"));
+                var info = $"  {function.ReturnType} {function.Name}({paramString})";
+                
+                if (!string.IsNullOrEmpty(function.Description))
+                    info += $" - {function.Description}";
+                
+                if (function.Permissions != "public")
+                    info += $" [{function.Permissions}]";
+                
+                // Show where the function comes from
+                if (source != "instance")
+                    info += $" (from {source})";
+                
+                info += $" (ID: {function.Id})";
+                
+                _commandProcessor.SendToPlayer(info);
+            }
+        }
+        else
+        {
+            _commandProcessor.SendToPlayer("No functions defined.");
         }
 
         return true;
@@ -542,8 +893,7 @@ public class ProgrammingCommands
     /// </summary>
     private bool HandleFunctionCommand(string[] parts)
     {
-        _commandProcessor.SendToPlayer("Functions are not yet implemented. Use verbs for now.");
-        return true;
+        return HandleFuncCommand(parts);
     }
 
     /// <summary>
@@ -551,7 +901,39 @@ public class ProgrammingCommands
     /// </summary>
     private bool HandleFunctionsCommand(string[] parts)
     {
-        _commandProcessor.SendToPlayer("Functions are not yet implemented. Use verbs for now.");
+        if (parts.Length != 2)
+        {
+            _commandProcessor.SendToPlayer("Usage: @functions <object>");
+            return true;
+        }
+
+        var objectName = parts[1];
+        var objectId = ResolveObject(objectName);
+        if (objectId == null)
+        {
+            _commandProcessor.SendToPlayer($"Object '{objectName}' not found.");
+            return true;
+        }
+
+        var functions = FunctionManager.GetFunctionsOnObject(objectId);
+        if (!functions.Any())
+        {
+            _commandProcessor.SendToPlayer($"No functions found on {GetObjectName(objectId)}.");
+            return true;
+        }
+
+        _commandProcessor.SendToPlayer($"Functions on {GetObjectName(objectId)}:");
+        foreach (var function in functions.OrderBy(f => f.Name))
+        {
+            var signature = $"{function.ReturnType} {function.Name}({string.Join(", ", function.ParameterTypes)})";
+            var info = $"  {signature}";
+            
+            if (!string.IsNullOrEmpty(function.Description))
+                info += $" - {function.Description}";
+            
+            _commandProcessor.SendToPlayer(info);
+        }
+
         return true;
     }
 
@@ -1204,6 +1586,389 @@ public class ProgrammingCommands
         }
 
         _commandProcessor.SendToPlayer($"Permission update complete. Updated {updatedCount} players.");
+        return true;
+    }
+
+    /// <summary>
+    /// @reload [verbs|scripts] - Manually trigger hot reload
+    /// </summary>
+    private bool HandleReloadCommand(string[] parts)
+    {
+        // Check if player has Admin flag
+        if (!PermissionManager.HasFlag(_player, PermissionManager.Flag.Admin))
+        {
+            _commandProcessor.SendToPlayer("You need the Admin flag to use the @reload command.");
+            return true;
+        }
+
+        if (parts.Length < 2)
+        {
+            _commandProcessor.SendToPlayer("Usage: @reload [verbs|scripts|status]");
+            _commandProcessor.SendToPlayer("  @reload verbs   - Reload all verb definitions");
+            _commandProcessor.SendToPlayer("  @reload scripts - Reload script engine");
+            _commandProcessor.SendToPlayer("  @reload status  - Show hot reload status");
+            return true;
+        }
+
+        var target = parts[1].ToLower();
+        switch (target)
+        {
+            case "verbs":
+                _commandProcessor.SendToPlayer("🔄 Initiating manual verb reload...");
+                try
+                {
+                    HotReloadManager.ManualReloadVerbs();
+                    _commandProcessor.SendToPlayer("✅ Verb reload completed successfully!");
+                }
+                catch (Exception ex)
+                {
+                    _commandProcessor.SendToPlayer($"❌ Verb reload failed: {ex.Message}");
+                    Logger.Error("Manual verb reload failed", ex);
+                }
+                break;
+
+            case "scripts":
+                _commandProcessor.SendToPlayer("🔄 Initiating manual script reload...");
+                try
+                {
+                    HotReloadManager.ManualReloadScripts();
+                    _commandProcessor.SendToPlayer("✅ Script reload completed successfully!");
+                }
+                catch (Exception ex)
+                {
+                    _commandProcessor.SendToPlayer($"❌ Script reload failed: {ex.Message}");
+                    Logger.Error("Manual script reload failed", ex);
+                }
+                break;
+
+            case "status":
+                var status = HotReloadManager.IsEnabled ? "ENABLED" : "DISABLED";
+                _commandProcessor.SendToPlayer($"Hot Reload Status: {status}");
+                _commandProcessor.SendToPlayer("Monitored paths:");
+                _commandProcessor.SendToPlayer("  • Resources/verbs/ (*.json)");
+                _commandProcessor.SendToPlayer("  • Scripts/ (*.cs) [if present]");
+                break;
+
+            default:
+                _commandProcessor.SendToPlayer($"Unknown reload target: {target}");
+                _commandProcessor.SendToPlayer("Valid targets: verbs, scripts, status");
+                break;
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// @hotreload [enable|disable|status] - Control hot reload functionality
+    /// </summary>
+    private bool HandleHotReloadCommand(string[] parts)
+    {
+        // Check if player has Admin flag
+        if (!PermissionManager.HasFlag(_player, PermissionManager.Flag.Admin))
+        {
+            _commandProcessor.SendToPlayer("You need the Admin flag to use the @hotreload command.");
+            return true;
+        }
+
+        if (parts.Length < 2)
+        {
+            var status = HotReloadManager.IsEnabled ? "ENABLED" : "DISABLED";
+            _commandProcessor.SendToPlayer($"Hot Reload Status: {status}");
+            _commandProcessor.SendToPlayer("Usage: @hotreload [enable|disable|status]");
+            _commandProcessor.SendToPlayer("  @hotreload enable  - Enable automatic hot reloading");
+            _commandProcessor.SendToPlayer("  @hotreload disable - Disable automatic hot reloading");
+            _commandProcessor.SendToPlayer("  @hotreload status  - Show current status");
+            return true;
+        }
+
+        var action = parts[1].ToLower();
+        switch (action)
+        {
+            case "enable":
+                HotReloadManager.SetEnabled(true);
+                _commandProcessor.SendToPlayer("✅ Hot reload ENABLED");
+                _commandProcessor.SendToPlayer("File changes will now automatically trigger reloads.");
+                break;
+
+            case "disable":
+                HotReloadManager.SetEnabled(false);
+                _commandProcessor.SendToPlayer("⏸️ Hot reload DISABLED");
+                _commandProcessor.SendToPlayer("File changes will no longer trigger automatic reloads.");
+                _commandProcessor.SendToPlayer("You can still use @reload commands for manual reloads.");
+                break;
+
+            case "status":
+                var enabled = HotReloadManager.IsEnabled;
+                var statusIcon = enabled ? "✅" : "❌";
+                var statusText = enabled ? "ENABLED" : "DISABLED";
+                
+                _commandProcessor.SendToPlayer($"{statusIcon} Hot Reload Status: {statusText}");
+                
+                if (enabled)
+                {
+                    _commandProcessor.SendToPlayer("📁 Monitoring the following directories:");
+                    _commandProcessor.SendToPlayer("  • Resources/verbs/ (*.json) - Verb definitions");
+                    _commandProcessor.SendToPlayer("  • Scripts/ (*.cs) - C# script files [if present]");
+                    _commandProcessor.SendToPlayer("🔄 Changes to these files will trigger automatic reloads");
+                }
+                else
+                {
+                    _commandProcessor.SendToPlayer("🔇 File monitoring is disabled");
+                    _commandProcessor.SendToPlayer("💡 Use '@reload verbs' or '@reload scripts' for manual reloads");
+                }
+                break;
+
+            default:
+                _commandProcessor.SendToPlayer($"Unknown hotreload action: {action}");
+                _commandProcessor.SendToPlayer("Valid actions: enable, disable, status");
+                break;
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// @corehot [status|test] - Core application hot reload control
+    /// </summary>
+    private bool HandleCoreHotReloadCommand(string[] parts)
+    {
+        // Check if player has Admin flag
+        if (!PermissionManager.HasFlag(_player, PermissionManager.Flag.Admin))
+        {
+            _commandProcessor.SendToPlayer("You need the Admin flag to use the @corehot command.");
+            return true;
+        }
+
+        if (parts.Length < 2)
+        {
+            _commandProcessor.SendToPlayer("Core Application Hot Reload");
+            _commandProcessor.SendToPlayer("Usage: @corehot [status|test]");
+            _commandProcessor.SendToPlayer("  @corehot status - Show core hot reload status");
+            _commandProcessor.SendToPlayer("  @corehot test   - Test core hot reload notifications");
+            _commandProcessor.SendToPlayer("");
+            _commandProcessor.SendToPlayer("💡 For automatic core hot reload, run server with:");
+            _commandProcessor.SendToPlayer("   dotnet watch run");
+            return true;
+        }
+
+        var action = parts[1].ToLower();
+        switch (action)
+        {
+            case "status":
+                var status = CoreHotReloadManager.GetStatus();
+                _commandProcessor.SendToPlayer("🔥 Core Hot Reload Status:");
+                _commandProcessor.SendToPlayer("");
+                foreach (var line in status.Split('\n'))
+                {
+                    if (!string.IsNullOrWhiteSpace(line))
+                        _commandProcessor.SendToPlayer(line);
+                }
+                
+                _commandProcessor.SendToPlayer("");
+                _commandProcessor.SendToPlayer("ℹ️ Core hot reload vs Verb hot reload:");
+                _commandProcessor.SendToPlayer("• Verb hot reload: Changes to JSON files in Resources/verbs/");
+                _commandProcessor.SendToPlayer("• Core hot reload: Changes to C# application code files");
+                break;
+
+            case "test":
+                try
+                {
+                    _commandProcessor.SendToPlayer("🧪 Triggering test core hot reload notification...");
+                    CoreHotReloadManager.TriggerTestNotification();
+                    _commandProcessor.SendToPlayer("✅ Test notification sent!");
+                }
+                catch (Exception ex)
+                {
+                    _commandProcessor.SendToPlayer($"❌ Test failed: {ex.Message}");
+                    Logger.Error("Core hot reload test failed", ex);
+                }
+                break;
+
+            default:
+                _commandProcessor.SendToPlayer($"Unknown action: {action}");
+                _commandProcessor.SendToPlayer("Valid actions: status, test");
+                break;
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// @func <object> <name> [returnType] [param1Type] [param2Type] ... - Create a new function with type checking
+    /// </summary>
+    private bool HandleFuncCommand(string[] parts)
+    {
+        if (parts.Length < 2)
+        {
+            _commandProcessor.SendToPlayer("Usage: @func <object> <name> [returnType] [param1Type] [param2Type] ...");
+            _commandProcessor.SendToPlayer("Example: @func system display_login string");
+            _commandProcessor.SendToPlayer("Example: @func player calculateDamage int int bool string");
+            return true;
+        }
+
+        // Parse the command - handle optional public/private modifier
+        var commandText = string.Join(" ", parts.Skip(1));
+        
+        string permissions = "public"; // Default to public
+        if (commandText.StartsWith("public "))
+        {
+            permissions = "public";
+            commandText = commandText.Substring(7);
+        }
+        else if (commandText.StartsWith("private "))
+        {
+            permissions = "private";
+            commandText = commandText.Substring(8);
+        }
+
+        // Parse return type, object:function signature
+        var signatureParts = commandText.Split(' ', 2);
+        if (signatureParts.Length < 2)
+        {
+            _commandProcessor.SendToPlayer("Usage: @func [public|private] <returnType> <object:functionName>(<type> <name>, ...)");
+            return true;
+        }
+
+        var returnType = signatureParts[0];
+        var functionSignature = signatureParts[1];
+
+        // Parse object:functionName(parameters)
+        var colonIndex = functionSignature.IndexOf(':');
+        var parenIndex = functionSignature.IndexOf('(');
+        var endParenIndex = functionSignature.LastIndexOf(')');
+
+        if (colonIndex == -1 || parenIndex == -1 || endParenIndex == -1 || parenIndex < colonIndex)
+        {
+            _commandProcessor.SendToPlayer("Invalid syntax. Use: object:functionName(type name, type name, ...)");
+            return true;
+        }
+
+        var objectName = functionSignature.Substring(0, colonIndex);
+        var functionName = functionSignature.Substring(colonIndex + 1, parenIndex - colonIndex - 1);
+        var parametersString = functionSignature.Substring(parenIndex + 1, endParenIndex - parenIndex - 1).Trim();
+
+        // Validate function name
+        if (!FunctionManager.IsValidFunctionName(functionName))
+        {
+            _commandProcessor.SendToPlayer($"Invalid function name '{functionName}'. Function names must start with a letter and contain only letters, numbers, and underscores.");
+            return true;
+        }
+
+        // Validate return type
+        if (!FunctionManager.IsValidReturnType(returnType))
+        {
+            _commandProcessor.SendToPlayer($"Invalid return type '{returnType}'. Valid types: void, string, int, bool, float, double, decimal, object, Player, GameObject, ObjectClass");
+            return true;
+        }
+
+        // Parse parameters
+        var parameterTypes = new List<string>();
+        var parameterNames = new List<string>();
+
+        if (!string.IsNullOrEmpty(parametersString))
+        {
+            var parameters = parametersString.Split(',');
+            foreach (var param in parameters)
+            {
+                var paramParts = param.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                if (paramParts.Length != 2)
+                {
+                    _commandProcessor.SendToPlayer($"Invalid parameter syntax: '{param.Trim()}'. Use: type name");
+                    return true;
+                }
+
+                var paramType = paramParts[0];
+                var paramName = paramParts[1];
+
+                // Validate parameter type
+                if (!FunctionManager.IsValidParameterType(paramType))
+                {
+                    _commandProcessor.SendToPlayer($"Invalid parameter type '{paramType}'. Valid types: string, int, bool, float, double, decimal, object, Player, GameObject, ObjectClass");
+                    return true;
+                }
+
+                // Validate parameter name
+                if (!IsValidVariableName(paramName))
+                {
+                    _commandProcessor.SendToPlayer($"Invalid parameter name '{paramName}'. Parameter names must start with a letter and contain only letters, numbers, and underscores.");
+                    return true;
+                }
+
+                parameterTypes.Add(paramType);
+                parameterNames.Add(paramName);
+            }
+        }
+
+        var objectId = ResolveObject(objectName);
+        if (objectId == null)
+        {
+            _commandProcessor.SendToPlayer($"Object '{objectName}' not found.");
+            return true;
+        }
+
+        // Check if function already exists
+        var existingFunction = FunctionManager.FindFunction(objectId, functionName);
+        if (existingFunction != null)
+        {
+            _commandProcessor.SendToPlayer($"Function '{functionName}' already exists on {GetObjectName(objectId)}.");
+            return true;
+        }
+
+        // Create the function
+        var function = FunctionManager.CreateFunction(objectId, functionName, parameterTypes.ToArray(), parameterNames.ToArray(), returnType, "", _player.Name);
+        
+        // Set visibility
+        function.Permissions = permissions;
+        var functions = GameDatabase.Instance.GetCollection<Function>("functions");
+        functions.Update(function);
+
+        var paramString = string.Join(", ", parameterTypes.Zip(parameterNames, (type, name) => $"{type} {name}"));
+        _commandProcessor.SendToPlayer($"Created {permissions} function '{returnType} {functionName}({paramString})' on {GetObjectName(objectId)}.");
+        _commandProcessor.SendToPlayer($"Function ID: {function.Id}");
+        _commandProcessor.SendToPlayer($"Use '@program function:{function.Id}' to add code to this function.");
+
+        return true;
+    }
+
+    /// <summary>
+    /// Validates if a string is a valid variable name
+    /// </summary>
+    private bool IsValidVariableName(string name)
+    {
+        if (string.IsNullOrEmpty(name))
+            return false;
+
+        if (!char.IsLetter(name[0]) && name[0] != '_')
+            return false;
+
+        return name.All(c => char.IsLetterOrDigit(c) || c == '_');
+    }
+
+    /// <summary>
+    /// @funcreload - Hot reload all function definitions from JSON files
+    /// </summary>
+    private bool HandleFuncReloadCommand(string[] parts)
+    {
+        // Check if player has admin privileges
+        if (!PermissionManager.HasFlag(_player, PermissionManager.Flag.Admin))
+        {
+            _commandProcessor.SendToPlayer("You need the Admin flag to use this command.");
+            return true;
+        }
+
+        _commandProcessor.SendToPlayer("Reloading function definitions...");
+
+        try
+        {
+            CSMOO.Server.Database.World.FunctionInitializer.ReloadFunctions();
+            _commandProcessor.SendToPlayer("Function definitions reloaded successfully!");
+        }
+        catch (Exception ex)
+        {
+            _commandProcessor.SendToPlayer($"Error reloading functions: {ex.Message}");
+            Logger.Error("Function reload failed", ex);
+        }
+
         return true;
     }
 }

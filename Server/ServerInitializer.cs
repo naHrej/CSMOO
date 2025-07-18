@@ -34,6 +34,10 @@ public static class ServerInitializer
             // Create a test admin player if none exists
             CreateDefaultAdminIfNeeded();
             
+            // Initialize hot reload functionality
+            HotReloadManager.Initialize();
+            CoreHotReloadManager.Initialize();
+            
             Logger.Info("Server initialization complete!");
             WorldInitializer.PrintWorldStatistics();
         }
@@ -82,6 +86,10 @@ public static class ServerInitializer
     public static void Shutdown()
     {
         Logger.Info("Shutting down CSMOO Server...");
+        
+        // Shutdown hot reload manager
+        HotReloadManager.Shutdown();
+        CoreHotReloadManager.Shutdown();
         
         // Disconnect all players
         var onlinePlayers = PlayerManager.GetOnlinePlayers();

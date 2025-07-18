@@ -260,7 +260,7 @@ public class CommandProcessor
     }
 
     /// <summary>
-    /// Displays the login banner by evaluating the system:display_login verb
+    /// Displays the login banner by executing the system:display_login function
     /// </summary>
     public void DisplayLoginBanner()
     {
@@ -269,25 +269,45 @@ public class CommandProcessor
             // Find the system object first
             var allObjects = GameDatabase.Instance.GameObjects.FindAll().ToList();
             var systemObj = allObjects.FirstOrDefault(obj => 
-                obj.Properties.ContainsKey("isSystemObject") && obj.Properties["isSystemObject"].AsBoolean == true);
+                (obj.Properties.ContainsKey("name") && obj.Properties["name"].AsString == "system") ||
+                (obj.Properties.ContainsKey("isSystemObject") && obj.Properties["isSystemObject"].AsBoolean == true));
             
             if (systemObj != null)
             {
-                // Try to find and execute the system:display_login verb
-                var verb = VerbManager.FindVerb(systemObj.Id, "display_login");
-                if (verb != null)
+                // Try to find and execute the system:display_login function
+                var function = Scripting.FunctionResolver.FindFunction(systemObj.Id, "display_login");
+                if (function != null)
                 {
-                    var scriptEngine = new ScriptEngine();
-                    var result = scriptEngine.ExecuteScript(verb.Code, null, this);
-                    if (!string.IsNullOrEmpty(result))
+                    try
                     {
-                        SendToPlayer(result);
-                        return;
+                        var functionEngine = new Scripting.FunctionScriptEngine();
+                        
+                        // Create a minimal system player context for login banner
+                        var systemPlayer = new Database.Player
+                        {
+                            Id = systemObj.Id,
+                            Name = "System"
+                        };
+                        
+                        var result = functionEngine.ExecuteFunction(function, new object[0], systemPlayer, this, systemObj.Id);
+                        if (result != null)
+                        {
+                            var output = result.ToString();
+                            if (!string.IsNullOrEmpty(output))
+                            {
+                                SendToPlayer(output);
+                                return;
+                            }
+                        }
+                    }
+                    catch (Exception funcEx)
+                    {
+                        Logger.Warning($"Error executing display_login function: {funcEx.Message}");
                     }
                 }
                 else
                 {
-                    Logger.Warning("display_login verb not found on system object");
+                    Logger.Warning("display_login function not found on system object");
                 }
             }
             else
@@ -297,10 +317,10 @@ public class CommandProcessor
         }
         catch (Exception ex)
         {
-            Logger.Error($"Error displaying login banner from verb: {ex.Message}");
+            Logger.Error($"Error displaying login banner from function: {ex.Message}");
         }
 
-        // Fallback to static banner if verb fails or doesn't exist
+        // Fallback to static banner if function fails or doesn't exist
         SendToPlayer("=== Welcome to CSMOO ===");
         SendToPlayer("A Multi-User Shared Object-Oriented Environment");
         SendToPlayer("");

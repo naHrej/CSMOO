@@ -24,6 +24,9 @@ public static class WorldInitializer
             // Load and create verbs from JSON files
             VerbInitializer.LoadAndCreateVerbs();
             
+            // Load and create functions from JSON files
+            World.FunctionInitializer.LoadAndCreateFunctions();
+            
             // Create the starting room and basic world areas
             RoomManager.CreateStartingRoom();
 

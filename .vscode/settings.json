@@ -1,0 +1,59 @@
+{
+  // Hot Reload optimizations
+  "dotnet.completion.showCompletionItemsFromUnimportedNamespaces": true,
+  "dotnet.inlayHints.enableInlayHintsForParameters": true,
+  "dotnet.inlayHints.enableInlayHintsForLiteralParameters": true,
+  "dotnet.inlayHints.enableInlayHintsForIndexerParameters": true,
+  "dotnet.inlayHints.enableInlayHintsForObjectCreationParameters": true,
+  "dotnet.inlayHints.enableInlayHintsForOtherParameters": true,
+  "dotnet.inlayHints.suppressInlayHintsForParametersThatDifferOnlyBySuffix": true,
+  "dotnet.inlayHints.suppressInlayHintsForParametersThatMatchMethodIntent": true,
+  "dotnet.inlayHints.suppressInlayHintsForParametersThatMatchArgumentName": true,
+
+  // File watching optimizations for hot reload
+  "files.watcherExclude": {
+    "**/bin/**": true,
+    "**/obj/**": true,
+    "**/.git/**": true,
+    "**/node_modules/**": true,
+    "**/logs/**": true,
+    "**/*.db": true,
+    "**/*.db-*": true
+  },
+
+  // Auto-save to trigger hot reload more frequently
+  "files.autoSave": "afterDelay",
+  "files.autoSaveDelay": 1000,
+
+  // JSON validation for verb files
+  "json.validate.enable": true,
+  "json.format.enable": true,
+
+  // Terminal settings for better hot reload experience
+  "terminal.integrated.defaultProfile.windows": "PowerShell",
+  "terminal.integrated.scrollback": 10000,
+
+  // File associations for CSMOO
+  "files.associations": {
+    "*.json": "jsonc"
+  },
+
+  // Exclude build artifacts from search
+  "search.exclude": {
+    "**/bin/**": true,
+    "**/obj/**": true,
+    "**/logs/**": true,
+    "**/*.db": true,
+    "**/*.db-*": true
+  },
+
+  // Better problem matching for hot reload
+  "problems.decorations.enabled": true,
+  
+  // Workspace recommendations
+  "extensions.recommendations": [
+    "ms-dotnettools.csharp",
+    "ms-dotnettools.vscode-dotnet-runtime",
+    "ms-vscode.vscode-json"
+  ]
+}
