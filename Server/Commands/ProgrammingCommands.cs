@@ -599,7 +599,7 @@ public class ProgrammingCommands
         var objectName = verbSpec.Substring(0, lastColonIndex);
         var verbName = verbSpec.Substring(lastColonIndex + 1);
 
-        var objectId = ResolveObject(objectName);        
+        var objectId = ResolveObject(objectName);
 
         if (objectId == null)
         {
@@ -608,6 +608,10 @@ public class ProgrammingCommands
             _commandProcessor.SendToPlayer($"{progEndPrefix}.");
             return true;
         }
+
+        // Retrieve the object using its objectId
+        var gameObject = ObjectManager.GetObject(objectId);
+        var dbref = gameObject != null ? $"#{gameObject.DbRef}" : objectId;
 
         var verb = VerbManager.GetVerbsOnObject(objectId)
             .FirstOrDefault(v => v.Name.ToLower() == verbName.ToLower());
@@ -621,7 +625,7 @@ public class ProgrammingCommands
         }
 
         // Start of the listing
-        _commandProcessor.SendToPlayer($"{progStartPrefix}@program {objectId}:{verb.Name}");
+        _commandProcessor.SendToPlayer($"{progStartPrefix}@program {dbref}:{verb.Name}");
 
         // Verb metadata
         _commandProcessor.SendToPlayer($"{progDataPrefix}{GetObjectName(objectId)}:{verb.Name}");
@@ -634,7 +638,7 @@ public class ProgrammingCommands
 
         _commandProcessor.SendToPlayer($"{progDataPrefix}Created by: {verb.CreatedBy} on {verb.CreatedAt:yyyy-MM-dd HH:mm}");
 
-     _commandProcessor.SendToPlayer($"{progEditPrefix}// @program {objectId}:{verb.Name}");
+     _commandProcessor.SendToPlayer($"{progEditPrefix}// @program {dbref}:{verb.Name}");
         // Verb code
         if (string.IsNullOrEmpty(verb.Code))
         {
