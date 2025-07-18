@@ -30,13 +30,33 @@ public static class HotReloadManager
         
         try
         {
+            // Read config.json to determine if hot reload should be enabled
+            bool enabled = false;
+            try
+            {
+                var configText = File.ReadAllText("config.json");
+                var configObj = System.Text.Json.JsonDocument.Parse(configText);
+                if (configObj.RootElement.TryGetProperty("HotReload", out var hotReloadObj))
+                {
+                    if (hotReloadObj.TryGetProperty("Enabled", out var enabledProp))
+                    {
+                        enabled = enabledProp.GetBoolean();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Warning($"Could not read HotReload config: {ex.Message}");
+            }
+
+            SetEnabled(enabled);
+
             // Watch verb JSON files
             SetupVerbFileWatcher();
-            
+
             // Watch C# script files if they exist
             SetupScriptFileWatcher();
-            
-            _isEnabled = true;
+
             Logger.Info("Hot Reload Manager initialized successfully!");
             Logger.Info("The following will trigger hot reloads:");
             Logger.Info("  - Changes to verb JSON files in Resources/verbs/");

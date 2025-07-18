@@ -3,6 +3,9 @@
     "Port": 1701,
     "ShowDebugInConsole": false
   },
+  "HotReload": {
+    "Enabled": false
+  },
   "Database": {
     "GameDataFile": "gamedata.db",
     "LogDataFile": "gamedata-log.db"

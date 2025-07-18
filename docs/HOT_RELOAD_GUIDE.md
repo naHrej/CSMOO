@@ -84,9 +84,38 @@ Hot reload commands require specific permission flags:
 
 ## Configuration
 
-Hot reload is automatically enabled when the server starts. It can be controlled via:
-- The `@hotreload enable/disable` commands
-- Programmatically via `HotReloadManager.SetEnabled(bool)`
+The server configuration is managed via `config.json`. You can set the server port, database file locations, logging options, and hot reload features.
+
+### Example config.json
+```jsonc
+{
+  "Server": {
+    "Port": 1701,
+    "ShowDebugInConsole": false
+  },
+  "HotReload": {
+    "Enabled": false // Set to true to enable hot reload features
+  },
+  "Database": {
+    "GameDataFile": "gamedata.db",
+    "LogDataFile": "gamedata-log.db"
+  },
+  "Logging": {
+    "EnableConsoleLogging": true,
+    "EnableFileLogging": true,
+    "GameLogFile": "logs/game.log",
+    "DebugLogFile": "logs/debug.log",
+    "LogLevel": "Debug",
+    "MaxLogFiles": 5
+  }
+}
+```
+
+## Hot Reload Manager
+
+The Hot Reload Manager allows you to update verb and script files without restarting the server. By default, it is disabled. To enable, set `"HotReload": { "Enabled": true }` in your `config.json`.
+
+**Note:** When disabled, changes to verb or script files will not be automatically reloaded until the server is restarted.
 
 ## Benefits
 
