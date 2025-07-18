@@ -645,10 +645,12 @@ public class ProgrammingCommands
         }
         else
         {
-            var lines = verb.Code.Split('\n');
+            // Normalize line endings and trim each line
+            var normalizedCode = verb.Code.Replace("\r\n", "\n").Replace("\r", "\n");
+            var lines = normalizedCode.Split('\n');
             foreach (var line in lines)
             {
-                _commandProcessor.SendToPlayer($"{progEditPrefix}{line}");
+                _commandProcessor.SendToPlayer($"{progEditPrefix}{line.TrimEnd()}");
             }
         }
 
