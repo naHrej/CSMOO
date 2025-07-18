@@ -665,39 +665,57 @@ public class ProgrammingCommands
     /// </summary>
     private bool HandleListFunction(string functionId)
     {
+        const string progStartPrefix = "ProgStart > ";
+        const string progDataPrefix = "ProgData > ";
+        const string progEditPrefix = "ProgEdit > ";
+        const string progEndPrefix = "ProgEnd > ";
+
         var functions = GameDatabase.Instance.GetCollection<Function>("functions");
         var function = functions.FindById(functionId);
-        
+
         if (function == null)
         {
-            _commandProcessor.SendToPlayer($"Function with ID '{functionId}' not found.");
+            _commandProcessor.SendToPlayer($"{progStartPrefix}Function with ID '{functionId}' not found.");
+            _commandProcessor.SendToPlayer($"{progEndPrefix}.");
             return true;
         }
 
-        var paramString = string.Join(", ", function.ParameterTypes.Zip(function.ParameterNames, (type, name) => $"{type} {name}"));
-        
-        _commandProcessor.SendToPlayer($"=== Function {function.Name} ===");
-        _commandProcessor.SendToPlayer($"Signature: {function.ReturnType} {function.Name}({paramString})");
-        _commandProcessor.SendToPlayer($"Object: {GetObjectName(function.ObjectId)}");
-        _commandProcessor.SendToPlayer($"Permissions: {function.Permissions}");
-        if (!string.IsNullOrEmpty(function.Description))
-            _commandProcessor.SendToPlayer($"Description: {function.Description}");
-        
-        _commandProcessor.SendToPlayer($"Created by: {function.CreatedBy} on {function.CreatedAt:yyyy-MM-dd HH:mm}");
-        _commandProcessor.SendToPlayer($"Modified: {function.ModifiedAt:yyyy-MM-dd HH:mm}");
+        // Get dbref for the object
+        var gameObject = ObjectManager.GetObject(function.ObjectId);
+        var dbref = gameObject != null ? $"#{gameObject.DbRef}" : function.ObjectId;
 
+        var paramString = string.Join(", ", function.ParameterTypes.Zip(function.ParameterNames, (type, name) => $"{type} {name}"));
+
+        // Start of the listing
+        _commandProcessor.SendToPlayer($"{progStartPrefix}@program {dbref}.{function.Name}()");
+
+        // Function metadata
+        _commandProcessor.SendToPlayer($"{progDataPrefix}{GetObjectName(function.ObjectId)}.{function.Name}()");
+        _commandProcessor.SendToPlayer($"{progDataPrefix}Signature: {function.ReturnType} {function.Name}({paramString})");
+        _commandProcessor.SendToPlayer($"{progDataPrefix}Permissions: {function.Permissions}");
+        if (!string.IsNullOrEmpty(function.Description))
+            _commandProcessor.SendToPlayer($"{progDataPrefix}Description: {function.Description}");
+        _commandProcessor.SendToPlayer($"{progDataPrefix}Created by: {function.CreatedBy} on {function.CreatedAt:yyyy-MM-dd HH:mm}");
+        _commandProcessor.SendToPlayer($"{progDataPrefix}Modified: {function.ModifiedAt:yyyy-MM-dd HH:mm}");
+
+        _commandProcessor.SendToPlayer($"{progEditPrefix}// @program {dbref}.{function.Name}()");
+        // Function code
         if (string.IsNullOrEmpty(function.Code))
         {
-            _commandProcessor.SendToPlayer("  (no code)");
+            _commandProcessor.SendToPlayer($"{progEditPrefix}(no code)");
         }
         else
         {
-            var lines = function.Code.Split('\n');
-            for (int i = 0; i < lines.Length; i++)
+            var normalizedCode = function.Code.Replace("\r\n", "\n").Replace("\r", "\n");
+            var lines = normalizedCode.Split('\n');
+            foreach (var line in lines)
             {
-                _commandProcessor.SendToPlayer($"{i + 1,3}: {lines[i]}");
+                _commandProcessor.SendToPlayer($"{progEditPrefix}{line.TrimEnd()}");
             }
         }
+
+        // End of the listing
+        _commandProcessor.SendToPlayer($"{progEndPrefix}.");
 
         return true;
     }
