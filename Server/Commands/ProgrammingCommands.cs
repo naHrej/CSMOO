@@ -1987,13 +1987,13 @@ public class ProgrammingCommands
         var functionSignature = signatureParts[1];
 
         // Parse object:functionName(parameters)
-        var colonIndex = functionSignature.IndexOf(':');
+        var colonIndex = functionSignature.IndexOf('.');
         var parenIndex = functionSignature.IndexOf('(');
         var endParenIndex = functionSignature.LastIndexOf(')');
 
         if (colonIndex == -1 || parenIndex == -1 || endParenIndex == -1 || parenIndex < colonIndex)
         {
-            _commandProcessor.SendToPlayer("Invalid syntax. Use: object:functionName(type name, type name, ...)");
+            _commandProcessor.SendToPlayer("Invalid syntax. Use: object.functionName(type name, type name, ...)");
             return true;
         }
 
