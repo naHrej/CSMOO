@@ -1,6 +1,8 @@
 ﻿using CSMOO.Server;
 using CSMOO.Server.Configuration;
 using CSMOO.Server.Logging;
+using CSMOO.Server.WebSocket;
+using System.Threading.Tasks;
 
 namespace CSMOO
 {
@@ -31,10 +33,17 @@ namespace CSMOO
                 // Initialize the server and world
                 ServerInitializer.Initialize();
                 
-                ServerTelnet serverTelnet = new ServerTelnet(config.Server.Port);
+                // Start both servers
+                var telnetServer = new ServerTelnet(config.Server.Port);
+                var webSocketServer = new WebSocketServer(config.Server.Port + 1); // Use next port for WebSocket
+                
                 try
                 {
-                    serverTelnet.Start();
+                    // Start WebSocket server asynchronously
+                    _ = Task.Run(async () => await webSocketServer.StartAsync());
+                    
+                    // Start Telnet server (blocking call)
+                    telnetServer.Start();
                 }
                 catch (Exception ex)
                 {
@@ -42,7 +51,8 @@ namespace CSMOO
                 }
                 finally
                 {
-                    serverTelnet.Stop();
+                    telnetServer.Stop();
+                    webSocketServer.Stop();
                     ServerInitializer.Shutdown();
                     Logger.Info("Server has stopped.");
                 }

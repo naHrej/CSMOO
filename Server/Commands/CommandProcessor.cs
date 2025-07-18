@@ -17,14 +17,26 @@ namespace CSMOO.Server.Commands;
 public class CommandProcessor
 {
     private readonly Guid _sessionGuid;
-    private readonly TcpClient _client;
+    private readonly IClientConnection _connection;
     private Player? _player;
     private ProgrammingCommands? _programmingCommands;
 
     public CommandProcessor(Guid sessionGuid, TcpClient client)
     {
         _sessionGuid = sessionGuid;
-        _client = client;
+        _connection = new TelnetConnection(sessionGuid, client);
+        _player = PlayerManager.GetPlayerBySession(sessionGuid);
+        
+        if (_player != null)
+        {
+            _programmingCommands = new ProgrammingCommands(this, _player);
+        }
+    }
+
+    public CommandProcessor(Guid sessionGuid, IClientConnection connection)
+    {
+        _sessionGuid = sessionGuid;
+        _connection = connection ?? throw new ArgumentNullException(nameof(connection));
         _player = PlayerManager.GetPlayerBySession(sessionGuid);
         
         if (_player != null)
@@ -98,7 +110,7 @@ public class CommandProcessor
             case "quit":
             case "exit":
                 SendToPlayer("Goodbye!");
-                _client.Close();
+                _connection.Disconnect();
                 break;
             default:
                 SendToPlayer("You must login first. Type 'help' for assistance.");
@@ -256,7 +268,7 @@ public class CommandProcessor
         {
             PlayerManager.DisconnectPlayer(_player.Id);
         }
-        _client.Close();
+        _connection.Disconnect();
     }
 
     /// <summary>
@@ -334,12 +346,11 @@ public class CommandProcessor
         var targetSession = sessionGuid ?? _sessionGuid;
         var session = SessionHandler.ActiveSessions.FirstOrDefault(s => s.ClientGuid == targetSession);
         
-        if (session?.Client.Connected == true)
+        if (session?.Connection.IsConnected == true)
         {
             try
             {
-                var data = Encoding.UTF8.GetBytes(message + "\r\n");
-                session.Client.GetStream().Write(data, 0, data.Length);
+                _ = session.Connection.SendMessageAsync(message + "\r\n");
             }
             catch
             {

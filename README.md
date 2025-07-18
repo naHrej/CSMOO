@@ -74,12 +74,23 @@ Class("Weapon", "repair");  // Call verb on Weapon class
 - **Transaction safety** - Consistent state even during crashes
 
 ### **Networking & Sessions**
-- **Telnet protocol** - Connect with [MUjs](https://github.com/naHrej/MUjs) (recommended) or any traditional MUD/telnet client
+- **Dual Protocol Support** - Telnet (traditional) and WebSocket (modern web clients)
+- **Telnet server** - Connect with [MUjs](https://github.com/naHrej/MUjs) (recommended) or any traditional MUD/telnet client on port 1701
+- **WebSocket server** - Modern web client support with dual channels on port 1702:
+  - **Text Channel** (`ws://localhost:1702/ws`) - Text-based communication similar to telnet
+  - **JSON API Channel** (`ws://localhost:1702/api`) - Structured data communication for rich clients
 - **Unicode support** - Full UTF-8 character encoding for international languages, emojis, and symbols
-- **Session management** - Multiple concurrent users
+- **Session management** - Multiple concurrent users across both protocols
 - **Real-time messaging** - Instant communication between players
 - **Command processing** - Sophisticated input parsing and routing
 - **Error handling** - Graceful recovery from script errors
+
+### **WebSocket API Features**
+- **Message Types**: `command`, `ping/pong`, `subscribe/unsubscribe` for channel management
+- **Channel Subscriptions**: Real-time event notifications for game state changes
+- **Request/Response Correlation**: Track command execution with unique IDs
+- **Structured Error Handling**: JSON-formatted error responses with timestamps
+- **Connection Management**: Automatic cleanup and graceful disconnection
 
 ## 🛠 Technical Stack
 
@@ -87,6 +98,8 @@ Class("Weapon", "repair");  // Call verb on Weapon class
 - **Microsoft.CodeAnalysis.CSharp.Scripting** - Full C# compilation and execution
 - **LiteDB** - Embedded NoSQL database with LINQ support
 - **System.Net.Sockets** - TCP/Telnet networking
+- **System.Net.WebSockets** - Modern WebSocket protocol support
+- **System.Text.Json** - High-performance JSON serialization for API responses
 - **Antlr4** - Advanced command parsing (planned feature)
 
 ## 🎮 Usage Examples
@@ -255,10 +268,59 @@ unicode-test  # See emojis, international characters, and symbols
 @verbreload
 ```
 
+### WebSocket Client Examples
+
+#### Text Channel Connection (JavaScript)
+```javascript
+const ws = new WebSocket('ws://localhost:1702/ws');
+
+ws.onopen = () => {
+    console.log('Connected to CSMOO text channel');
+};
+
+ws.onmessage = (event) => {
+    console.log('Message:', event.data);
+};
+
+// Send commands like telnet
+ws.send('look');
+ws.send('north');
+```
+
+#### JSON API Channel Connection (JavaScript)
+```javascript
+const apiWs = new WebSocket('ws://localhost:1702/api');
+
+apiWs.onopen = () => {
+    // Subscribe to game events
+    apiWs.send(JSON.stringify({
+        type: 'subscribe',
+        channel: 'room_events'
+    }));
+    
+    // Send a command with request tracking
+    apiWs.send(JSON.stringify({
+        type: 'command',
+        command: 'look',
+        id: 'req_001'
+    }));
+};
+
+apiWs.onmessage = (event) => {
+    const data = JSON.parse(event.data);
+    console.log('API Response:', data);
+    
+    if (data.type === 'command_result') {
+        console.log(`Command "${data.command}" executed in ${data.executionTime}ms`);
+    }
+};
+```
+
 ## 🎯 Use Cases
 
 - **Educational Programming** - Learn C# in an interactive environment
 - **Game Development** - Create MUDs, text adventures, and virtual worlds
+- **Web-based MUD Clients** - Modern browser-based clients via WebSocket
 - **Collaborative Coding** - Multi-user programming environments
 - **Rapid Prototyping** - Test ideas with immediate feedback
 - **Virtual Workspaces** - Shared development environments
@@ -269,7 +331,7 @@ unicode-test  # See emojis, international characters, and symbols
 - [ ] Advanced ANTLR4 command parsing
 - [ ] Plugin system for external modules
 - [ ] RESTful API for external integrations
-- [ ] WebSocket support for real-time web clients
+- [x] **WebSocket support for real-time web clients** ✅ **COMPLETED**
 - [ ] Advanced debugging tools
 - [ ] Code repository and version control
 - [ ] Lua scripting support alongside C#

@@ -28,7 +28,20 @@ namespace CSMOO.Server.Session;
         {
             if (client == null) throw new ArgumentNullException(nameof(client));
             
-            var sessionInfo = new SessionInfo(clientGuid, client);
+            var connection = new TelnetConnection(clientGuid, client);
+            var sessionInfo = new SessionInfo(clientGuid, connection);
+            
+            lock (_lock)
+            {
+                _activeSessions.Add(sessionInfo);
+            }
+        }
+
+        public static void AddSession(Guid clientGuid, IClientConnection connection)
+        {
+            if (connection == null) throw new ArgumentNullException(nameof(connection));
+            
+            var sessionInfo = new SessionInfo(clientGuid, connection);
             
             lock (_lock)
             {
@@ -80,6 +93,6 @@ namespace CSMOO.Server.Session;
             return true;
         }
 
-        public record SessionInfo(Guid ClientGuid, TcpClient Client);
+        public record SessionInfo(Guid ClientGuid, IClientConnection Connection);
     }
 
