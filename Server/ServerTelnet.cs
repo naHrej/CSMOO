@@ -85,7 +85,7 @@ namespace CSMOO.Server
                                 inputBuffer.Remove(inputBuffer.Length - 1, 1);
                             }
                         }
-                        else if (c >= 32) // Printable characters
+                        else if (char.IsControl(c) == false) // Accept all non-control characters (includes Unicode)
                         {
                             inputBuffer.Append(c);
                         }

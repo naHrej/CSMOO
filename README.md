@@ -75,6 +75,7 @@ Class("Weapon", "repair");  // Call verb on Weapon class
 
 ### **Networking & Sessions**
 - **Telnet protocol** - Connect with [MUjs](https://github.com/naHrej/MUjs) (recommended) or any traditional MUD/telnet client
+- **Unicode support** - Full UTF-8 character encoding for international languages, emojis, and symbols
 - **Session management** - Multiple concurrent users
 - **Real-time messaging** - Instant communication between players
 - **Command processing** - Sophisticated input parsing and routing
@@ -246,6 +247,9 @@ return "Welcome to CSMOO!";
 
 # Test your creation
 greet
+
+# Test Unicode support
+unicode-test  # See emojis, international characters, and symbols
 
 # Hot reload verb definitions (new!)
 @verbreload
