@@ -218,6 +218,30 @@ public static class HotReloadManager
     }
 
     /// <summary>
+    /// Reload all function definitions
+    /// </summary>
+    private static void ReloadFunctions()
+    {
+        try
+        {
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+            
+            Logger.Info("🔄 Hot reloading function definitions...");
+            FunctionInitializer.ReloadFunctions();
+            
+            stopwatch.Stop();
+            Logger.Info($"✅ Function hot reload completed in {stopwatch.ElapsedMilliseconds}ms");
+            
+            // Notify online players of the reload
+            NotifyOnlinePlayersOfReload("Function definitions have been hot reloaded!");
+        }
+        catch (Exception ex)
+        {
+            Logger.Error("❌ Failed to hot reload functions", ex);
+        }
+    }
+
+    /// <summary>
     /// Reload script engine components
     /// </summary>
     private static void ReloadScripts()
@@ -250,6 +274,15 @@ public static class HotReloadManager
     {
         Logger.Info("Manual verb reload requested");
         ReloadVerbs();
+    }
+
+    /// <summary>
+    /// Manually trigger a hot reload of functions
+    /// </summary>
+    public static void ManualReloadFunctions()
+    {
+        Logger.Info("Manual function reload requested");
+        ReloadFunctions();
     }
 
     /// <summary>

@@ -78,7 +78,7 @@ public class ProgrammingCommands
     }
 
     /// <summary>
-    /// @program <object>:<verb> or function:<functionId> - Start programming a verb or function
+    /// @program <object>:<verb> or <object>.<function>() - Start programming a verb or function
     /// </summary>
     private bool HandleProgramCommand(string[] parts)
     {
@@ -91,21 +91,21 @@ public class ProgrammingCommands
 
         if (parts.Length != 2)
         {
-            _commandProcessor.SendToPlayer("Usage: @program <object>:<verb> or @program f:<object>:<function>");
+            _commandProcessor.SendToPlayer("Usage: @program <object>:<verb> or @program <object>.<function>()");
             _commandProcessor.SendToPlayer("Example: @program here:test or @program me:inventory");
-            _commandProcessor.SendToPlayer("Example: @program f:system:test_params");
+            _commandProcessor.SendToPlayer("Example: @program system.test_params()");
             return true;
         }
 
         var spec = parts[1];
-        if (!spec.Contains(':'))
+        
+        // Check if this is a function specification (object.function())
+        if (spec.Contains(".") && spec.EndsWith("()"))
         {
-            _commandProcessor.SendToPlayer("Specification must be in format <object>:<verb> or f:<object>:<function>");
-            return true;
+            return HandleProgramFunctionByDotNotation(spec);
         }
-
-        // Check if this is a function specification (f:object:function)
-        if (spec.StartsWith("f:"))
+        // Check if this is the old f:object:function format (keep for backward compatibility)
+        else if (spec.StartsWith("f:"))
         {
             var functionSpec = spec.Substring(2); // Remove "f:" prefix
             if (!functionSpec.Contains(':'))
@@ -120,9 +120,15 @@ public class ProgrammingCommands
         {
             return HandleProgramFunction(spec.Substring(9)); // Remove "function:" prefix
         }
-        else
+        // Check if it's a verb specification (object:verb)
+        else if (spec.Contains(':'))
         {
             return HandleProgramVerb(spec);
+        }
+        else
+        {
+            _commandProcessor.SendToPlayer("Specification must be in format <object>:<verb> or <object>.<function>()");
+            return true;
         }
     }
 
@@ -277,6 +283,49 @@ public class ProgrammingCommands
 
         var objectName = functionSpec.Substring(0, lastColonIndex);
         var functionName = functionSpec.Substring(lastColonIndex + 1);
+
+        // Resolve object
+        var objectId = ResolveObject(objectName);
+        if (string.IsNullOrEmpty(objectId))
+        {
+            _commandProcessor.SendToPlayer($"Object '{objectName}' not found.");
+            return true;
+        }
+
+        // Find function on object
+        var function = FunctionResolver.FindFunction(objectId, functionName);
+        if (function == null)
+        {
+            _commandProcessor.SendToPlayer($"Function '{functionName}' not found on object '{objectName}'.");
+            return true;
+        }
+
+        // Use the existing HandleProgramFunction method
+        return HandleProgramFunction(function.Id);
+    }
+
+    /// <summary>
+    /// Handle programming a function by object.function() notation
+    /// </summary>
+    private bool HandleProgramFunctionByDotNotation(string functionSpec)
+    {
+        // Remove the trailing () 
+        if (!functionSpec.EndsWith("()"))
+        {
+            _commandProcessor.SendToPlayer("Function specification must end with () - e.g., system.display_login()");
+            return true;
+        }
+
+        var specWithoutParens = functionSpec.Substring(0, functionSpec.Length - 2);
+        var dotIndex = specWithoutParens.LastIndexOf('.');
+        if (dotIndex == -1)
+        {
+            _commandProcessor.SendToPlayer("Function specification must be in format <object>.<function>()");
+            return true;
+        }
+
+        var objectName = specWithoutParens.Substring(0, dotIndex);
+        var functionName = specWithoutParens.Substring(dotIndex + 1);
 
         // Resolve object
         var objectId = ResolveObject(objectName);
@@ -490,25 +539,25 @@ public class ProgrammingCommands
     }
 
     /// <summary>
-    /// @list <object>:<verb> or function:<functionId> - Show the code for a verb or function
+    /// @list <object>:<verb> or <object>.<function>() - Show the code for a verb or function
     /// </summary>
     private bool HandleListCommand(string[] parts)
     {
         if (parts.Length != 2)
         {
-            _commandProcessor.SendToPlayer("Usage: @list <object>:<verb> or @list f:<object>:<function>");
+            _commandProcessor.SendToPlayer("Usage: @list <object>:<verb> or @list <object>.<function>()");
             return true;
         }
 
         var spec = parts[1];
-        if (!spec.Contains(':'))
+        
+        // Check if this is a function specification (object.function())
+        if (spec.Contains(".") && spec.EndsWith("()"))
         {
-            _commandProcessor.SendToPlayer("Specification must be in format <object>:<verb> or f:<object>:<function>");
-            return true;
+            return HandleListFunctionByDotNotation(spec);
         }
-
-        // Check if this is a function specification (f:object:function)
-        if (spec.StartsWith("f:"))
+        // Check if this is the old f:object:function format (keep for backward compatibility)
+        else if (spec.StartsWith("f:"))
         {
             var functionSpec = spec.Substring(2); // Remove "f:" prefix
             if (!functionSpec.Contains(':'))
@@ -523,9 +572,15 @@ public class ProgrammingCommands
         {
             return HandleListFunction(spec.Substring(9)); // Remove "function:" prefix
         }
-        else
+        // Check if it's a verb specification (object:verb)
+        else if (spec.Contains(':'))
         {
             return HandleListVerb(spec);
+        }
+        else
+        {
+            _commandProcessor.SendToPlayer("Specification must be in format <object>:<verb> or <object>.<function>()");
+            return true;
         }
     }
 
@@ -640,6 +695,49 @@ public class ProgrammingCommands
 
         var objectName = functionSpec.Substring(0, lastColonIndex);
         var functionName = functionSpec.Substring(lastColonIndex + 1);
+
+        // Resolve object
+        var objectId = ResolveObject(objectName);
+        if (string.IsNullOrEmpty(objectId))
+        {
+            _commandProcessor.SendToPlayer($"Object '{objectName}' not found.");
+            return true;
+        }
+
+        // Find function on object
+        var function = FunctionResolver.FindFunction(objectId, functionName);
+        if (function == null)
+        {
+            _commandProcessor.SendToPlayer($"Function '{functionName}' not found on object '{objectName}'.");
+            return true;
+        }
+
+        // Use the existing HandleListFunction method
+        return HandleListFunction(function.Id);
+    }
+
+    /// <summary>
+    /// Handle listing a function by object.function() notation
+    /// </summary>
+    private bool HandleListFunctionByDotNotation(string functionSpec)
+    {
+        // Remove the trailing () 
+        if (!functionSpec.EndsWith("()"))
+        {
+            _commandProcessor.SendToPlayer("Function specification must end with () - e.g., system.display_login()");
+            return true;
+        }
+
+        var specWithoutParens = functionSpec.Substring(0, functionSpec.Length - 2);
+        var dotIndex = specWithoutParens.LastIndexOf('.');
+        if (dotIndex == -1)
+        {
+            _commandProcessor.SendToPlayer("Function specification must be in format <object>.<function>()");
+            return true;
+        }
+
+        var objectName = specWithoutParens.Substring(0, dotIndex);
+        var functionName = specWithoutParens.Substring(dotIndex + 1);
 
         // Resolve object
         var objectId = ResolveObject(objectName);
@@ -1590,7 +1688,7 @@ public class ProgrammingCommands
     }
 
     /// <summary>
-    /// @reload [verbs|scripts] - Manually trigger hot reload
+    /// @reload [verbs|functions|scripts] - Manually trigger hot reload
     /// </summary>
     private bool HandleReloadCommand(string[] parts)
     {
@@ -1603,10 +1701,11 @@ public class ProgrammingCommands
 
         if (parts.Length < 2)
         {
-            _commandProcessor.SendToPlayer("Usage: @reload [verbs|scripts|status]");
-            _commandProcessor.SendToPlayer("  @reload verbs   - Reload all verb definitions");
-            _commandProcessor.SendToPlayer("  @reload scripts - Reload script engine");
-            _commandProcessor.SendToPlayer("  @reload status  - Show hot reload status");
+            _commandProcessor.SendToPlayer("Usage: @reload [verbs|functions|scripts|status]");
+            _commandProcessor.SendToPlayer("  @reload verbs     - Reload all verb definitions");
+            _commandProcessor.SendToPlayer("  @reload functions - Reload all function definitions");
+            _commandProcessor.SendToPlayer("  @reload scripts   - Reload script engine");
+            _commandProcessor.SendToPlayer("  @reload status    - Show hot reload status");
             return true;
         }
 
@@ -1624,6 +1723,21 @@ public class ProgrammingCommands
                 {
                     _commandProcessor.SendToPlayer($"❌ Verb reload failed: {ex.Message}");
                     Logger.Error("Manual verb reload failed", ex);
+                }
+                break;
+
+            case "functions":
+            case "funcs":
+                _commandProcessor.SendToPlayer("🔄 Initiating manual function reload...");
+                try
+                {
+                    HotReloadManager.ManualReloadFunctions();
+                    _commandProcessor.SendToPlayer("✅ Function reload completed successfully!");
+                }
+                catch (Exception ex)
+                {
+                    _commandProcessor.SendToPlayer($"❌ Function reload failed: {ex.Message}");
+                    Logger.Error("Manual function reload failed", ex);
                 }
                 break;
 
@@ -1646,12 +1760,13 @@ public class ProgrammingCommands
                 _commandProcessor.SendToPlayer($"Hot Reload Status: {status}");
                 _commandProcessor.SendToPlayer("Monitored paths:");
                 _commandProcessor.SendToPlayer("  • Resources/verbs/ (*.json)");
+                _commandProcessor.SendToPlayer("  • Resources/functions/ (*.json)");
                 _commandProcessor.SendToPlayer("  • Scripts/ (*.cs) [if present]");
                 break;
 
             default:
                 _commandProcessor.SendToPlayer($"Unknown reload target: {target}");
-                _commandProcessor.SendToPlayer("Valid targets: verbs, scripts, status");
+                _commandProcessor.SendToPlayer("Valid targets: verbs, functions, scripts, status");
                 break;
         }
 
@@ -1714,7 +1829,7 @@ public class ProgrammingCommands
                 else
                 {
                     _commandProcessor.SendToPlayer("🔇 File monitoring is disabled");
-                    _commandProcessor.SendToPlayer("💡 Use '@reload verbs' or '@reload scripts' for manual reloads");
+                    _commandProcessor.SendToPlayer("💡 Use '@reload verbs', '@reload functions', or '@reload scripts' for manual reloads");
                 }
                 break;
 

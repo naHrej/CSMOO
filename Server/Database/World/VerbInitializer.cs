@@ -50,8 +50,12 @@ public static class VerbInitializer
 
         // Clear existing verb definitions from database
         var verbs = GameDatabase.Instance.GetCollection<Verb>("verbs");
+        var countBefore = verbs.Count();
+        Logger.Debug($"Found {countBefore} verbs before deletion");
+        
         verbs.DeleteAll();
-        Logger.Debug("Cleared existing verb definitions");
+        var countAfterDelete = verbs.Count();
+        Logger.Debug($"Cleared existing verb definitions - {countAfterDelete} verbs remaining");
 
         // Reload all verbs from JSON files
         var classStats = LoadClassVerbs();
@@ -59,8 +63,9 @@ public static class VerbInitializer
 
         var totalLoaded = classStats.Loaded + systemStats.Loaded;
         var totalSkipped = classStats.Skipped + systemStats.Skipped;
+        var countAfterReload = verbs.Count();
 
-        Logger.Info($"Verb definitions reloaded successfully - Created: {totalLoaded}, Skipped: {totalSkipped}");
+        Logger.Info($"Verb definitions reloaded successfully - Created: {totalLoaded}, Skipped: {totalSkipped}, Total in DB: {countAfterReload}");
     }
 
     /// <summary>

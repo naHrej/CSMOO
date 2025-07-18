@@ -50,8 +50,12 @@ public static class FunctionInitializer
 
         // Clear existing function definitions from database
         var functions = GameDatabase.Instance.GetCollection<Function>("functions");
+        var countBefore = functions.Count();
+        Logger.Debug($"Found {countBefore} functions before deletion");
+        
         functions.DeleteAll();
-        Logger.Debug("Cleared existing function definitions");
+        var countAfterDelete = functions.Count();
+        Logger.Debug($"Cleared existing function definitions - {countAfterDelete} functions remaining");
 
         // Reload all functions from JSON files
         var classStats = LoadClassFunctions();
@@ -59,8 +63,9 @@ public static class FunctionInitializer
 
         var totalLoaded = classStats.Loaded + systemStats.Loaded;
         var totalSkipped = classStats.Skipped + systemStats.Skipped;
+        var countAfterReload = functions.Count();
 
-        Logger.Info($"Function definitions reloaded successfully - Created: {totalLoaded}, Skipped: {totalSkipped}");
+        Logger.Info($"Function definitions reloaded successfully - Created: {totalLoaded}, Skipped: {totalSkipped}, Total in DB: {countAfterReload}");
     }
 
     /// <summary>
