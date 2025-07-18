@@ -74,7 +74,7 @@ Class("Weapon", "repair");  // Call verb on Weapon class
 - **Transaction safety** - Consistent state even during crashes
 
 ### **Networking & Sessions**
-- **Telnet protocol** - Connect with any telnet client
+- **Telnet protocol** - Connect with [MUjs](https://github.com/naHrej/MUjs) (recommended) or any traditional MUD/telnet client
 - **Session management** - Multiple concurrent users
 - **Real-time messaging** - Instant communication between players
 - **Command processing** - Sophisticated input parsing and routing
@@ -191,6 +191,15 @@ Object (abstract base)
 - **Players** - User accounts and session data
 
 ## 🚦 Getting Started
+
+### Recommended Client
+CSMOO is designed to work optimally with **[MUjs](https://github.com/naHrej/MUjs)**, a modern web-based MUD client that provides:
+- Rich text formatting and color support
+- Enhanced user interface elements
+- Improved command input and history
+- Better integration with CSMOO's advanced features
+
+However, CSMOO is fully compatible with any traditional MUD client or standard telnet client.
 
 ### Prerequisites
 - .NET 9 SDK
