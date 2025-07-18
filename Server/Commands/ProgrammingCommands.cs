@@ -599,7 +599,8 @@ public class ProgrammingCommands
         var objectName = verbSpec.Substring(0, lastColonIndex);
         var verbName = verbSpec.Substring(lastColonIndex + 1);
 
-        var objectId = ResolveObject(objectName);
+        var objectId = ResolveObject(objectName);        
+
         if (objectId == null)
         {
             // Optionally prepare for creating a new verb
@@ -620,9 +621,10 @@ public class ProgrammingCommands
         }
 
         // Start of the listing
-        _commandProcessor.SendToPlayer($"{progStartPrefix}@program {GetObjectName(objectId)}:{verb.Name}");
+        _commandProcessor.SendToPlayer($"{progStartPrefix}@program {objectId}:{verb.Name}");
 
         // Verb metadata
+        _commandProcessor.SendToPlayer($"{progDataPrefix}{GetObjectName(objectId)}:{verb.Name}");
         if (!string.IsNullOrEmpty(verb.Aliases))
             _commandProcessor.SendToPlayer($"{progDataPrefix}Aliases: {verb.Aliases}");
         if (!string.IsNullOrEmpty(verb.Pattern))
@@ -632,6 +634,7 @@ public class ProgrammingCommands
 
         _commandProcessor.SendToPlayer($"{progDataPrefix}Created by: {verb.CreatedBy} on {verb.CreatedAt:yyyy-MM-dd HH:mm}");
 
+     _commandProcessor.SendToPlayer($"{progEditPrefix}// @program {objectId}:{verb.Name}");
         // Verb code
         if (string.IsNullOrEmpty(verb.Code))
         {
