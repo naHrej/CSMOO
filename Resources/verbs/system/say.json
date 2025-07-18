@@ -15,6 +15,6 @@
     "Builtins.Notify(Player, $\"You say, \\\"{message}\\\"\");",
     "",
     "// Send to other players in the room",
-    "Builtins.SayToRoom($\"{Builtins.GetPlayerName(Player.Id)} says, \\\"{message}\\\"\", true);"
+    "Builtins.SayToRoom($\"Player.Name says, \\\"{message}\\\"\", true);"
   ]
 }

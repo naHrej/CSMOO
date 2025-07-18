@@ -4,6 +4,7 @@ using CSMOO.Server.Commands;
 using CSMOO.Server.Database;
 using CSMOO.Server.Database.Models;
 using CSMOO.Server.Logging;
+using System.Text;
 
 namespace CSMOO.Server.Scripting
 {
@@ -39,7 +40,7 @@ namespace CSMOO.Server.Scripting
         /// Execute a verb's code with enhanced script globals
         /// </summary>
         public string ExecuteVerb(Database.Models.Verb verb, string input, Database.Player player, 
-            CommandProcessor commandProcessor, string? thisObjectId = null)
+            CommandProcessor commandProcessor, string? thisObjectId = null, Dictionary<string, string>? variables = null)
         {
             try
             {
@@ -51,7 +52,8 @@ namespace CSMOO.Server.Scripting
                     ThisObject = thisObjectId ?? verb.ObjectId,
                     Input = input,
                     Args = ParseArguments(input),
-                    Verb = verb.Name
+                    Verb = verb.Name,
+                    Variables = variables ?? new Dictionary<string, string>()
                 };
 
                 // Set the current context for the Builtins class
@@ -60,7 +62,10 @@ namespace CSMOO.Server.Scripting
                 // Initialize the object factory for enhanced script support
                 globals.InitializeObjectFactory();
 
-                var script = CSharpScript.Create(verb.Code, _scriptOptions, typeof(VerbScriptGlobals));
+                // Build the complete script with automatic variable declarations
+                var completeScript = BuildScriptWithVariables(verb.Code, variables);
+
+                var script = CSharpScript.Create(completeScript, _scriptOptions, typeof(VerbScriptGlobals));
                 var result = script.RunAsync(globals).Result;
                 
                 return result.ReturnValue?.ToString() ?? "";
@@ -81,6 +86,45 @@ namespace CSMOO.Server.Scripting
         {
             var parts = input.Split(' ', StringSplitOptions.RemoveEmptyEntries);
             return parts.Skip(1).ToList(); // Skip the verb itself
+        }
+
+        /// <summary>
+        /// Builds a complete script by injecting variable declarations before the main code
+        /// </summary>
+        private string BuildScriptWithVariables(string originalCode, Dictionary<string, string>? variables)
+        {
+            if (variables == null || variables.Count == 0)
+            {
+                return originalCode;
+            }
+
+            var scriptBuilder = new StringBuilder();
+            
+            // Add variable declarations at the beginning
+            scriptBuilder.AppendLine("// Auto-generated variable declarations from pattern matching");
+            foreach (var kvp in variables)
+            {
+                // Use simple string escaping for C# string literals
+                var escapedValue = kvp.Value
+                    .Replace("\\", "\\\\")   // Escape backslashes
+                    .Replace("\"", "\\\"")   // Escape double quotes
+                    .Replace("\r", "\\r")    // Escape carriage returns
+                    .Replace("\n", "\\n")    // Escape newlines
+                    .Replace("\t", "\\t");   // Escape tabs
+                    
+                scriptBuilder.AppendLine($"string {kvp.Key} = \"{escapedValue}\";");
+                Logger.Debug($"Auto-declared variable: {kvp.Key} = \"{escapedValue}\"");
+            }
+            scriptBuilder.AppendLine();
+            
+            // Add the original verb code
+            scriptBuilder.AppendLine("// Original verb code:");
+            scriptBuilder.AppendLine(originalCode);
+            
+            var completeScript = scriptBuilder.ToString();
+            Logger.Debug($"Complete generated script:\n{completeScript}");
+            
+            return completeScript;
         }
     }
 }

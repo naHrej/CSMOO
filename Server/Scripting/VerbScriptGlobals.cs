@@ -35,6 +35,11 @@ namespace CSMOO.Server.Scripting
         public string Verb { get; set; } = string.Empty;
 
         /// <summary>
+        /// Named variables extracted from the verb pattern (e.g., {item}, {person})
+        /// </summary>
+        public Dictionary<string, string> Variables { get; set; } = new Dictionary<string, string>();
+
+        /// <summary>
         /// Get a property from the current object (this)
         /// </summary>
         public object? GetThisProperty(string propertyName)

@@ -12,12 +12,76 @@ using CSMOO.Server.Logging;
 namespace CSMOO.Server.Scripting;
 
 /// <summary>
+/// Result of verb matching that includes extracted pattern variables
+/// </summary>
+public class VerbMatchResult
+{
+    public Verb Verb { get; set; }
+    public Dictionary<string, string> Variables { get; set; } = new Dictionary<string, string>();
+    
+    public VerbMatchResult(Verb verb, Dictionary<string, string>? variables = null)
+    {
+        Verb = verb;
+        Variables = variables ?? new Dictionary<string, string>();
+    }
+}
+
+/// <summary>
 /// Resolves and manages verb execution for objects
 /// </summary>
 public static class VerbResolver
 {
     /// <summary>
-    /// Finds the best matching verb for a command on an object
+    /// Finds the best matching verb for a command on an object with variable extraction
+    /// </summary>
+    public static VerbMatchResult? FindMatchingVerbWithVariables(string objectId, string[] commandArgs, bool includeSystemVerbs = true)
+    {
+        if (commandArgs.Length == 0) return null;
+
+        var verbName = commandArgs[0].ToLower();
+        var allVerbs = GetVerbsForObject(objectId, includeSystemVerbs);
+
+        // Step 1: Try to find verb by name or alias first
+        Verb? foundVerb = null;
+        
+        // Try exact name match
+        foundVerb = allVerbs.FirstOrDefault(v => v.Name?.ToLower() == verbName);
+        if (foundVerb == null)
+        {
+            // Try alias match
+            foundVerb = allVerbs.FirstOrDefault(v => 
+                !string.IsNullOrEmpty(v.Aliases) && 
+                v.Aliases.Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                         .Any(alias => alias.ToLower() == verbName));
+        }
+
+        // Step 2: If we found a verb, check if it has a pattern
+        if (foundVerb != null)
+        {
+            if (!string.IsNullOrEmpty(foundVerb.Pattern))
+            {
+                var variables = MatchesPatternWithVariables(commandArgs, foundVerb.Pattern);
+                if (variables != null)
+                {
+                    return new VerbMatchResult(foundVerb, variables);
+                }
+                else
+                {
+                    return null; // Pattern didn't match, don't fall back to legacy
+                }
+            }
+            else
+            {
+                return new VerbMatchResult(foundVerb); // No pattern, use legacy args
+            }
+        }
+
+        // Step 3: If no verb found by name/alias, return null
+        return null;
+    }
+
+    /// <summary>
+    /// Finds the best matching verb for a command on an object (legacy method)
     /// </summary>
     public static Verb? FindMatchingVerb(string objectId, string[] commandArgs, bool includeSystemVerbs = true)
     {
@@ -149,6 +213,113 @@ public static class VerbResolver
 
         // Pattern matches if we consumed all pattern parts
         return patternIndex == patternParts.Length;
+    }
+
+    /// <summary>
+    /// Enhanced pattern matching that supports named variables like {varname}
+    /// Returns a dictionary of extracted variables if the pattern matches
+    /// </summary>
+    public static Dictionary<string, string>? MatchesPatternWithVariables(string[] args, string pattern)
+    {
+        if (string.IsNullOrEmpty(pattern)) return new Dictionary<string, string>();
+
+        // Handle special case: wildcard pattern "*" matches anything
+        if (pattern == "*")
+        {
+            return new Dictionary<string, string>(); // Empty variables dict but successful match
+        }
+
+        // Only process patterns that contain {variables}
+        if (!pattern.Contains("{") || !pattern.Contains("}"))
+        {
+            return MatchesPatternLegacy(args, pattern) ? new Dictionary<string, string>() : null;
+        }
+
+        // Convert pattern with {varname} syntax to regex
+        var regexPattern = ConvertPatternToRegex(pattern);
+        if (regexPattern == null) return null;
+
+        // Join all args except the first (verb name) into a single string
+        var input = string.Join(" ", args.Skip(1));
+        
+        var match = Regex.Match(input, regexPattern, RegexOptions.IgnoreCase);
+        if (!match.Success) return null;
+
+        // Extract variable names from the original pattern
+        var variableNames = ExtractVariableNames(pattern);
+        var variables = new Dictionary<string, string>();
+
+        // Map captured groups to variable names
+        for (int i = 0; i < variableNames.Count && i + 1 < match.Groups.Count; i++)
+        {
+            variables[variableNames[i]] = match.Groups[i + 1].Value;
+        }
+
+        return variables;
+    }
+
+    /// <summary>
+    /// Legacy pattern matching for patterns without named variables
+    /// </summary>
+    private static bool MatchesPatternLegacy(string[] args, string pattern)
+    {
+        // This handles the old-style patterns
+        return MatchesPattern(args, pattern);
+    }
+
+    /// <summary>
+    /// Converts a pattern like "give {item} to {person}" to a regex pattern
+    /// </summary>
+    private static string? ConvertPatternToRegex(string pattern)
+    {
+        try
+        {
+            // First, let's extract variables before escaping
+            var variablePattern = @"\{(\w+)\}";
+            var variables = new List<string>();
+            var matches = Regex.Matches(pattern, variablePattern);
+            foreach (Match match in matches)
+            {
+                variables.Add(match.Groups[1].Value);
+            }
+            
+            // Replace variables with a placeholder
+            var tempPattern = Regex.Replace(pattern, variablePattern, "VARIABLE_PLACEHOLDER");
+            
+            // Now escape the pattern (this will escape everything except our placeholder)
+            var escaped = Regex.Escape(tempPattern);
+            
+            // Replace the placeholder with the capture group
+            var regexPattern = escaped.Replace("VARIABLE_PLACEHOLDER", @"(\w+)");
+            
+            // Allow for flexible whitespace
+            regexPattern = Regex.Replace(regexPattern, @"\\ ", @"\s+");
+            
+            var finalPattern = $"^{regexPattern}$";
+            
+            return finalPattern;
+        }
+        catch (Exception ex)
+        {
+            Logger.Error($"Error converting pattern '{pattern}' to regex: {ex.Message}");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Extracts variable names from a pattern like "give {item} to {person}"
+    /// </summary>
+    private static List<string> ExtractVariableNames(string pattern)
+    {
+        var variables = new List<string>();
+        var matches = Regex.Matches(pattern, @"{(\w+)}");
+        
+        foreach (Match match in matches)
+        {
+            variables.Add(match.Groups[1].Value);
+        }
+        
+        return variables;
     }
 
     /// <summary>
@@ -323,10 +494,10 @@ public static class VerbResolver
         var roomObjects = ObjectManager.GetObjectsInLocation(player.Location);
         foreach (var obj in roomObjects)
         {
-            var matchedVerb = FindMatchingVerb(obj.Id, parts);
-            if (matchedVerb != null)
+            var matchResult = FindMatchingVerbWithVariables(obj.Id, parts);
+            if (matchResult != null)
             {
-                return ExecuteVerb(matchedVerb, input, player, commandProcessor, obj.Id);
+                return ExecuteVerb(matchResult.Verb, input, player, commandProcessor, obj.Id, matchResult.Variables);
             }
         }
 
@@ -334,29 +505,62 @@ public static class VerbResolver
         var room = GameDatabase.Instance.GameObjects.FindById(player.Location);
         if (room != null)
         {
-            var roomVerb = FindMatchingVerb(room.Id, parts);
-            if (roomVerb != null)
+            var roomVerbResult = FindMatchingVerbWithVariables(room.Id, parts);
+            if (roomVerbResult != null)
             {
-                return ExecuteVerb(roomVerb, input, player, commandProcessor, room.Id);
+                return ExecuteVerb(roomVerbResult.Verb, input, player, commandProcessor, room.Id, roomVerbResult.Variables);
             }
         }
 
         // 3. Check the player
-        var playerVerb = FindMatchingVerb(player.Id, parts);
-        if (playerVerb != null)
+        var playerVerbResult = FindMatchingVerbWithVariables(player.Id, parts);
+        if (playerVerbResult != null)
         {
-            return ExecuteVerb(playerVerb, input, player, commandProcessor, player.Id);
+            return ExecuteVerb(playerVerbResult.Verb, input, player, commandProcessor, player.Id, playerVerbResult.Variables);
         }
 
         // 4. Check global verbs (we'll use a special "system" object)
         var systemObject = GetOrCreateSystemObject();
-        var globalVerb = FindMatchingVerb(systemObject.Id, parts);
-        if (globalVerb != null)
+        var globalVerbResult = FindMatchingVerbWithVariables(systemObject.Id, parts);
+        if (globalVerbResult != null)
         {
-            return ExecuteVerb(globalVerb, input, player, commandProcessor, systemObject.Id);
+            return ExecuteVerb(globalVerbResult.Verb, input, player, commandProcessor, systemObject.Id, globalVerbResult.Variables);
         }
 
-        // 5. Fallback: Check if this is a movement command (single word that matches an exit)
+        // 5. Final fallback: Check for pattern-based verbs with named variables across all objects
+        if (parts.Length > 1)
+        {
+            // Check all objects in order for verbs with named variable patterns
+            var allObjectIds = new List<string>();
+            
+            // Add room objects
+            var roomObjectList = ObjectManager.GetObjectsInLocation(player.Location);
+            allObjectIds.AddRange(roomObjectList.Select(obj => obj.Id));
+            
+            // Add room
+            if (room != null) allObjectIds.Add(room.Id);
+            
+            // Add player
+            allObjectIds.Add(player.Id);
+            
+            // Add system object
+            allObjectIds.Add(systemObject.Id);
+            
+            foreach (var objectId in allObjectIds)
+            {
+                var allVerbs = GetVerbsForObject(objectId, objectId == systemObject.Id);
+                foreach (var verbItem in allVerbs.Where(v => !string.IsNullOrEmpty(v.Pattern) && v.Pattern.Contains("{") && v.Pattern.Contains("}")))
+                {
+                    var variables = MatchesPatternWithVariables(parts, verbItem.Pattern);
+                    if (variables != null)
+                    {
+                        return ExecuteVerb(verbItem, input, player, commandProcessor, objectId, variables);
+                    }
+                }
+            }
+        }
+
+        // 6. Fallback: Check if this is a movement command (single word that matches an exit)
         if (parts.Length == 1)
         {
             var direction = parts[0].ToLower();
@@ -372,15 +576,13 @@ public static class VerbResolver
     /// <summary>
     /// Executes a verb with the script engine
     /// </summary>
-    private static bool ExecuteVerb(Verb verb, string input, Database.Player player, Commands.CommandProcessor commandProcessor, string thisObjectId)
+    private static bool ExecuteVerb(Verb verb, string input, Database.Player player, Commands.CommandProcessor commandProcessor, string thisObjectId, Dictionary<string, string>? variables = null)
     {
         try
         {
             var scriptEngine = new VerbScriptEngine();
-            var result = scriptEngine.ExecuteVerb(verb, input, player, commandProcessor, thisObjectId);
+            var result = scriptEngine.ExecuteVerb(verb, input, player, commandProcessor, thisObjectId, variables);
             
-            // Log successful execution
-            Logger.Debug($"Executed verb '{verb.Name}' on object {thisObjectId} for player {player.Name}");
             return true;
         }
         catch (Exception ex)
