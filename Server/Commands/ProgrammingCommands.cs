@@ -638,7 +638,6 @@ public class ProgrammingCommands
 
         _commandProcessor.SendToPlayer($"{progDataPrefix}Created by: {verb.CreatedBy} on {verb.CreatedAt:yyyy-MM-dd HH:mm}");
 
-     _commandProcessor.SendToPlayer($"{progEditPrefix}// @program {dbref}:{verb.Name}");
         // Verb code
         if (string.IsNullOrEmpty(verb.Code))
         {
