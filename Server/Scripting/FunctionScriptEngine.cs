@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Dynamic;
 using System.Linq;
 using System.Reflection;
 using System.Text;
@@ -9,6 +10,8 @@ using CSMOO.Server.Database;
 using CSMOO.Server.Database.Models;
 using CSMOO.Server.Logging;
 using CSMOO.Server.Commands;
+using LiteDB;
+using Database = CSMOO.Server.Database;
 
 namespace CSMOO.Server.Scripting;
 
@@ -69,6 +72,7 @@ public class FunctionScriptEngine
             var globals = new FunctionScriptGlobals
             {
                 Player = callingPlayer,
+                
                 CommandProcessor = commandProcessor,
                 CallingObjectId = callingObjectId,
                 Parameters = parameters
@@ -82,6 +86,14 @@ public class FunctionScriptEngine
                 {
                     globals.SetParameter(paramName, parameters[i]);
                 }
+
+                
+            }
+
+            // we need to resolve thisObjectId to the actual GameObject
+            if (!string.IsNullOrEmpty(callingObjectId))
+            {
+                globals.SetParameter("self", Database.ObjectManager.GetObject(callingObjectId));
             }
 
             // Build script code that declares the parameters as variables
@@ -196,7 +208,25 @@ public class FunctionScriptGlobals : ScriptGlobals
     /// </summary>
     public string CallingObjectId { get; set; } = "";
 
+    /// <summary>
+    /// Dynamic object that provides "this.propertyName" syntax
+    /// </summary>
+    public ThisObjectAccessor @this { get; private set; }
+
+    /// <summary>
+    /// Get the calling object ID - alias for CallingObjectId for easier access
+    /// </summary>
+    public string ThisObject => CallingObjectId;
+
     private readonly Dictionary<string, object?> _namedParameters = new();
+
+    /// <summary>
+    /// Constructor that initializes the dynamic object accessor
+    /// </summary>
+    public FunctionScriptGlobals()
+    {
+        @this = new ThisObjectAccessor(this);
+    }
 
     /// <summary>
     /// Sets a named parameter that can be accessed in the script
@@ -288,6 +318,48 @@ public class FunctionScriptGlobals : ScriptGlobals
     }
 
     /// <summary>
+    /// Get a property from the calling object
+    /// </summary>
+    public object? GetThisProperty(string propertyName)
+    {
+        if (string.IsNullOrEmpty(CallingObjectId))
+        {
+            throw new InvalidOperationException("No calling object context available.");
+        }
+        
+        var property = Database.ObjectManager.GetProperty(CallingObjectId, propertyName);
+        return property?.RawValue;
+    }
+
+    /// <summary>
+    /// Set a property on the calling object
+    /// </summary>
+    public void SetThisProperty(string propertyName, object? value)
+    {
+        if (string.IsNullOrEmpty(CallingObjectId))
+        {
+            throw new InvalidOperationException("No calling object context available.");
+        }
+
+        // Convert value to BsonValue
+        BsonValue bsonValue = value switch
+        {
+            null => BsonValue.Null,
+            string s => new BsonValue(s),
+            int i => new BsonValue(i),
+            long l => new BsonValue(l),
+            double d => new BsonValue(d),
+            float f => new BsonValue((double)f),
+            bool b => new BsonValue(b),
+            DateTime dt => new BsonValue(dt),
+            BsonValue bv => bv,
+            _ => new BsonValue(value.ToString() ?? "")
+        };
+
+        Database.ObjectManager.SetProperty(CallingObjectId, propertyName, bsonValue);
+    }
+
+    /// <summary>
     /// Call a function on a specific object by DBREF
     /// </summary>
     public new object? Object(int dbref, string functionName, params object?[] parameters)
@@ -301,5 +373,51 @@ public class FunctionScriptGlobals : ScriptGlobals
     public new object? Class(string className, string functionName, params object?[] parameters)
     {
         return CallFunction($"class:{className}", functionName, parameters);
+    }
+}
+
+/// <summary>
+/// Dynamic object that provides natural property access syntax for the calling object
+/// Enables "this.propertyName" and "this.propertyName = value" syntax
+/// </summary>
+public class ThisObjectAccessor : DynamicObject
+{
+    private readonly FunctionScriptGlobals _globals;
+
+    public ThisObjectAccessor(FunctionScriptGlobals globals)
+    {
+        _globals = globals;
+    }
+
+    /// <summary>
+    /// Handles property getting: this.propertyName
+    /// </summary>
+    public override bool TryGetMember(GetMemberBinder binder, out object? result)
+    {
+        try
+        {
+            result = _globals.GetThisProperty(binder.Name);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException($"Error accessing property '{binder.Name}' on calling object: {ex.Message}", ex);
+        }
+    }
+
+    /// <summary>
+    /// Handles property setting: this.propertyName = value
+    /// </summary>
+    public override bool TrySetMember(SetMemberBinder binder, object? value)
+    {
+        try
+        {
+            _globals.SetThisProperty(binder.Name, value);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException($"Error setting property '{binder.Name}' on calling object: {ex.Message}", ex);
+        }
     }
 }

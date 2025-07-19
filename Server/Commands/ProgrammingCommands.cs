@@ -613,6 +613,11 @@ public class ProgrammingCommands
         var gameObject = ObjectManager.GetObject(objectId);
         var dbref = gameObject != null ? $"#{gameObject.DbRef}" : objectId;
 
+        if (dbref.StartsWith("class"))
+        {
+            dbref = $"class:{dbref.Substring(6)}";
+        }
+
         var verb = VerbManager.GetVerbsOnObject(objectId)
             .FirstOrDefault(v => v.Name.ToLower() == verbName.ToLower());
 
@@ -625,6 +630,10 @@ public class ProgrammingCommands
         }
 
         // Start of the listing
+        // we need to output the verb in the format of class:classname:verbname if it's a class
+        // or just object:verbname if it's a regular object
+        // This allows the player to copy the verb command directly
+
         _commandProcessor.SendToPlayer($"{progStartPrefix}@program {dbref}:{verb.Name}");
 
         // Verb metadata
@@ -684,6 +693,7 @@ public class ProgrammingCommands
         var gameObject = ObjectManager.GetObject(function.ObjectId);
         var dbref = gameObject != null ? $"#{gameObject.DbRef}" : function.ObjectId;
 
+
         var paramString = string.Join(", ", function.ParameterTypes.Zip(function.ParameterNames, (type, name) => $"{type} {name}"));
 
         // Start of the listing
@@ -691,6 +701,7 @@ public class ProgrammingCommands
 
         // Function metadata
         _commandProcessor.SendToPlayer($"{progDataPrefix}{GetObjectName(function.ObjectId)}.{function.Name}()");
+_commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{function.Name}()");
         _commandProcessor.SendToPlayer($"{progDataPrefix}Signature: {function.ReturnType} {function.Name}({paramString})");
         _commandProcessor.SendToPlayer($"{progDataPrefix}Permissions: {function.Permissions}");
         if (!string.IsNullOrEmpty(function.Description))
@@ -1252,6 +1263,12 @@ public class ProgrammingCommands
                         c.Name.Equals(className, StringComparison.OrdinalIgnoreCase));
                     result = objectClass?.Id;
                     Logger.Debug($"Class lookup '{className}' -> {result ?? "not found"}");
+                }
+                // Check if it's a direct class ID (like "obj_room", "obj_exit", etc.)
+                else if (GameDatabase.Instance.ObjectClasses.FindById(objectName) != null)
+                {
+                    result = objectName; // The objectName itself is the class ID
+                    Logger.Debug($"Direct class ID lookup '{objectName}' -> {result}");
                 }
                 else
                 {

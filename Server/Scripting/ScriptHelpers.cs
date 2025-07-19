@@ -171,6 +171,12 @@ public class ScriptHelpers
                     result = objectClass?.Id;
                     Logger.Debug($"Class lookup '{className}' -> {result ?? "not found"}");
                 }
+                // Check if it's a direct class ID (like "obj_room", "obj_exit", etc.)
+                else if (GameDatabase.Instance.ObjectClasses.FindById(objectName) != null)
+                {
+                    result = objectName; // The objectName itself is the class ID
+                    Logger.Debug($"Direct class ID lookup '{objectName}' -> {result}");
+                }
                 else
                 {
                     // Try to find by name in current location, then globally, then as a class

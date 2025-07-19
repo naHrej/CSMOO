@@ -213,6 +213,13 @@ public static class FunctionResolver
             return objectClass?.Id;
         }
 
+        // Check if it's a direct class ID (like "obj_room", "obj_exit", etc.)
+        var classById = GameDatabase.Instance.ObjectClasses.FindById(objectRef);
+        if (classById != null)
+        {
+            return classById.Id;
+        }
+
         // Try to find by object ID directly
         var gameObjects2 = GameDatabase.Instance.GameObjects;
         if (gameObjects2.Exists(o => o.Id == objectRef))
@@ -220,7 +227,12 @@ public static class FunctionResolver
 
         // Try to find by name
         var namedObject = gameObjects2.FindOne(o => o.Properties.ContainsKey("name") && o.Properties["name"].AsString.Equals(objectRef, StringComparison.OrdinalIgnoreCase));
-        return namedObject?.Id;
+        if (namedObject != null) return namedObject.Id;
+
+        // Try as class name
+        var classByName = GameDatabase.Instance.ObjectClasses.FindOne(c => 
+            c.Name.Equals(objectRef, StringComparison.OrdinalIgnoreCase));
+        return classByName?.Id;
     }
 
     /// <summary>

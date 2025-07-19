@@ -226,6 +226,13 @@ namespace CSMOO.Server.Scripting
                     c.Name.Equals(className, StringComparison.OrdinalIgnoreCase));
                 return objectClass?.Id;
             }
+
+            // Check if it's a direct class ID (like "obj_room", "obj_exit", etc.)
+            var classById = GameDatabase.Instance.ObjectClasses.FindById(objectRef);
+            if (classById != null)
+            {
+                return classById.Id;
+            }
             
             // Try to find by name (simplified version for script context)
             var allObjects = GameDatabase.Instance.GameObjects.FindAll();

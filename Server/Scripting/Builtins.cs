@@ -237,7 +237,7 @@ public static class Builtins
             case "system":
                 // Find the system object
                 var allObjects = GameDatabase.Instance.GameObjects.FindAll();
-                var systemObj = allObjects.FirstOrDefault(obj => 
+                var systemObj = allObjects.FirstOrDefault(obj =>
                     (obj.Properties.ContainsKey("name") && obj.Properties["name"].AsString == "system") ||
                     (obj.Properties.ContainsKey("isSystemObject") && obj.Properties["isSystemObject"].AsBoolean == true));
                 return systemObj?.Id;
@@ -249,12 +249,12 @@ public static class Builtins
             var obj = GameDatabase.Instance.GameObjects.FindOne(o => o.DbRef == dbref);
             return obj?.Id;
         }
-        
+
         // Check if it's a class reference (starts with "class:" or ends with ".class")
         if (objectName.StartsWith("class:", StringComparison.OrdinalIgnoreCase))
         {
             var className = objectName.Substring(6); // Remove "class:" prefix
-            var objectClass = GameDatabase.Instance.ObjectClasses.FindOne(c => 
+            var objectClass = GameDatabase.Instance.ObjectClasses.FindOne(c =>
                 c.Name.Equals(className, StringComparison.OrdinalIgnoreCase));
             return objectClass?.Id;
         }
@@ -265,6 +265,13 @@ public static class Builtins
             var objectClass = GameDatabase.Instance.ObjectClasses.FindOne(c => 
                 c.Name.Equals(className, StringComparison.OrdinalIgnoreCase));
             return objectClass?.Id;
+        }
+
+        // Check if it's a direct class ID (like "obj_room", "obj_exit", etc.)
+        var classById = GameDatabase.Instance.ObjectClasses.FindById(objectName);
+        if (classById != null)
+        {
+            return classById.Id;
         }
         
         // Try to find a player first
@@ -307,7 +314,21 @@ public static class Builtins
         var directClass = GameDatabase.Instance.ObjectClasses.FindOne(c => 
             c.Name.Equals(objectName, StringComparison.OrdinalIgnoreCase));
         
-        return directClass?.Id;
+        if (directClass != null)
+        {
+            return directClass.Id;
+        }
+
+        // Finally, search globally for any object with a matching name
+        var globalObjects = GameDatabase.Instance.GameObjects.FindAll();
+        var globalObject = globalObjects.FirstOrDefault(obj =>
+        {
+            var objName = GetObjectName(obj.Id);
+            return objName.Equals(objectName, StringComparison.OrdinalIgnoreCase) ||
+                   objName.StartsWith(objectName, StringComparison.OrdinalIgnoreCase);
+        });
+        
+        return globalObject?.Id;
     }
     
     /// <summary>
