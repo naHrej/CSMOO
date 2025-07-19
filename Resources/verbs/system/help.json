@@ -22,14 +22,14 @@
     "    }",
     "    output.AppendLine();",
     "    output.AppendLine(\"Type 'help <category>' to see topics in that category.\");",
-    "    Builtins.Notify(Player, output.ToString().TrimEnd());",
+    "    notify(Player, output.ToString().TrimEnd());",
     "    return;",
     "}",
     "",
     "var category = Args[0].ToLower();",
     "if (!helpCategories.ContainsKey(category))",
     "{",
-    "    Builtins.Notify(Player, $\"Unknown help category: {category}\");",
+    "    notify(Player, $\"Unknown help category: {category}\");",
     "    return;",
     "}",
     "",
@@ -42,6 +42,6 @@
     "}",
     "output2.AppendLine();",
     "output2.AppendLine(\"Type 'help <category> <topic>' for details.\");",
-    "Builtins.Notify(Player, output2.ToString().TrimEnd());"
+    "notify(Player, output2.ToString().TrimEnd());"
   ]
 }

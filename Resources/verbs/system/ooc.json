@@ -7,7 +7,7 @@
     "// OOC command - out of character chat to all online players",
     "if (Args.Count == 0)",
     "{",
-    "    Builtins.Notify(Player, \"Say what OOC?\");",
+    "    notify(Player, \"Say what OOC?\");",
     "    return;",
     "}",
     "",
@@ -18,11 +18,11 @@
     "{",
     "    if (onlinePlayer.Id == Player.Id)",
     "    {",
-    "        Builtins.Notify(onlinePlayer, $\"[OOC] You say, \\\"{message}\\\"\");",
+    "        notify(onlinePlayer, $\"[OOC] You say, \\\"{message}\\\"\");",
     "    }",
     "    else",
     "    {",
-    "        Builtins.Notify(onlinePlayer, $\"[OOC] {Builtins.GetObjectName(Player.Id)} says, \\\"{message}\\\"\");",
+    "        notify(onlinePlayer, $\"[OOC] {Builtins.GetObjectName(Player.Id)} says, \\\"{message}\\\"\");",
     "    }",
     "}"
   ]

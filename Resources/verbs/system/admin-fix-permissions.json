@@ -7,14 +7,14 @@
     "var admin = CSMOO.Server.Database.PlayerManager.FindPlayerByName(\"admin\");",
     "if (admin != null)",
     "{",
-    "    Builtins.Notify(player, \"Found admin player, updating permissions...\");",
+    "    notify(player, \"Found admin player, updating permissions...\");",
     "    CSMOO.Server.Database.PermissionManager.InitializeAdminPermissions(admin);",
     "    var flags = CSMOO.Server.Database.PermissionManager.GetFlagsString(admin);",
-    "    Builtins.Notify(player, $\"Admin permissions updated. Flags: {flags}\");",
+    "    notify(player, $\"Admin permissions updated. Flags: {flags}\");",
     "}",
     "else",
     "{",
-    "    Builtins.Notify(player, \"Admin player not found!\");",
+    "    notify(player, \"Admin player not found!\");",
     "}"
   ]
 }

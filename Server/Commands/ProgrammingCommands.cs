@@ -429,17 +429,7 @@ public class ProgrammingCommands
                 // Script mode - execute the code immediately
                 try
                 {
-                    // Create a temporary verb to execute the script with proper globals
-                    var tempVerb = new Verb
-                    {
-                        Name = "script",
-                        Code = code,
-                        ObjectId = "system"
-                    };
-                    
-                    // Use VerbScriptEngine for consistency with single-line script verb
-                    var scriptEngine = new VerbScriptEngine();
-                    var result = scriptEngine.ExecuteVerb(tempVerb, "@script", _player, _commandProcessor, "system");
+                    var result = Builtins.ExecuteScript(code, _player, _commandProcessor, _player.Location, "");
                     
                     _commandProcessor.SendToPlayer("Script executed successfully.");
                     if (!string.IsNullOrEmpty(result) && result != "null")

@@ -5,11 +5,11 @@
   "description": "List all online players",
   "code": [
     "// Who command - list online players",
-    "var onlinePlayers = GetOnlinePlayers();",
+    "var onlinePlayers = Builtins.GetOnlinePlayers();",
     "notify(Player, \"Online players:\");",
     "foreach (var onlinePlayer in onlinePlayers)",
     "{",
-    "    notify(Player, $\"  {onlinePlayer.name}\");",
+    "    notify(Player, $\"  {onlinePlayer.Name}\");",
     "}"
   ]
 }

@@ -9,10 +9,10 @@
     "var targetObject = Builtins.FindObject(targetId);",
     "if (targetObject == null)",
     "{",
-    "    Builtins.Notify(Player, \"Object not found.\");",
+    "    notify(Player, \"Object not found.\");",
     "    return;",
     "}",
     "var name = Builtins.GetProperty(targetObject.Id, \"name\") ?? \"something\";",
-    "Builtins.Notify(Player, $\"You examine {name}.\");"
+    "notify(Player, $\"You examine {name}.\");"
   ]
 }

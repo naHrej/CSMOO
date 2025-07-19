@@ -55,7 +55,7 @@
     "var destination = Builtins.GetProperty(matchingExit.Id, \"destination\");",
     "if (destination == null)",
     "{",
-    "    Builtins.Notify(player, \"That exit doesn't lead anywhere.\");",
+    "    notify(player, \"That exit doesn't lead anywhere.\");",
     "    return;",
     "}",
     "",
@@ -65,12 +65,12 @@
     "    // Update player location in both database and in-memory object",
     "    player.Location = destination;",
     "    var exitDirection = Builtins.GetProperty(matchingExit.Id, \"direction\") ?? normalizedDirection;",
-    "    Builtins.Notify(player, $\"You go {exitDirection}.\");",
+    "    notify(player, $\"You go {exitDirection}.\");",
     "    Builtins.ShowRoom();",
     "}",
     "else",
     "{",
-    "    Builtins.Notify(player, \"You can't go that way.\");",
+    "    notify(player, \"You can't go that way.\");",
     "}"
   ]
 }
