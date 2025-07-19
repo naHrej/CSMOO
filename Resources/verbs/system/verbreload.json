@@ -6,23 +6,23 @@
   "code": [
     "// Hot reload verb definitions - admin command",
     "// Check if player has admin privileges (simple check)",
-    "if (player.Name != \"admin\")",
+    "if (player.name != \"admin\")",
     "{",
-    "    Builtins.Notify(player, \"Permission denied. This command requires admin privileges.\");",
+    "    notify(player, \"Permission denied. This command requires admin privileges.\");",
     "    return;",
     "}",
     "",
-    "Builtins.Notify(player, \"Reloading verb definitions...\");",
+    "notify(player, \"Reloading verb definitions...\");",
     "",
     "try",
     "{",
     "    // Call the VerbInitializer reload method directly",
     "    CSMOO.Server.Database.World.VerbInitializer.ReloadVerbs();",
-    "    Builtins.Notify(player, \"Verb definitions reloaded successfully!\");",
+    "    notify(player, \"Verb definitions reloaded successfully!\");",
     "}",
     "catch (Exception ex)",
     "{",
-    "    Builtins.Notify(player, $\"Error reloading verbs: {ex.Message}\");",
+    "    notify(player, $\"Error reloading verbs: {ex.Message}\");",
     "}"
   ]
 }

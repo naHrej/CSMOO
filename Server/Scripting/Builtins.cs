@@ -18,6 +18,11 @@ public static class Builtins
     /// Current script context - set by the script engine before execution
     /// </summary>
     public static VerbScriptGlobals? CurrentContext { get; set; }
+    
+    /// <summary>
+    /// Unified script context - set by the UnifiedScriptEngine before execution
+    /// </summary>
+    public static UnifiedScriptGlobals? UnifiedContext { get; set; }
 
     #region Object Management
     
@@ -81,11 +86,12 @@ public static class Builtins
     }
     
     /// <summary>
-    /// Get all objects in a location
+    /// Get all objects in a location - returns dynamic wrappers
     /// </summary>
-    public static List<GameObject> GetObjectsInLocation(string locationId)
+    public static List<dynamic> GetObjectsInLocation(string locationId)
     {
-        return ObjectManager.GetObjectsInLocation(locationId);
+        var gameObjects = ObjectManager.GetObjectsInLocation(locationId);
+        return gameObjects.Select(obj => new DynamicGameObject(obj) as dynamic).ToList();
     }
     
     /// <summary>
@@ -165,6 +171,30 @@ public static class Builtins
     }
     
     /// <summary>
+    /// Get all players (online and offline) - useful for lambda filtering
+    /// </summary>
+    public static List<Player> GetAllPlayers()
+    {
+        return GameDatabase.Instance.Players.FindAll().ToList();
+    }
+    
+    /// <summary>
+    /// Get all game objects - useful for lambda filtering and searching
+    /// </summary>
+    public static List<GameObject> GetAllObjects()
+    {
+        return GameDatabase.Instance.GameObjects.FindAll().ToList();
+    }
+    
+    /// <summary>
+    /// Get all object classes - useful for lambda filtering
+    /// </summary>
+    public static List<ObjectClass> GetAllObjectClasses()
+    {
+        return GameDatabase.Instance.ObjectClasses.FindAll().ToList();
+    }
+    
+    /// <summary>
     /// Check if a player has a specific permission flag
     /// </summary>
     public static bool HasFlag(Player player, string flagName)
@@ -214,6 +244,126 @@ public static class Builtins
     public static string GetPlayerFlagsString(Player player)
     {
         return PermissionManager.GetFlagsString(player);
+    }
+    
+    /// <summary>
+    /// Check if a player has Admin flag (dynamic overload for UnifiedScriptEngine)
+    /// </summary>
+    public static bool IsAdmin(dynamic? player)
+    {
+        if (player == null) return false;
+        
+        // Handle GameObject wrapper
+        if (player is GameObject gameObject)
+        {
+            var dbPlayer = GameDatabase.Instance.Players.FindById(gameObject.Id);
+            return dbPlayer != null && PermissionManager.HasFlag(dbPlayer, PermissionManager.Flag.Admin);
+        }
+        
+        // Handle direct Database.Player
+        if (player is Player dbPlayerDirect)
+        {
+            return PermissionManager.HasFlag(dbPlayerDirect, PermissionManager.Flag.Admin);
+        }
+        
+        // Handle dynamic object with Id property
+        if (player.Id != null)
+        {
+            var dbPlayer = GameDatabase.Instance.Players.FindById((string)player.Id);
+            return dbPlayer != null && PermissionManager.HasFlag(dbPlayer, PermissionManager.Flag.Admin);
+        }
+        
+        return false;
+    }
+    
+    /// <summary>
+    /// Check if a player has Moderator flag (dynamic overload for UnifiedScriptEngine)
+    /// </summary>
+    public static bool IsModerator(dynamic? player)
+    {
+        if (player == null) return false;
+        
+        // Handle GameObject wrapper
+        if (player is GameObject gameObject)
+        {
+            var dbPlayer = GameDatabase.Instance.Players.FindById(gameObject.Id);
+            return dbPlayer != null && PermissionManager.HasFlag(dbPlayer, PermissionManager.Flag.Moderator);
+        }
+        
+        // Handle direct Database.Player
+        if (player is Player dbPlayerDirect)
+        {
+            return PermissionManager.HasFlag(dbPlayerDirect, PermissionManager.Flag.Moderator);
+        }
+        
+        // Handle dynamic object with Id property
+        if (player.Id != null)
+        {
+            var dbPlayer = GameDatabase.Instance.Players.FindById((string)player.Id);
+            return dbPlayer != null && PermissionManager.HasFlag(dbPlayer, PermissionManager.Flag.Moderator);
+        }
+        
+        return false;
+    }
+    
+    /// <summary>
+    /// Check if a player has Programmer flag (dynamic overload for UnifiedScriptEngine)
+    /// </summary>
+    public static bool IsProgrammer(dynamic? player)
+    {
+        if (player == null) return false;
+        
+        // Handle GameObject wrapper
+        if (player is GameObject gameObject)
+        {
+            var dbPlayer = GameDatabase.Instance.Players.FindById(gameObject.Id);
+            return dbPlayer != null && PermissionManager.HasFlag(dbPlayer, PermissionManager.Flag.Programmer);
+        }
+        
+        // Handle direct Database.Player
+        if (player is Player dbPlayerDirect)
+        {
+            return PermissionManager.HasFlag(dbPlayerDirect, PermissionManager.Flag.Programmer);
+        }
+        
+        // Handle dynamic object with Id property
+        if (player.Id != null)
+        {
+            var dbPlayer = GameDatabase.Instance.Players.FindById((string)player.Id);
+            return dbPlayer != null && PermissionManager.HasFlag(dbPlayer, PermissionManager.Flag.Programmer);
+        }
+        
+        return false;
+    }
+    
+    /// <summary>
+    /// Get all flags for a player as a list of strings (dynamic overload for UnifiedScriptEngine)
+    /// </summary>
+    public static List<string> GetPlayerFlags(dynamic? player)
+    {
+        if (player == null) return new List<string>();
+        
+        // Handle GameObject wrapper
+        if (player is GameObject gameObject)
+        {
+            var dbPlayer = GameDatabase.Instance.Players.FindById(gameObject.Id);
+            return dbPlayer != null ? PermissionManager.GetPlayerFlags(dbPlayer).Select(f => f.ToString()).ToList() : new List<string>();
+        }
+        
+        // Handle direct Database.Player
+        if (player is Player dbPlayerDirect)
+        {
+            return PermissionManager.GetPlayerFlags(dbPlayerDirect).Select(f => f.ToString()).ToList();
+        }
+        
+        // Handle dynamic object with Id property
+        if (player.Id != null)
+        {
+            var dbPlayer = GameDatabase.Instance.Players.FindById((string)player.Id);
+            return dbPlayer != null ? PermissionManager.GetPlayerFlags(dbPlayer).Select(f => f.ToString()).ToList() : new List<string>();
+        }
+        
+        return new List<string>();
     }
     
     #endregion
@@ -287,13 +437,16 @@ public static class Builtins
             var objectsInRoom = GetObjectsInLocation(currentPlayer.Location);
             var foundObject = objectsInRoom.FirstOrDefault(obj =>
             {
-                var objName = GetObjectName(obj.Id);
+                var gameObject = obj.GameObject as GameObject;
+                if (gameObject == null) return false;
+                var objName = GetObjectName(gameObject.Id);
                 return objName.StartsWith(objectName, StringComparison.OrdinalIgnoreCase);
             });
             
             if (foundObject != null)
             {
-                return foundObject.Id;
+                var gameObject = foundObject.GameObject as GameObject;
+                if (gameObject != null) return gameObject.Id;
             }
         }
         
@@ -301,13 +454,16 @@ public static class Builtins
         var inventory = GetObjectsInLocation(currentPlayer.Id);
         var inventoryObject = inventory.FirstOrDefault(obj =>
         {
-            var objName = GetObjectName(obj.Id);
+            var gameObject = obj.GameObject as GameObject;
+            if (gameObject == null) return false;
+            var objName = GetObjectName(gameObject.Id);
             return objName.StartsWith(objectName, StringComparison.OrdinalIgnoreCase);
         });
         
         if (inventoryObject != null)
         {
-            return inventoryObject.Id;
+            var gameObject = inventoryObject.GameObject as GameObject;
+            if (gameObject != null) return gameObject.Id;
         }
         
         // If not found as an object, try as a class name
@@ -339,11 +495,15 @@ public static class Builtins
         if (currentPlayer.Location == null) return null;
         
         var objectsInRoom = GetObjectsInLocation(currentPlayer.Location);
-        return objectsInRoom.FirstOrDefault(obj =>
+        var foundObject = objectsInRoom.FirstOrDefault(obj =>
         {
-            var objName = GetObjectName(obj.Id);
+            var gameObject = obj.GameObject as GameObject;
+            if (gameObject == null) return false;
+            var objName = GetObjectName(gameObject.Id);
             return objName.StartsWith(objectName, StringComparison.OrdinalIgnoreCase);
         });
+        
+        return foundObject?.GameObject as GameObject;
     }
     
     /// <summary>
@@ -352,11 +512,15 @@ public static class Builtins
     public static GameObject? FindObjectInInventory(string objectName, Player currentPlayer)
     {
         var inventory = GetObjectsInLocation(currentPlayer.Id);
-        return inventory.FirstOrDefault(obj =>
+        var foundObject = inventory.FirstOrDefault(obj =>
         {
-            var objName = GetObjectName(obj.Id);
+            var gameObject = obj.GameObject as GameObject;
+            if (gameObject == null) return false;
+            var objName = GetObjectName(gameObject.Id);
             return objName.StartsWith(objectName, StringComparison.OrdinalIgnoreCase);
         });
+        
+        return foundObject?.GameObject as GameObject;
     }
     
     #endregion
@@ -437,11 +601,16 @@ public static class Builtins
         var playersInRoom = GetObjectsInLocation(roomId);
         foreach (var obj in playersInRoom)
         {
-            var player = GetPlayerFromObject(obj.Id);
-            if (player != null && (excludePlayer == null || player.Id != excludePlayer.Id))
+            // Extract the GameObject from the dynamic wrapper
+            var gameObject = obj.GameObject as GameObject;
+            if (gameObject != null)
             {
-                // The script engine will handle the actual notification
-                // This is a placeholder for the interface
+                var player = GetPlayerFromObject(gameObject.Id);
+                if (player != null && (excludePlayer == null || player.Id != excludePlayer.Id))
+                {
+                    // The script engine will handle the actual notification
+                    // This is a placeholder for the interface
+                }
             }
         }
     }
@@ -500,6 +669,14 @@ public static class Builtins
     /// </summary>
     public static Player? GetCurrentPlayer()
     {
+        // Check unified context first, then fall back to old context
+        if (UnifiedContext?.Player != null)
+        {
+            // Convert GameObject to Database.Player
+            return UnifiedContext.Player as Database.Player ?? 
+                   GameDatabase.Instance.Players.FindById(UnifiedContext.Player.Id);
+        }
+        
         return CurrentContext?.Player;
     }
 
@@ -566,16 +743,24 @@ public static class Builtins
 
             // Show objects
             var objects = GetObjectsInLocation(currentPlayer.Location)
-                .Where(obj => obj.ClassId != GameDatabase.Instance.ObjectClasses.FindOne(c => c.Name == "Exit")?.Id)
-                .Where(obj => obj.ClassId != GameDatabase.Instance.ObjectClasses.FindOne(c => c.Name == "Player")?.Id);
+                .Where(obj => {
+                    var gameObject = obj.GameObject as GameObject;
+                    return gameObject != null && 
+                           gameObject.ClassId != GameDatabase.Instance.ObjectClasses.FindOne(c => c.Name == "Exit")?.Id &&
+                           gameObject.ClassId != GameDatabase.Instance.ObjectClasses.FindOne(c => c.Name == "Player")?.Id;
+                });
 
             foreach (var obj in objects)
             {
-                var visible = GetProperty(obj, "visible")?.AsBoolean ?? true;
-                if (visible)
+                var gameObject = obj.GameObject as GameObject;
+                if (gameObject != null)
                 {
-                    var shortDesc = GetProperty(obj, "shortDescription")?.AsString ?? "something";
-                    Notify(currentPlayer, $"You see {shortDesc} here.");
+                    var visible = GetProperty(gameObject, "visible")?.AsBoolean ?? true;
+                    if (visible)
+                    {
+                        var shortDesc = GetProperty(gameObject, "shortDescription")?.AsString ?? "something";
+                        Notify(currentPlayer, $"You see {shortDesc} here.");
+                    }
                 }
             }
 
@@ -601,8 +786,10 @@ public static class Builtins
         
         var targetObject = objects.FirstOrDefault(obj =>
         {
-            var name = GetProperty(obj, "name")?.AsString?.ToLower();
-            var shortDesc = GetProperty(obj, "shortDescription")?.AsString?.ToLower();
+            var gameObject = obj.GameObject as GameObject;
+            if (gameObject == null) return false;
+            var name = GetProperty(gameObject, "name")?.AsString?.ToLower();
+            var shortDesc = GetProperty(gameObject, "shortDescription")?.AsString?.ToLower();
             return name?.Contains(target) == true || shortDesc?.Contains(target) == true;
         });
 
@@ -612,14 +799,18 @@ public static class Builtins
             return;
         }
 
-        var longDesc = GetProperty(targetObject, "longDescription")?.AsString ?? "You see nothing special.";
-        Notify(currentPlayer, longDesc);
+        var gameObj = targetObject.GameObject as GameObject;
+        if (gameObj != null)
+        {
+            var longDesc = GetProperty(gameObj, "longDescription")?.AsString ?? "You see nothing special.";
+            Notify(currentPlayer, longDesc);
+        }
     }
 
     /// <summary>
-    /// Find an item in the current room by name
+    /// Find an item in the current room by name - returns dynamic wrapper
     /// </summary>
-    public static GameObject? FindItemInRoom(string itemName)
+    public static dynamic? FindItemInRoom(string itemName)
     {
         var currentPlayer = GetCurrentPlayer();
         if (currentPlayer?.Location == null) return null;
@@ -627,18 +818,22 @@ public static class Builtins
         itemName = itemName.ToLower();
         var roomObjects = GetObjectsInLocation(currentPlayer.Location);
         
-        return roomObjects.FirstOrDefault(obj =>
+        var foundObject = roomObjects.FirstOrDefault(obj =>
         {
-            var name = GetProperty(obj, "name")?.AsString?.ToLower();
-            var shortDesc = GetProperty(obj, "shortDescription")?.AsString?.ToLower();
+            var gameObject = obj.GameObject as GameObject;
+            if (gameObject == null) return false;
+            var name = GetProperty(gameObject.Id, "name")?.ToLower();
+            var shortDesc = GetProperty(gameObject.Id, "shortDescription")?.ToLower();
             return name?.Contains(itemName) == true || shortDesc?.Contains(itemName) == true;
         });
+        
+        return foundObject != null ? foundObject : null;
     }
 
     /// <summary>
-    /// Find an item in the player's inventory by name
+    /// Find an item in the player's inventory by name - returns dynamic wrapper
     /// </summary>
-    public static GameObject? FindItemInInventory(string itemName)
+    public static dynamic? FindItemInInventory(string itemName)
     {
         var currentPlayer = GetCurrentPlayer();
         if (currentPlayer == null) return null;
@@ -647,7 +842,7 @@ public static class Builtins
         var playerGameObject = GameDatabase.Instance.GameObjects.FindById(currentPlayer.Id);
         if (playerGameObject?.Contents == null) return null;
 
-        return playerGameObject.Contents
+        var foundObject = playerGameObject.Contents
             .Select(id => GameDatabase.Instance.GameObjects.FindById(id))
             .FirstOrDefault(obj =>
             {
@@ -656,6 +851,8 @@ public static class Builtins
                 var shortDesc = GetProperty(obj, "shortDescription")?.AsString?.ToLower();
                 return name?.Contains(itemName) == true || shortDesc?.Contains(itemName) == true;
             });
+            
+        return foundObject != null ? new DynamicGameObject(foundObject) : null;
     }
 
     /// <summary>
@@ -765,6 +962,150 @@ public static class Builtins
             Code = verb.Code ?? "",
             CodeLines = string.IsNullOrEmpty(verb.Code) ? new string[0] : verb.Code.Split('\n')
         };
+    }
+
+    #endregion
+
+    #region Lambda-Friendly Helper Methods
+
+    /// <summary>
+    /// Execute an action for each player matching a condition
+    /// Usage: ForEachPlayer(p => p.IsOnline, p => notify(p, "Hello!"));
+    /// </summary>
+    public static void ForEachPlayer(Func<Player, bool> predicate, Action<Player> action)
+    {
+        var players = GetAllPlayers().Where(predicate);
+        foreach (var player in players)
+        {
+            try
+            {
+                action(player);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error($"Error executing action on player {player.Name}: {ex.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Execute an action for each object matching a condition
+    /// Usage: ForEachObject(obj => GetProperty(obj.Id, "type") == "weapon", obj => SetProperty(obj.Id, "sharpened", "true"));
+    /// </summary>
+    public static void ForEachObject(Func<GameObject, bool> predicate, Action<GameObject> action)
+    {
+        var objects = GetAllObjects().Where(predicate);
+        foreach (var obj in objects)
+        {
+            try
+            {
+                action(obj);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error($"Error executing action on object {obj.Id}: {ex.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Find players matching a condition - returns a list for further processing
+    /// Usage: var admins = FindPlayers(p => IsAdmin(p));
+    /// </summary>
+    public static List<Player> FindPlayers(Func<Player, bool> predicate)
+    {
+        return GetAllPlayers().Where(predicate).ToList();
+    }
+
+    /// <summary>
+    /// Find objects matching a condition - returns a list for further processing
+    /// Usage: var weapons = FindObjects(obj => GetProperty(obj.Id, "type") == "weapon");
+    /// </summary>
+    public static List<GameObject> FindObjects(Func<GameObject, bool> predicate)
+    {
+        return GetAllObjects().Where(predicate).ToList();
+    }
+
+    /// <summary>
+    /// Find objects in a location matching a condition
+    /// Usage: var redItems = FindObjectsInLocation(roomId, obj => GetProperty(obj.Id, "color") == "red");
+    /// </summary>
+    public static List<dynamic> FindObjectsInLocation(string locationId, Func<dynamic, bool> predicate)
+    {
+        return GetObjectsInLocation(locationId).Where(predicate).ToList();
+    }
+
+    /// <summary>
+    /// Find objects in a location matching a condition (strongly-typed for DynamicGameObject)
+    /// Usage: var redItems = FindObjectsInLocationTyped(roomId, obj => obj.color == "red");
+    /// </summary>
+    public static List<DynamicGameObject> FindObjectsInLocationTyped(string locationId, Func<DynamicGameObject, bool> predicate)
+    {
+        var objects = GetObjectsInLocation(locationId);
+        return objects.Cast<DynamicGameObject>().Where(predicate).ToList();
+    }
+
+    /// <summary>
+    /// Filter dynamic objects with strongly-typed predicate
+    /// Usage: var filtered = FilterObjects(GetObjectsInLocation(roomId), obj => obj.visible == true);
+    /// </summary>
+    public static List<DynamicGameObject> FilterObjects(IEnumerable<dynamic> objects, Func<DynamicGameObject, bool> predicate)
+    {
+        return objects.Cast<DynamicGameObject>().Where(predicate).ToList();
+    }
+
+    /// <summary>
+    /// Transform dynamic objects to another type
+    /// Usage: var names = SelectFromObjects(GetObjectsInLocation(roomId), obj => obj.name);
+    /// </summary>
+    public static List<T> SelectFromObjects<T>(IEnumerable<dynamic> objects, Func<DynamicGameObject, T> selector)
+    {
+        return objects.Cast<DynamicGameObject>().Select(selector).ToList();
+    }
+
+    /// <summary>
+    /// Count players matching a condition
+    /// Usage: var onlineCount = CountPlayers(p => p.IsOnline);
+    /// </summary>
+    public static int CountPlayers(Func<Player, bool> predicate)
+    {
+        return GetAllPlayers().Count(predicate);
+    }
+
+    /// <summary>
+    /// Count objects matching a condition
+    /// Usage: var weaponCount = CountObjects(obj => GetProperty(obj.Id, "type") == "weapon");
+    /// </summary>
+    public static int CountObjects(Func<GameObject, bool> predicate)
+    {
+        return GetAllObjects().Count(predicate);
+    }
+
+    /// <summary>
+    /// Check if any player matches a condition
+    /// Usage: var hasAdmin = AnyPlayer(p => IsAdmin(p));
+    /// </summary>
+    public static bool AnyPlayer(Func<Player, bool> predicate)
+    {
+        return GetAllPlayers().Any(predicate);
+    }
+
+    /// <summary>
+    /// Check if any object matches a condition
+    /// Usage: var hasWeapon = AnyObject(obj => GetProperty(obj.Id, "type") == "weapon");
+    /// </summary>
+    public static bool AnyObject(Func<GameObject, bool> predicate)
+    {
+        return GetAllObjects().Any(predicate);
+    }
+
+    /// <summary>
+    /// Transform a list of objects using a lambda
+    /// Usage: var names = Transform(GetObjectsInLocation(roomId), obj => obj.name);
+    /// </summary>
+    public static List<T> Transform<TSource, T>(IEnumerable<TSource> source, Func<TSource, T> selector)
+    {
+        return source.Select(selector).ToList();
     }
 
     #endregion

@@ -7,7 +7,7 @@
     "// Tell command - send private message to another player",
     "if (Args.Count < 2)",
     "{",
-    "    Builtins.Notify(Player, \"Usage: tell <player> <message>\");",
+    "    notify(Player, \"Usage: tell <player> <message>\");",
     "    return;",
     "}",
     "",
@@ -22,18 +22,18 @@
     "var targetPlayer = Builtins.FindPlayer(targetPlayerName);",
     "if (targetPlayer == null)",
     "{",
-    "    Builtins.Notify(Player, $\"Player '{targetPlayerName}' is not online.\");",
+    "    notify(Player, $\"Player '{targetPlayerName}' is not online.\");",
     "    return;",
     "}",
     "",
-    "if (targetPlayer.Id == Player.Id)",
+    "if (targetPlayer.Id == Player.id)",
     "{",
-    "    Builtins.Notify(Player, \"You can't tell yourself.\");",
+    "    notify(Player, \"You can't tell yourself.\");",
     "    return;",
     "}",
     "",
     "// Send the message",
-    "Builtins.Notify(targetPlayer, $\"{Builtins.GetObjectName(Player.Id)} tells you, \\\"{message}\\\"\");",
-    "Builtins.Notify(Player, $\"You tell {targetPlayer.Name}, \\\"{message}\\\"\");"
+    "notify(targetPlayer, $\"{Player.name} tells you, \\\"{message}\\\"\");",
+    "notify(Player, $\"You tell {targetPlayer.name}, \\\"{message}\\\"\");"
   ]
 }

@@ -260,11 +260,12 @@ public class ScriptHelpers
     }
 
     /// <summary>
-    /// Get an object by its ID
+    /// Get an object by its ID - returns a dynamic wrapper for property access
     /// </summary>
-    public GameObject? GetObject(string objectId)
+    public dynamic? GetObject(string objectId)
     {
-        return GameDatabase.Instance.GameObjects.FindById(objectId);
+        var gameObject = GameDatabase.Instance.GameObjects.FindById(objectId);
+        return gameObject != null ? new DynamicGameObject(gameObject) : null;
     }
 
     /// <summary>
@@ -461,11 +462,12 @@ public class ScriptHelpers
     }
 
     /// <summary>
-    /// Get all objects in a specific location
+    /// Get all objects in a specific location - returns dynamic wrappers for property access
     /// </summary>
-    public List<GameObject> GetObjectsInLocation(string locationId)
+    public List<dynamic> GetObjectsInLocation(string locationId)
     {
-        return ObjectManager.GetObjectsInLocation(locationId);
+        var gameObjects = ObjectManager.GetObjectsInLocation(locationId);
+        return gameObjects.Select(obj => new DynamicGameObject(obj)).Cast<dynamic>().ToList();
     }
 
     /// <summary>
@@ -605,9 +607,9 @@ public class ScriptHelpers
     }
 
     /// <summary>
-    /// Find an item in the player's inventory by name
+    /// Find an item in the player's inventory by name - returns dynamic wrapper
     /// </summary>
-    public GameObject? FindItemInInventory(string itemName)
+    public dynamic? FindItemInInventory(string itemName)
     {
         if (_player == null) return null;
 
@@ -615,7 +617,7 @@ public class ScriptHelpers
         var playerGameObject = GameDatabase.Instance.GameObjects.FindById(_player.Id);
         if (playerGameObject?.Contents == null) return null;
 
-        return playerGameObject.Contents
+        var foundObject = playerGameObject.Contents
             .Select(id => GameDatabase.Instance.GameObjects.FindById(id))
             .FirstOrDefault(obj =>
             {
@@ -624,24 +626,28 @@ public class ScriptHelpers
                 var shortDesc = ObjectManager.GetProperty(obj, "shortDescription")?.AsString?.ToLower();
                 return name?.Contains(itemName) == true || shortDesc?.Contains(itemName) == true;
             });
+            
+        return foundObject != null ? new DynamicGameObject(foundObject) : null;
     }
 
     /// <summary>
-    /// Find an item in the current room by name
+    /// Find an item in the current room by name - returns dynamic wrapper
     /// </summary>
-    public GameObject? FindItemInRoom(string itemName)
+    public dynamic? FindItemInRoom(string itemName)
     {
         if (_player?.Location == null) return null;
 
         itemName = itemName.ToLower();
         var roomObjects = ObjectManager.GetObjectsInLocation(_player.Location);
         
-        return roomObjects.FirstOrDefault(obj =>
+        var foundObject = roomObjects.FirstOrDefault(obj =>
         {
             var name = ObjectManager.GetProperty(obj, "name")?.AsString?.ToLower();
             var shortDesc = ObjectManager.GetProperty(obj, "shortDescription")?.AsString?.ToLower();
             return name?.Contains(itemName) == true || shortDesc?.Contains(itemName) == true;
         });
+        
+        return foundObject != null ? new DynamicGameObject(foundObject) : null;
     }
 
     #endregion

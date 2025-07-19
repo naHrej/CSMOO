@@ -325,20 +325,31 @@ public class EnhancedScriptGlobals : ScriptGlobals
     /// </summary>
     public void InitializeObjectFactory()
     {
-        // Check for Helpers in both base and derived class
+        // Check for Helpers in base, derived class, or UnifiedScriptGlobals
         ScriptHelpers? helpers = null;
-        if (this is VerbScriptGlobals verbGlobals)
+        Database.Player? dbPlayer = null;
+        
+        if (this is UnifiedScriptGlobals unifiedGlobals)
+        {
+            helpers = unifiedGlobals.Helpers;
+            // Convert GameObject back to Database.Player if needed
+            dbPlayer = unifiedGlobals.Player as Database.Player ?? 
+                      GameDatabase.Instance.Players.FindById(unifiedGlobals.Player?.Id ?? "");
+        }
+        else if (this is VerbScriptGlobals verbGlobals)
         {
             helpers = verbGlobals.Helpers;
+            dbPlayer = verbGlobals.Player;
         }
         else
         {
             helpers = Helpers;
+            dbPlayer = Player as Database.Player;
         }
         
-        if (Player != null && CommandProcessor != null && helpers != null)
+        if (dbPlayer != null && CommandProcessor != null && helpers != null)
         {
-            _objectFactory = new ScriptObjectFactory(Player, CommandProcessor, helpers);
+            _objectFactory = new ScriptObjectFactory(dbPlayer, CommandProcessor, helpers);
         }
     }
 
@@ -355,7 +366,22 @@ public class EnhancedScriptGlobals : ScriptGlobals
     /// The player executing the verb
     /// Usage: player.Name = "NewName"; player.Location = "room_id";
     /// </summary>
-    public dynamic? player => _objectFactory?.GetObjectById(Player?.Id ?? "");
+    public dynamic? player
+    {
+        get
+        {
+            string? playerId = null;
+            if (this is UnifiedScriptGlobals unifiedGlobals)
+            {
+                playerId = unifiedGlobals.Player?.Id;
+            }
+            else
+            {
+                playerId = Player?.Id;
+            }
+            return _objectFactory?.GetObjectById(playerId ?? "");
+        }
+    }
 
     /// <summary>
     /// The object this verb is running on (same as 'this')
@@ -365,7 +391,11 @@ public class EnhancedScriptGlobals : ScriptGlobals
     {
         get
         {
-            if (this is VerbScriptGlobals verbGlobals && !string.IsNullOrEmpty(verbGlobals.ThisObject))
+            if (this is UnifiedScriptGlobals unifiedGlobals)
+            {
+                return _objectFactory?.GetObjectById(unifiedGlobals.This?.Id ?? "");
+            }
+            else if (this is VerbScriptGlobals verbGlobals && !string.IsNullOrEmpty(verbGlobals.ThisObject))
             {
                 return _objectFactory?.GetObjectById(verbGlobals.ThisObject);
             }
@@ -377,7 +407,22 @@ public class EnhancedScriptGlobals : ScriptGlobals
     /// The current room (where the player is)
     /// Usage: here.Name = "New Room Name"; here:look();
     /// </summary>
-    public dynamic? here => _objectFactory?.GetObjectById(Player?.Location ?? "");
+    public dynamic? here
+    {
+        get
+        {
+            string? location = null;
+            if (this is UnifiedScriptGlobals unifiedGlobals)
+            {
+                location = unifiedGlobals.Player?.Location;
+            }
+            else
+            {
+                location = Player?.Location;
+            }
+            return _objectFactory?.GetObjectById(location ?? "");
+        }
+    }
 
     /// <summary>
     /// The system object as a ScriptObject
@@ -393,7 +438,11 @@ public class EnhancedScriptGlobals : ScriptGlobals
     {
         get
         {
-            if (this is VerbScriptGlobals verbGlobals && !string.IsNullOrEmpty(verbGlobals.ThisObject))
+            if (this is UnifiedScriptGlobals unifiedGlobals)
+            {
+                return _objectFactory?.GetObjectById(unifiedGlobals.This?.Id ?? "");
+            }
+            else if (this is VerbScriptGlobals verbGlobals && !string.IsNullOrEmpty(verbGlobals.ThisObject))
             {
                 return _objectFactory?.GetObjectById(verbGlobals.ThisObject);
             }

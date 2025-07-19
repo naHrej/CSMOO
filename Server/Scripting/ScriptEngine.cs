@@ -53,9 +53,10 @@ public class ScriptEngine
         try
         {
             // Create script globals that provide access to game systems
-            var globals = new EnhancedScriptGlobals
+            var globals = new UnifiedScriptGlobals
             {
-                Player = player,
+                Player = player != null ? Database.ObjectManager.GetObject(player.Id) : null,
+                This = player != null ? Database.ObjectManager.GetObject(player.Id) : null, // For test scripts, 'this' refers to the player
                 CommandProcessor = commandProcessor,
                 ObjectManager = new ScriptObjectManager(),
                 WorldManager = new ScriptWorldManager(),
@@ -79,7 +80,7 @@ public class ScriptEngine
             code = ScriptPreprocessor.Preprocess(code);
 
             // Execute the script
-            var script = CSharpScript.Create(code, _scriptOptions, typeof(EnhancedScriptGlobals));
+            var script = CSharpScript.Create(code, _scriptOptions, typeof(UnifiedScriptGlobals));
             var result = script.RunAsync(globals).GetAwaiter().GetResult();
 
             return result.ReturnValue?.ToString() ?? "";

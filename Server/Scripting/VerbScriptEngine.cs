@@ -36,53 +36,16 @@ namespace CSMOO.Server.Scripting
                 );
         }
 
-        /// <summary>
-        /// Execute a verb's code with enhanced script globals
-        /// </summary>
-        public string ExecuteVerb(Database.Models.Verb verb, string input, Database.Player player, 
-            CommandProcessor commandProcessor, string? thisObjectId = null, Dictionary<string, string>? variables = null)
-        {
-            try
-            {
-                var globals = new VerbScriptGlobals
-                {
-                    Player = player,
-                    CommandProcessor = commandProcessor,
-                    Helpers = new ScriptHelpers(player, commandProcessor),
-                    ThisObject = thisObjectId ?? verb.ObjectId,
-                    Input = input,
-                    Args = ParseArguments(input),
-                    Verb = verb.Name,
-                    Variables = variables ?? new Dictionary<string, string>()
-                };
-
-                // Set the current context for the Builtins class
-                Builtins.CurrentContext = globals;
-
-                // Initialize the object factory for enhanced script support
-                globals.InitializeObjectFactory();
-
-                // Build the complete script with automatic variable declarations
-                var completeScript = BuildScriptWithVariables(verb.Code, variables);
-
-                var script = CSharpScript.Create(completeScript, _scriptOptions, typeof(VerbScriptGlobals));
-                var result = script.RunAsync(globals).Result;
-                
-                return result.ReturnValue?.ToString() ?? "";
-            }
-            catch (Exception ex)
-            {
-                // Log the full exception for debugging
-                Logger.Error($"Script execution error in verb '{verb.Name}': {ex.Message}");
-                if (ex.InnerException != null)
-                {
-                    Logger.Error($"Inner exception: {ex.InnerException.Message}");
-                }
-                throw; // Re-throw so VerbResolver can handle it properly
-            }
-        }
-
-        private List<string> ParseArguments(string input)
+    /// <summary>
+    /// Execute a verb's code with enhanced script globals
+    /// </summary>
+    public string ExecuteVerb(Database.Models.Verb verb, string input, Database.Player player, 
+        CommandProcessor commandProcessor, string? thisObjectId = null, Dictionary<string, string>? variables = null)
+    {
+        // Use the new unified script engine for consistent behavior
+        var unifiedEngine = new UnifiedScriptEngine();
+        return unifiedEngine.ExecuteVerb(verb, input, player, commandProcessor, thisObjectId, variables);
+    }        private List<string> ParseArguments(string input)
         {
             var parts = input.Split(' ', StringSplitOptions.RemoveEmptyEntries);
             return parts.Skip(1).ToList(); // Skip the verb itself

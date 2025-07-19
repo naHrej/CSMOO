@@ -51,88 +51,9 @@ public class FunctionScriptEngine
     /// </summary>
     public object? ExecuteFunction(Function function, object?[] parameters, Player callingPlayer, CommandProcessor? commandProcessor = null, string callingObjectId = "")
     {
-        try
-        {
-            // Validate parameter count
-            if (parameters.Length != function.ParameterTypes.Length)
-            {
-                throw new ArgumentException($"Function '{function.Name}' expects {function.ParameterTypes.Length} parameters, but {parameters.Length} were provided.");
-            }
-
-            // Validate parameter types
-            for (int i = 0; i < parameters.Length; i++)
-            {
-                if (!ValidateParameterType(parameters[i], function.ParameterTypes[i]))
-                {
-                    throw new ArgumentException($"Parameter {i + 1} of function '{function.Name}' expected type '{function.ParameterTypes[i]}', but got '{parameters[i]?.GetType().Name ?? "null"}'.");
-                }
-            }
-
-            // Create globals for function execution
-            var globals = new FunctionScriptGlobals
-            {
-                Player = callingPlayer,
-                
-                CommandProcessor = commandProcessor,
-                CallingObjectId = callingObjectId,
-                Parameters = parameters
-            };
-
-            // Add parameters as named variables to the globals
-            for (int i = 0; i < function.ParameterNames.Length && i < parameters.Length; i++)
-            {
-                var paramName = function.ParameterNames[i];
-                if (!string.IsNullOrEmpty(paramName))
-                {
-                    globals.SetParameter(paramName, parameters[i]);
-                }
-
-                
-            }
-
-            // we need to resolve thisObjectId to the actual GameObject
-            if (!string.IsNullOrEmpty(callingObjectId))
-            {
-                globals.SetParameter("self", Database.ObjectManager.GetObject(callingObjectId));
-            }
-
-            // Build script code that declares the parameters as variables
-            var scriptCode = new StringBuilder();
-            
-            // Declare each parameter as a local variable
-            for (int i = 0; i < function.ParameterNames.Length && i < parameters.Length; i++)
-            {
-                var paramName = function.ParameterNames[i];
-                var paramType = function.ParameterTypes[i];
-                if (!string.IsNullOrEmpty(paramName))
-                {
-                    scriptCode.AppendLine($"{paramType} {paramName} = ({paramType})GetParameter(\"{paramName}\");");
-                }
-            }
-            
-            // Add the actual function code
-            scriptCode.AppendLine(function.Code);
-            
-            var finalCode = scriptCode.ToString();
-
-            // Create and execute script
-            var script = CSharpScript.Create(finalCode, _scriptOptions, typeof(FunctionScriptGlobals));
-            var result = script.RunAsync(globals).Result;
-
-            // Validate return type
-            var returnValue = result.ReturnValue;
-            if (!ValidateReturnType(returnValue, function.ReturnType))
-            {
-                Logger.Warning($"Function '{function.Name}' returned unexpected type. Expected '{function.ReturnType}', got '{returnValue?.GetType().Name ?? "null"}'.");
-            }
-
-            return returnValue;
-        }
-        catch (Exception ex)
-        {
-            Logger.Error($"Error executing function '{function.Name}': {ex.Message}");
-            throw;
-        }
+        // Use the new unified script engine for consistent behavior
+        var unifiedEngine = new UnifiedScriptEngine();
+        return unifiedEngine.ExecuteFunction(function, parameters, callingPlayer, commandProcessor, callingObjectId);
     }
 
     /// <summary>
