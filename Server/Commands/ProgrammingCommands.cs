@@ -170,20 +170,20 @@ public class ProgrammingCommands
         _currentFunctionId = string.Empty; // Clear function ID
         _currentCode.Clear(); // Always start with empty code - @program replaces existing code
         
-        if (!string.IsNullOrEmpty(verb.Code))
-        {
-            _commandProcessor.SendToPlayer("Existing code (will be replaced):");
-            var lines = verb.Code.Split('\n');
-            for (int i = 0; i < lines.Length; i++)
-            {
-                _commandProcessor.SendToPlayer($"{i + 1}: {lines[i]}");
-            }
-            _commandProcessor.SendToPlayer("--- End of existing code ---");
-        }
-        else
-        {
-            _commandProcessor.SendToPlayer("No existing code.");
-        }
+        // if (!string.IsNullOrEmpty(verb.Code))
+        // {
+        //     _commandProcessor.SendToPlayer("Existing code (will be replaced):");
+        //     var lines = verb.Code.Split('\n');
+        //     for (int i = 0; i < lines.Length; i++)
+        //     {
+        //         _commandProcessor.SendToPlayer($"{i + 1}: {lines[i]}");
+        //     }
+        //     _commandProcessor.SendToPlayer("--- End of existing code ---");
+        // }
+        // else
+        // {
+        //     _commandProcessor.SendToPlayer("No existing code.");
+        // }
 
         _commandProcessor.SendToPlayer("Enter your NEW C# code (will replace any existing code).");
         _commandProcessor.SendToPlayer("Type '.' on a line by itself to save, or '.abort' to cancel without changes.");
@@ -192,8 +192,8 @@ public class ProgrammingCommands
         _commandProcessor.SendToPlayer("  ThisObject - ID of the object this verb is on");
         _commandProcessor.SendToPlayer("  Input - the complete command input");
         _commandProcessor.SendToPlayer("  Args - list of arguments");
-        _commandProcessor.SendToPlayer("  notify(player, message) - send message to specific player");
-        _commandProcessor.SendToPlayer("  notify(me, message) - send message to current player");
+        _commandProcessor.SendToPlayer("  Notify(player, message) - send message to specific player");
+        _commandProcessor.SendToPlayer("  Notify(me, message) - send message to current player");
         _commandProcessor.SendToPlayer("  GetPlayer(name) - get player object by name for notify()");
         _commandProcessor.SendToPlayer("  SayToRoom(message) - send message to all in room");
 
@@ -464,7 +464,7 @@ public class ProgrammingCommands
 
         // Add line to current code
         _currentCode.AppendLine(input);
-        _commandProcessor.SendToPlayer($"[{_currentCode.ToString().Split('\n').Length}] "); // Show line number
+        //_commandProcessor.SendToPlayer($"[{_currentCode.ToString().Split('\n').Length}] "); // Show line number
         return true;
     }
 
