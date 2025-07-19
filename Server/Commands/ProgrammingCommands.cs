@@ -158,12 +158,10 @@ public class ProgrammingCommands
         {
             verb = VerbManager.CreateVerb(objectId, verbName, "", "", _player.Name);
             _commandProcessor.SendToPlayer($"Created new verb '{verbName}' on {GetObjectName(objectId)}.");
-            Logger.Debug($"Created new verb: ID={verb.Id}, Name={verb.Name}, ObjectId={verb.ObjectId}");
         }
         else
         {
             _commandProcessor.SendToPlayer($"Editing existing verb '{verbName}' on {GetObjectName(objectId)}.");
-            Logger.Debug($"Editing existing verb: ID={verb.Id}, Name={verb.Name}, CurrentCodeLength={verb.Code?.Length ?? 0}");
         }
 
         // Enter programming mode
@@ -171,8 +169,6 @@ public class ProgrammingCommands
         _currentVerbId = verb.Id;
         _currentFunctionId = string.Empty; // Clear function ID
         _currentCode.Clear(); // Always start with empty code - @program replaces existing code
-        
-        Logger.Debug($"Entering programming mode for verb ID: {_currentVerbId}");
         
         if (!string.IsNullOrEmpty(verb.Code))
         {
@@ -224,16 +220,12 @@ public class ProgrammingCommands
         // Show function signature
         var paramString = string.Join(", ", function.ParameterTypes.Zip(function.ParameterNames, (type, name) => $"{type} {name}"));
         _commandProcessor.SendToPlayer($"Function signature: {function.ReturnType} {function.Name}({paramString})");
-        
-        Logger.Debug($"Editing function: ID={function.Id}, Name={function.Name}, CurrentCodeLength={function.Code?.Length ?? 0}");
 
         // Enter programming mode
         _isInProgrammingMode = true;
         _currentVerbId = string.Empty; // Clear verb ID
         _currentFunctionId = function.Id;
         _currentCode.Clear(); // Always start with empty code - @program replaces existing code
-        
-        Logger.Debug($"Entering programming mode for function ID: {_currentFunctionId}");
         
         if (!string.IsNullOrEmpty(function.Code))
         {
@@ -358,8 +350,6 @@ public class ProgrammingCommands
         _currentFunctionId = string.Empty; // No function ID for script mode
         _currentCode.Clear();
         
-        Logger.Debug("Entering script mode for testing");
-        
         _commandProcessor.SendToPlayer("Enter your C# code for testing:");
         _commandProcessor.SendToPlayer("Type '.' on a line by itself to execute, or '.abort' to cancel.");
         _commandProcessor.SendToPlayer("Script mode active. Available variables:");
@@ -383,12 +373,60 @@ public class ProgrammingCommands
             // Finish programming or execute script
             var code = _currentCode.ToString();
             
-            if (string.IsNullOrEmpty(_currentVerbId))
+            if (!string.IsNullOrEmpty(_currentVerbId))
+            {
+                // Verb programming mode - save the code
+                VerbManager.UpdateVerbCode(_currentVerbId, code);
+                
+                // Verify the code was saved
+                var savedVerb = GameDatabase.Instance.GetCollection<Verb>("verbs").FindById(_currentVerbId);
+                if (savedVerb != null)
+                {
+                    _commandProcessor.SendToPlayer("Verb programming complete.");
+                    _commandProcessor.SendToPlayer($"Code saved ({code.Split('\n').Length} lines).");
+                    _commandProcessor.SendToPlayer($"Verified: Code length is {savedVerb.Code?.Length ?? 0} characters.");
+                }
+                else
+                {
+                    _commandProcessor.SendToPlayer("ERROR: Could not verify that code was saved!");
+                }
+            }
+            else if (!string.IsNullOrEmpty(_currentFunctionId))
+            {
+                // Function programming mode - save the code
+                var functions = GameDatabase.Instance.GetCollection<Function>("functions");
+                var function = functions.FindById(_currentFunctionId);
+                
+                if (function != null)
+                {
+                    function.Code = code;
+                    var updateResult = FunctionManager.UpdateFunction(function);
+                    
+                    if (updateResult)
+                    {
+                        _commandProcessor.SendToPlayer("Function programming complete.");
+                        _commandProcessor.SendToPlayer($"Code saved ({code.Split('\n').Length} lines).");
+                        
+                        // Re-fetch to verify
+                        var verifyFunction = functions.FindById(_currentFunctionId);
+                        if (verifyFunction != null)
+                        {
+                            _commandProcessor.SendToPlayer($"Verified: Code length is {verifyFunction.Code?.Length ?? 0} characters.");
+                        }
+                    }
+                    else
+                    {
+                        _commandProcessor.SendToPlayer("ERROR: Failed to save function code.");
+                    }
+                }
+                else
+                {
+                    _commandProcessor.SendToPlayer("ERROR: Could not find function to save code to!");
+                }
+            }
+            else
             {
                 // Script mode - execute the code immediately
-                Logger.Debug($"Executing script code. Code length: {code.Length}");
-                Logger.Debug($"Script content: '{code}'");
-                
                 try
                 {
                     // Create a temporary verb to execute the script with proper globals
@@ -412,56 +450,6 @@ public class ProgrammingCommands
                 catch (Exception ex)
                 {
                     _commandProcessor.SendToPlayer($"Script execution failed: {ex.Message}");
-                    Logger.Error($"Script execution exception: {ex}");
-                }
-            }
-            else if (!string.IsNullOrEmpty(_currentVerbId))
-            {
-                // Verb programming mode - save the code
-                Logger.Debug($"Saving verb code. VerbId: {_currentVerbId}, Code length: {code.Length}");
-                Logger.Debug($"Code content: '{code}'");
-                
-                VerbManager.UpdateVerbCode(_currentVerbId, code);
-                
-                // Verify the code was saved
-                var savedVerb = GameDatabase.Instance.GetCollection<Verb>("verbs").FindById(_currentVerbId);
-                if (savedVerb != null)
-                {
-                    Logger.Debug($"Verification: Saved code length: {savedVerb.Code?.Length ?? 0}");
-                    _commandProcessor.SendToPlayer("Verb programming complete.");
-                    _commandProcessor.SendToPlayer($"Code saved ({code.Split('\n').Length} lines).");
-                    _commandProcessor.SendToPlayer($"Verified: Code length is {savedVerb.Code?.Length ?? 0} characters.");
-                }
-                else
-                {
-                    Logger.Error($"Could not find verb with ID {_currentVerbId} after saving!");
-                    _commandProcessor.SendToPlayer("ERROR: Could not verify that code was saved!");
-                }
-            }
-            else if (!string.IsNullOrEmpty(_currentFunctionId))
-            {
-                // Function programming mode - save the code
-                Logger.Debug($"Saving function code. FunctionId: {_currentFunctionId}, Code length: {code.Length}");
-                Logger.Debug($"Code content: '{code}'");
-                
-                var functions = GameDatabase.Instance.GetCollection<Function>("functions");
-                var function = functions.FindById(_currentFunctionId);
-                
-                if (function != null)
-                {
-                    function.Code = code;
-                    function.ModifiedAt = DateTime.UtcNow;
-                    functions.Update(function);
-                    
-                    Logger.Debug($"Verification: Saved code length: {function.Code?.Length ?? 0}");
-                    _commandProcessor.SendToPlayer("Function programming complete.");
-                    _commandProcessor.SendToPlayer($"Code saved ({code.Split('\n').Length} lines).");
-                    _commandProcessor.SendToPlayer($"Verified: Code length is {function.Code?.Length ?? 0} characters.");
-                }
-                else
-                {
-                    Logger.Error($"Could not find function with ID {_currentFunctionId} after saving!");
-                    _commandProcessor.SendToPlayer("ERROR: Could not find function to save code to!");
                 }
             }
             
@@ -1223,8 +1211,6 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
     /// </summary>
     private string? ResolveObject(string objectName)
     {
-        Logger.Debug($"Resolving object name: '{objectName}'");
-        
         string? result = null;
         
         // Handle special keywords first
@@ -1245,7 +1231,6 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
                 {
                     var obj = GameDatabase.Instance.GameObjects.FindOne(o => o.DbRef == dbref);
                     result = obj?.Id;
-                    Logger.Debug($"DBREF lookup #{dbref} -> {result ?? "not found"}");
                 }
                 // Check if it's a class reference (starts with "class:" or ends with ".class")
                 else if (objectName.StartsWith("class:", StringComparison.OrdinalIgnoreCase))
@@ -1254,7 +1239,6 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
                     var objectClass = GameDatabase.Instance.ObjectClasses.FindOne(c => 
                         c.Name.Equals(className, StringComparison.OrdinalIgnoreCase));
                     result = objectClass?.Id;
-                    Logger.Debug($"Class lookup '{className}' -> {result ?? "not found"}");
                 }
                 else if (objectName.EndsWith(".class", StringComparison.OrdinalIgnoreCase))
                 {
@@ -1262,13 +1246,11 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
                     var objectClass = GameDatabase.Instance.ObjectClasses.FindOne(c => 
                         c.Name.Equals(className, StringComparison.OrdinalIgnoreCase));
                     result = objectClass?.Id;
-                    Logger.Debug($"Class lookup '{className}' -> {result ?? "not found"}");
                 }
                 // Check if it's a direct class ID (like "obj_room", "obj_exit", etc.)
                 else if (GameDatabase.Instance.ObjectClasses.FindById(objectName) != null)
                 {
                     result = objectName; // The objectName itself is the class ID
-                    Logger.Debug($"Direct class ID lookup '{objectName}' -> {result}");
                 }
                 else
                 {

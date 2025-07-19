@@ -937,6 +937,66 @@ public class DynamicGameObject : DynamicObject
     }
 
     /// <summary>
+    /// Handles method calls (functions): This.functionName(args)
+    /// </summary>
+    public override bool TryInvokeMember(InvokeMemberBinder binder, object?[]? args, out object? result)
+    {
+        var methodName = binder.Name;
+        
+        try
+        {
+            // Check if this is a null object (missing from database)
+            if (_gameObject.Properties.ContainsKey("_isNullObject") && 
+                _gameObject.Properties["_isNullObject"].AsBoolean)
+            {
+                throw new InvalidOperationException($"Cannot call method '{methodName}' on missing object {_gameObject.Id}");
+            }
+
+            // Find the function on this object using the FunctionResolver
+            var function = FunctionResolver.FindFunction(_gameObject.Id, methodName);
+            if (function == null)
+            {
+                throw new ArgumentException($"Function '{methodName}' not found on object {_gameObject.Id}");
+            }
+
+            // Get the current player from the UnifiedContext if available
+            Database.Player? currentPlayer = null;
+            CommandProcessor? commandProcessor = null;
+            
+            if (Builtins.UnifiedContext != null)
+            {
+                // Try to get Database.Player from the dynamic Player object
+                var playerObj = Builtins.UnifiedContext.Player;
+                if (playerObj is DynamicGameObject dynamicPlayer)
+                {
+                    currentPlayer = GameDatabase.Instance.Players.FindById(dynamicPlayer.GameObject.Id);
+                }
+                else if (playerObj is GameObject gameObj)
+                {
+                    currentPlayer = GameDatabase.Instance.Players.FindById(gameObj.Id);
+                }
+                
+                commandProcessor = Builtins.UnifiedContext.CommandProcessor;
+            }
+
+            if (currentPlayer == null)
+            {
+                throw new InvalidOperationException($"Cannot execute function '{methodName}': no current player context available");
+            }
+
+            // Execute the function using the function script engine
+            var functionEngine = new FunctionScriptEngine();
+            result = functionEngine.ExecuteFunction(function, args ?? new object[0], 
+                currentPlayer, commandProcessor, _gameObject.Id);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException($"Error calling function '{methodName}' on object {_gameObject.Id}: {ex.Message}", ex);
+        }
+    }
+
+    /// <summary>
     /// String representation
     /// </summary>
     public override string ToString()

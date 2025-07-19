@@ -8,7 +8,7 @@
     "if (Args.Count == 0)",
     "{",
     "    // Just 'look' - show the room",
-    "    Builtins.ShowRoom();",
+    "    notify(Player, here.StyledDesc());",
     "}",
     "else if (Args.Count >= 2 && Args[0].ToLower() == \"at\")",
     "{",
