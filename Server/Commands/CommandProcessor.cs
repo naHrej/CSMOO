@@ -206,6 +206,17 @@ public class CommandProcessor
             return;
         }
 
+        // Insert space after special command characters if at the start
+        if (!string.IsNullOrEmpty(input))
+        {
+            char[] specialChars = [';', '\'', '"', ':', '!'];
+            char firstChar = input[0];
+            if (specialChars.Contains(firstChar) && input.Length > 1 && !char.IsWhiteSpace(input[1]))
+            {
+                input = $"{firstChar} {input.Substring(1)}";
+            }
+        }
+
         // Try to execute as a verb first
         if (VerbResolver.TryExecuteVerb(input, _player, this))
         {
