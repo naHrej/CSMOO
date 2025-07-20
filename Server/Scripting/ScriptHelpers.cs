@@ -260,12 +260,12 @@ public class ScriptHelpers
     }
 
     /// <summary>
-    /// Get an object by its ID - returns a dynamic wrapper for property access
+    /// Get an object by its ID - returns a GameObject for property access
     /// </summary>
-    public dynamic? GetObject(string objectId)
+    public GameObject? GetObject(string objectId)
     {
         var gameObject = GameDatabase.Instance.GameObjects.FindById(objectId);
-        return gameObject != null ? new DynamicGameObject(gameObject) : null;
+        return gameObject;
     }
 
     /// <summary>
@@ -462,12 +462,12 @@ public class ScriptHelpers
     }
 
     /// <summary>
-    /// Get all objects in a specific location - returns dynamic wrappers for property access
+    /// Get all objects in a specific location - returns GameObjects for property access
     /// </summary>
-    public List<dynamic> GetObjectsInLocation(string locationId)
+    public List<GameObject> GetObjectsInLocation(string locationId)
     {
         var gameObjects = ObjectManager.GetObjectsInLocation(locationId);
-        return gameObjects.Select(obj => new DynamicGameObject(obj)).Cast<dynamic>().ToList();
+        return gameObjects.ToList();
     }
 
     /// <summary>
@@ -607,9 +607,9 @@ public class ScriptHelpers
     }
 
     /// <summary>
-    /// Find an item in the player's inventory by name - returns dynamic wrapper
+    /// Find an item in the player's inventory by name - returns GameObject
     /// </summary>
-    public dynamic? FindItemInInventory(string itemName)
+    public GameObject? FindItemInInventory(string itemName)
     {
         if (_player == null) return null;
 
@@ -627,13 +627,13 @@ public class ScriptHelpers
                 return name?.Contains(itemName) == true || shortDesc?.Contains(itemName) == true;
             });
             
-        return foundObject != null ? new DynamicGameObject(foundObject) : null;
+        return foundObject;
     }
 
     /// <summary>
-    /// Find an item in the current room by name - returns dynamic wrapper
+    /// Find an item in the current room by name - returns GameObject
     /// </summary>
-    public dynamic? FindItemInRoom(string itemName)
+    public GameObject? FindItemInRoom(string itemName)
     {
         if (_player?.Location == null) return null;
 
@@ -647,7 +647,7 @@ public class ScriptHelpers
             return name?.Contains(itemName) == true || shortDesc?.Contains(itemName) == true;
         });
         
-        return foundObject != null ? new DynamicGameObject(foundObject) : null;
+        return foundObject;
     }
 
     #endregion

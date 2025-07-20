@@ -72,8 +72,8 @@ public class UnifiedScriptEngine
 
             var globals = new UnifiedScriptGlobals
             {
-                Player = playerObject != null ? new DynamicGameObject(playerObject) : null,
-                This = thisObject != null ? new DynamicGameObject(thisObject) : CreateNullGameObject(actualThisObjectId),
+                Player = playerObject,
+                This = thisObject ?? CreateNullGameObject(actualThisObjectId),
                 CommandProcessor = commandProcessor,
                 Helpers = new ScriptHelpers(player, commandProcessor),
                 Input = input,
@@ -155,8 +155,8 @@ public class UnifiedScriptEngine
             // Create globals for function execution
             var globals = new UnifiedScriptGlobals
             {
-                Player = playerObject != null ? new DynamicGameObject(playerObject) : null,
-                This = thisObject != null ? new DynamicGameObject(thisObject) : CreateNullGameObject(actualThisObjectId),
+                Player = playerObject,
+                This = thisObject ?? CreateNullGameObject(actualThisObjectId),
                 CommandProcessor = commandProcessor,
                 CallingObjectId = actualThisObjectId,
                 Parameters = parameters
@@ -235,7 +235,7 @@ public class UnifiedScriptEngine
     /// Creates a placeholder GameObject for null object references
     /// This ensures This and ThisObject are never null, preventing runtime errors
     /// </summary>
-    private static DynamicGameObject CreateNullGameObject(string objectId)
+    private static GameObject CreateNullGameObject(string objectId)
     {
         // Create a minimal GameObject that represents a missing/null object
         var nullGameObject = new GameObject
@@ -254,7 +254,7 @@ public class UnifiedScriptEngine
         nullGameObject.Properties["_isNullObject"] = true;
         nullGameObject.Properties["name"] = $"<missing object {objectId}>";
         
-        return new DynamicGameObject(nullGameObject);
+        return nullGameObject;
     }
 
     /// <summary>
@@ -365,30 +365,30 @@ public class UnifiedScriptGlobals : EnhancedScriptGlobals
     public new ScriptHelpers? Helpers { get; set; }
     
     /// <summary>
-    /// The object this script is running on (dynamic wrapper for natural syntax)
+    /// The object this script is running on (now directly GameObject with dynamic support)
     /// </summary>
-    public dynamic? This { get; set; }
+    public GameObject? This { get; set; }
     
     /// <summary>
-    /// Alias for This - the object this script is running on (dynamic wrapper for natural syntax)
+    /// Alias for This - the object this script is running on (now directly GameObject with dynamic support)
     /// </summary>
-    public dynamic? ThisObject 
+    public GameObject? ThisObject 
     { 
         get => This; 
         set => This = value; 
     }
     
     /// <summary>
-    /// The current player as a dynamic wrapper (not Database.Player)
+    /// The current player as GameObject (now with dynamic support)
     /// </summary>
-    public new dynamic? Player { get; set; }
+    public new GameObject? Player { get; set; }
     
     /// <summary>
     /// Get the underlying GameObject for This (for internal use)
     /// </summary>
     public GameObject? GetThisGameObject()
     {
-        return (This as DynamicGameObject)?.GameObject;
+        return This;
     }
     
     /// <summary>
@@ -396,7 +396,7 @@ public class UnifiedScriptGlobals : EnhancedScriptGlobals
     /// </summary>
     public GameObject? GetPlayerGameObject()
     {
-        return (Player as DynamicGameObject)?.GameObject;
+        return Player;
     }
 
     /// <summary>
@@ -484,29 +484,16 @@ public class UnifiedScriptGlobals : EnhancedScriptGlobals
     }
 
     /// <summary>
-    /// Send a message to a specific player
+    /// Send a message to a specific GameObject player
     /// </summary>
     public void notify(GameObject targetPlayer, string message)
     {
-        // Convert GameObject to Database.Player if needed
         var dbPlayer = targetPlayer as Database.Player ?? 
                       GameDatabase.Instance.Players.FindById(targetPlayer.Id);
         
         if (dbPlayer != null)
         {
             CommandProcessor?.SendToPlayer(message, dbPlayer.SessionGuid);
-        }
-    }
-
-    /// <summary>
-    /// Send a message to a specific dynamic player
-    /// </summary>
-    public void notify(dynamic targetPlayer, string message)
-    {
-        var gameObject = (targetPlayer as DynamicGameObject)?.GameObject;
-        if (gameObject != null)
-        {
-            notify(gameObject, message);
         }
     }
 
@@ -793,220 +780,5 @@ public class UnifiedScriptGlobals : EnhancedScriptGlobals
     public new object? Class(string className, string verbName, params object[] args)
     {
         return CallVerb($"class:{className}", verbName, args);
-    }
-}
-
-/// <summary>
-/// Dynamic wrapper for GameObject that provides natural property access syntax
-/// Enables "This.propertyName" and "This.propertyName = value" syntax
-/// </summary>
-public class DynamicGameObject : DynamicObject
-{
-    private readonly GameObject _gameObject;
-
-    public DynamicGameObject(GameObject gameObject)
-    {
-        _gameObject = gameObject;
-    }
-
-    /// <summary>
-    /// The underlying GameObject
-    /// </summary>
-    public GameObject GameObject => _gameObject;
-
-    /// <summary>
-    /// Handles property getting: This.longDescription
-    /// </summary>
-    public override bool TryGetMember(GetMemberBinder binder, out object? result)
-    {
-        var propertyName = binder.Name;
-        
-        try
-        {
-            // Handle special GameObject properties first
-            switch (propertyName.ToLower())
-            {
-                case "id":
-                    result = _gameObject.Id;
-                    return true;
-                case "dbref":
-                    result = _gameObject.DbRef;
-                    return true;
-                case "classid":
-                    result = _gameObject.ClassId;
-                    return true;
-                case "location":
-                    result = _gameObject.Location;
-                    return true;
-                case "contents":
-                    result = _gameObject.Contents;
-                    return true;
-                case "createdat":
-                    result = _gameObject.CreatedAt;
-                    return true;
-                case "modifiedat":
-                    result = _gameObject.ModifiedAt;
-                    return true;
-            }
-
-            // Check if this is a null object (missing from database)
-            if (_gameObject.Properties.ContainsKey("_isNullObject") && 
-                _gameObject.Properties["_isNullObject"].AsBoolean)
-            {
-                result = null;
-                return true; // Return null for any property on a missing object
-            }
-
-            // Try to get the property from the object's property system
-            var propertyValue = Database.ObjectManager.GetProperty(_gameObject, propertyName);
-            
-            if (propertyValue == null)
-            {
-                result = null;
-                return true; // Return true but with null result - property doesn't exist
-            }
-            
-            // Convert BsonValue to appropriate C# type
-            result = propertyValue.RawValue;
-            return true;
-        }
-        catch (Exception ex)
-        {
-            throw new InvalidOperationException($"Error accessing property '{propertyName}' on object {_gameObject.Id}: {ex.Message}", ex);
-        }
-    }
-
-    /// <summary>
-    /// Handles property setting: This.longDescription = "value"
-    /// </summary>
-    public override bool TrySetMember(SetMemberBinder binder, object? value)
-    {
-        var propertyName = binder.Name;
-        
-        try
-        {
-            // Check if this is a null object (missing from database)
-            if (_gameObject.Properties.ContainsKey("_isNullObject") && 
-                _gameObject.Properties["_isNullObject"].AsBoolean)
-            {
-                throw new InvalidOperationException($"Cannot set property '{propertyName}' on missing object {_gameObject.Id}");
-            }
-
-            // Prevent setting read-only GameObject properties
-            switch (propertyName.ToLower())
-            {
-                case "id":
-                case "dbref":
-                case "classid":
-                case "createdat":
-                    throw new InvalidOperationException($"Property '{propertyName}' is read-only");
-                case "location":
-                    // Special handling for location changes
-                    Database.ObjectManager.MoveObject(_gameObject.Id, value?.ToString());
-                    return true;
-                case "contents":
-                    throw new InvalidOperationException("Contents property cannot be set directly. Use object movement commands instead.");
-                case "modifiedat":
-                    _gameObject.ModifiedAt = value is DateTime dt ? dt : DateTime.UtcNow;
-                    GameDatabase.Instance.GameObjects.Update(_gameObject);
-                    return true;
-            }
-
-            // Convert value to BsonValue for property storage
-            BsonValue bsonValue = value switch
-            {
-                null => BsonValue.Null,
-                string s => new BsonValue(s),
-                int i => new BsonValue(i),
-                long l => new BsonValue(l),
-                double d => new BsonValue(d),
-                float f => new BsonValue((double)f),
-                bool b => new BsonValue(b),
-                DateTime dt => new BsonValue(dt),
-                BsonValue bv => bv,
-                _ => new BsonValue(value.ToString() ?? "")
-            };
-
-            Database.ObjectManager.SetProperty(_gameObject, propertyName, bsonValue);
-            return true;
-        }
-        catch (Exception ex)
-        {
-            throw new InvalidOperationException($"Error setting property '{propertyName}' on object {_gameObject.Id}: {ex.Message}", ex);
-        }
-    }
-
-    /// <summary>
-    /// Handles method calls (functions): This.functionName(args)
-    /// </summary>
-    public override bool TryInvokeMember(InvokeMemberBinder binder, object?[]? args, out object? result)
-    {
-        var methodName = binder.Name;
-        
-        try
-        {
-            // Check if this is a null object (missing from database)
-            if (_gameObject.Properties.ContainsKey("_isNullObject") && 
-                _gameObject.Properties["_isNullObject"].AsBoolean)
-            {
-                throw new InvalidOperationException($"Cannot call method '{methodName}' on missing object {_gameObject.Id}");
-            }
-
-            // Find the function on this object using the FunctionResolver
-            var function = FunctionResolver.FindFunction(_gameObject.Id, methodName);
-            if (function == null)
-            {
-                throw new ArgumentException($"Function '{methodName}' not found on object {_gameObject.Id}");
-            }
-
-            // Get the current player from the UnifiedContext if available
-            Database.Player? currentPlayer = null;
-            CommandProcessor? commandProcessor = null;
-            
-            if (Builtins.UnifiedContext != null)
-            {
-                // Try to get Database.Player from the dynamic Player object
-                var playerObj = Builtins.UnifiedContext.Player;
-                if (playerObj is DynamicGameObject dynamicPlayer)
-                {
-                    currentPlayer = GameDatabase.Instance.Players.FindById(dynamicPlayer.GameObject.Id);
-                }
-                else if (playerObj is GameObject gameObj)
-                {
-                    currentPlayer = GameDatabase.Instance.Players.FindById(gameObj.Id);
-                }
-                
-                commandProcessor = Builtins.UnifiedContext.CommandProcessor;
-            }
-
-            if (currentPlayer == null)
-            {
-                throw new InvalidOperationException($"Cannot execute function '{methodName}': no current player context available");
-            }
-
-            // Execute the function using the function script engine
-            var functionEngine = new FunctionScriptEngine();
-            result = functionEngine.ExecuteFunction(function, args ?? new object[0], 
-                currentPlayer, commandProcessor, _gameObject.Id);
-            return true;
-        }
-        catch (Exception ex)
-        {
-            throw new InvalidOperationException($"Error calling function '{methodName}' on object {_gameObject.Id}: {ex.Message}", ex);
-        }
-    }
-
-    /// <summary>
-    /// String representation
-    /// </summary>
-    public override string ToString()
-    {
-        var nameProperty = Database.ObjectManager.GetProperty(_gameObject, "name");
-        var shortDescProperty = Database.ObjectManager.GetProperty(_gameObject, "shortDescription");
-        
-        var name = nameProperty?.AsString;
-        var shortDesc = shortDescProperty?.AsString;
-        
-        return name ?? shortDesc ?? $"Object #{_gameObject.DbRef}";
     }
 }
