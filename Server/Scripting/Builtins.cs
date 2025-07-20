@@ -25,7 +25,7 @@ public static class Builtins
     public static UnifiedScriptGlobals? UnifiedContext { get; set; }
 
     #region Object Management
-    
+
     /// <summary>
     /// Find a game object by its ID
     /// </summary>
@@ -37,19 +37,17 @@ public static class Builtins
     /// <summary>
     /// Get the string value of an object property
     /// </summary>
-    public static string GetProperty(string objectId, string propertyName)
+    public static BsonValue? GetProperty(string objectId, string propertyName)
     {
-        var property = ObjectManager.GetProperty(objectId, propertyName) as BsonValue;
-        return property?.AsString ?? "";
+        return ObjectManager.GetProperty(objectId, propertyName);
     }
     
     /// <summary>
-    /// Get the string value of an object property (DynamicGameObject overload)
+    /// Get the string value of an object property (GameObject overload)
     /// </summary>
-    public static string GetProperty(dynamic obj, string propertyName)
+    public static BsonValue? GetProperty(GameObject obj, string propertyName)
     {
-        var objectId = (obj as DynamicGameObject)?.GameObject?.Id ?? throw new ArgumentException("Object must be a DynamicGameObject");
-        return GetProperty(objectId, propertyName);
+        return ObjectManager.GetProperty(obj, propertyName);
     }
     
     /// <summary>
@@ -62,12 +60,11 @@ public static class Builtins
     }
     
     /// <summary>
-    /// Get the string value of an object property with default (DynamicGameObject overload)
+    /// Get the string value of an object property with default (GameObject overload)
     /// </summary>
-    public static string GetProperty(dynamic obj, string propertyName, string defaultValue)
+    public static string GetProperty(GameObject obj, string propertyName, string defaultValue)
     {
-        var objectId = (obj as DynamicGameObject)?.GameObject?.Id ?? throw new ArgumentException("Object must be a DynamicGameObject");
-        return GetProperty(objectId, propertyName, defaultValue);
+        return GetProperty(obj.Id, propertyName, defaultValue);
     }
     
     /// <summary>
@@ -80,12 +77,11 @@ public static class Builtins
     }
     
     /// <summary>
-    /// Get the boolean value of an object property (DynamicGameObject overload)
+    /// Get the boolean value of an object property (GameObject overload)
     /// </summary>
-    public static bool GetBoolProperty(dynamic obj, string propertyName, bool defaultValue = false)
+    public static bool GetBoolProperty(GameObject obj, string propertyName, bool defaultValue = false)
     {
-        var objectId = (obj as DynamicGameObject)?.GameObject?.Id ?? throw new ArgumentException("Object must be a DynamicGameObject");
-        return GetBoolProperty(objectId, propertyName, defaultValue);
+        return GetBoolProperty(obj.Id, propertyName, defaultValue);
     }
     
     /// <summary>
@@ -101,12 +97,11 @@ public static class Builtins
     }
     
     /// <summary>
-    /// Set a property on an object (DynamicGameObject overload)
+    /// Set a property on an object (GameObject overload)
     /// </summary>
-    public static void SetProperty(dynamic obj, string propertyName, string value)
+    public static void SetProperty(GameObject obj, string propertyName, string value)
     {
-        var objectId = (obj as DynamicGameObject)?.GameObject?.Id ?? throw new ArgumentException("Object must be a DynamicGameObject");
-        SetProperty(objectId, propertyName, value);
+        SetProperty(obj.Id, propertyName, value);
     }
     
     /// <summary>
@@ -122,21 +117,20 @@ public static class Builtins
     }
     
     /// <summary>
-    /// Set a boolean property on an object (DynamicGameObject overload)
+    /// Set a boolean property on an object (GameObject overload)
     /// </summary>
-    public static void SetBoolProperty(dynamic obj, string propertyName, bool value)
+    public static void SetBoolProperty(GameObject obj, string propertyName, bool value)
     {
-        var objectId = (obj as DynamicGameObject)?.GameObject?.Id ?? throw new ArgumentException("Object must be a DynamicGameObject");
-        SetBoolProperty(objectId, propertyName, value);
+        SetBoolProperty(obj.Id, propertyName, value);
     }
     
     /// <summary>
-    /// Get all objects in a location - returns dynamic wrappers
+    /// Get all objects in a location - returns GameObject dynamic objects
     /// </summary>
     public static List<dynamic> GetObjectsInLocation(string locationId)
     {
         var gameObjects = ObjectManager.GetObjectsInLocation(locationId);
-        return gameObjects.Select(obj => new DynamicGameObject(obj) as dynamic).ToList();
+        return gameObjects.Cast<dynamic>().ToList();
     }
     
     /// <summary>
@@ -154,22 +148,11 @@ public static class Builtins
     }
     
     /// <summary>
-    /// Move an object to a new location (DynamicGameObject overloads)
+    /// Move an object to a new location (GameObject overload)
     /// </summary>
-    public static bool MoveObject(dynamic obj, string newLocationId)
+    public static bool MoveObject(GameObject obj, string newLocationId)
     {
-        var objectId = (obj as DynamicGameObject)?.GameObject?.Id ?? throw new ArgumentException("Object must be a DynamicGameObject");
-        return MoveObject(objectId, newLocationId);
-    }
-    
-    /// <summary>
-    /// Move an object to a new location (both DynamicGameObject parameters)
-    /// </summary>
-    public static bool MoveObject(dynamic obj, dynamic newLocation)
-    {
-        var objectId = (obj as DynamicGameObject)?.GameObject?.Id ?? throw new ArgumentException("Object must be a DynamicGameObject");
-        var newLocationId = (newLocation as DynamicGameObject)?.GameObject?.Id ?? throw new ArgumentException("NewLocation must be a DynamicGameObject");
-        return MoveObject(objectId, newLocationId);
+        return MoveObject(obj.Id, newLocationId);
     }
     
     /// <summary>
@@ -181,12 +164,11 @@ public static class Builtins
     }
     
     /// <summary>
-    /// Get the name of an object (DynamicGameObject overload)
+    /// Get the name of an object (GameObject overload)
     /// </summary>
-    public static string GetObjectName(dynamic obj)
+    public static string GetObjectName(GameObject obj)
     {
-        var objectId = (obj as DynamicGameObject)?.GameObject?.Id ?? throw new ArgumentException("Object must be a DynamicGameObject");
-        return GetObjectName(objectId);
+        return GetObjectName(obj.Id);
     }
     
     /// <summary>
@@ -198,12 +180,11 @@ public static class Builtins
     }
     
     /// <summary>
-    /// Get the short description of an object (DynamicGameObject overload)
+    /// Get the short description of an object (GameObject overload)
     /// </summary>
-    public static string GetObjectShortDesc(dynamic obj)
+    public static string GetObjectShortDesc(GameObject obj)
     {
-        var objectId = (obj as DynamicGameObject)?.GameObject?.Id ?? throw new ArgumentException("Object must be a DynamicGameObject");
-        return GetObjectShortDesc(objectId);
+        return GetObjectShortDesc(obj.Id);
     }
     
     /// <summary>
@@ -215,24 +196,24 @@ public static class Builtins
     }
     
     /// <summary>
-    /// Get the long description of an object (DynamicGameObject overload)
+    /// Get the long description of an object (GameObject overload)
     /// </summary>
-    public static string GetObjectLongDesc(dynamic obj)
+    public static string GetObjectLongDesc(GameObject obj)
     {
-        var objectId = (obj as DynamicGameObject)?.GameObject?.Id ?? throw new ArgumentException("Object must be a DynamicGameObject");
-        return GetObjectLongDesc(objectId);
+        return GetObjectLongDesc(obj.Id);
     }
-    
+
+
     #endregion
-    
+
     #region Player Management
-    
+
     /// <summary>
     /// Find a player by name
     /// </summary>
     public static Player FindPlayer(string playerName)
     {
-        return GameDatabase.Instance.Players.FindOne(p => 
+        return GameDatabase.Instance.Players.FindOne(p =>
             p.Name.Equals(playerName, StringComparison.OrdinalIgnoreCase));
     }
     
@@ -627,12 +608,11 @@ public static class Builtins
     }
 
     /// <summary>
-    /// Get all verbs on an object (DynamicGameObject overload)
+    /// Get all verbs on an object (GameObject overload)
     /// </summary>
-    public static List<Verb> GetVerbsOnObject(dynamic obj)
+    public static List<Verb> GetVerbsOnObject(GameObject obj)
     {
-        var objectId = (obj as DynamicGameObject)?.GameObject?.Id ?? throw new ArgumentException("Object must be a DynamicGameObject");
-        return GetVerbsOnObject(objectId);
+        return GetVerbsOnObject(obj.Id);
     }
 
     /// <summary>
@@ -644,12 +624,11 @@ public static class Builtins
     }
 
     /// <summary>
-    /// Get all functions on an object (DynamicGameObject overload)
+    /// Get all functions on an object (GameObject overload)
     /// </summary>
-    public static List<Function> GetFunctionsOnObject(dynamic obj)
+    public static List<Function> GetFunctionsOnObject(GameObject obj)
     {
-        var objectId = (obj as DynamicGameObject)?.GameObject?.Id ?? throw new ArgumentException("Object must be a DynamicGameObject");
-        return GetFunctionsOnObject(objectId);
+        return GetFunctionsOnObject(obj.Id);
     }
 
     /// <summary>
@@ -661,12 +640,11 @@ public static class Builtins
     }
     
     /// <summary>
-    /// Find a specific function on an object (DynamicGameObject overload)
+    /// Find a specific function on an object (GameObject overload)
     /// </summary>
-    public static Function? FindFunction(dynamic obj, string functionName)
+    public static Function? FindFunction(GameObject obj, string functionName)
     {
-        var objectId = (obj as DynamicGameObject)?.GameObject?.Id ?? throw new ArgumentException("Object must be a DynamicGameObject");
-        return FindFunction(objectId, functionName);
+        return FindFunction(obj.Id, functionName);
     }
     
     #endregion
@@ -687,12 +665,11 @@ public static class Builtins
     }
     
     /// <summary>
-    /// Check if an object represents a player and return the player (DynamicGameObject overload)
+    /// Check if an object represents a player and return the player (GameObject overload)
     /// </summary>
-    public static Player? GetPlayerFromObject(dynamic obj)
+    public static Player? GetPlayerFromObject(GameObject obj)
     {
-        var objectId = (obj as DynamicGameObject)?.GameObject?.Id ?? throw new ArgumentException("Object must be a DynamicGameObject");
-        return GetPlayerFromObject(objectId);
+        return GetPlayerFromObject(obj.Id);
     }
     
     /// <summary>
@@ -706,12 +683,11 @@ public static class Builtins
     }
     
     /// <summary>
-    /// Check if an object directly represents a player (DynamicGameObject overload)
+    /// Check if an object directly represents a player (GameObject overload)
     /// </summary>
-    public static bool IsPlayerObject(dynamic obj)
+    public static bool IsPlayerObject(GameObject obj)
     {
-        var objectId = (obj as DynamicGameObject)?.GameObject?.Id ?? throw new ArgumentException("Object must be a DynamicGameObject");
-        return IsPlayerObject(objectId);
+        return IsPlayerObject(obj.Id);
     }
     
     #endregion
@@ -771,12 +747,11 @@ public static class Builtins
     }
     
     /// <summary>
-    /// Get a friendly display name for an object (DynamicGameObject overload)
+    /// Get a friendly display name for an object (GameObject overload)
     /// </summary>
-    public static string GetDisplayName(dynamic obj)
+    public static string GetDisplayName(GameObject obj)
     {
-        var objectId = (obj as DynamicGameObject)?.GameObject?.Id ?? throw new ArgumentException("Object must be a DynamicGameObject");
-        return GetDisplayName(objectId);
+        return GetDisplayName(obj.Id);
     }
     
     /// <summary>
@@ -788,12 +763,11 @@ public static class Builtins
     }
     
     /// <summary>
-    /// Check if an object is gettable (DynamicGameObject overload)
+    /// Check if an object is gettable (GameObject overload)
     /// </summary>
-    public static bool IsGettable(dynamic obj)
+    public static bool IsGettable(GameObject obj)
     {
-        var objectId = (obj as DynamicGameObject)?.GameObject?.Id ?? throw new ArgumentException("Object must be a DynamicGameObject");
-        return IsGettable(objectId);
+        return IsGettable(obj.Id);
     }
     
     /// <summary>
@@ -819,12 +793,11 @@ public static class Builtins
     }
     
     /// <summary>
-    /// Get the class of an object (DynamicGameObject overload)
+    /// Get the class of an object (GameObject overload)
     /// </summary>
-    public static ObjectClass? GetObjectClass(dynamic obj)
+    public static ObjectClass? GetObjectClass(GameObject obj)
     {
-        var objectId = (obj as DynamicGameObject)?.GameObject?.Id ?? throw new ArgumentException("Object must be a DynamicGameObject");
-        return GetObjectClass(objectId);
+        return GetObjectClass(obj.Id);
     }
 
     /// <summary>
@@ -853,14 +826,6 @@ public static class Builtins
         return PlayerManager.GetOnlinePlayers()
             .Where(p => p.Location == roomId)
             .ToList();
-    }
-
-    /// <summary>
-    /// Get property of an object by GameObject reference
-    /// </summary>
-    public static BsonValue? GetProperty(GameObject obj, string propertyName)
-    {
-        return ObjectManager.GetProperty(obj, propertyName);
     }
 
     #endregion
@@ -983,14 +948,14 @@ public static class Builtins
         
         var foundObject = roomObjects.FirstOrDefault(obj =>
         {
-            var gameObject = obj.GameObject as GameObject;
+            var gameObject = obj as GameObject;
             if (gameObject == null) return false;
-            var name = GetProperty(gameObject.Id, "name")?.ToLower();
-            var shortDesc = GetProperty(gameObject.Id, "shortDescription")?.ToLower();
+            var name = GetProperty(gameObject, "name")?.AsString?.ToLower();
+            var shortDesc = GetProperty(gameObject, "shortDescription")?.AsString?.ToLower();
             return name?.Contains(itemName) == true || shortDesc?.Contains(itemName) == true;
         });
         
-        return foundObject != null ? foundObject : null;
+        return foundObject;
     }
 
     /// <summary>
@@ -1015,7 +980,7 @@ public static class Builtins
                 return name?.Contains(itemName) == true || shortDesc?.Contains(itemName) == true;
             });
             
-        return foundObject != null ? new DynamicGameObject(foundObject) : null;
+        return foundObject;
     }
 
     /// <summary>
@@ -1199,31 +1164,31 @@ public static class Builtins
     }
 
     /// <summary>
-    /// Find objects in a location matching a condition (strongly-typed for DynamicGameObject)
+    /// Find objects in a location matching a condition (strongly-typed for GameObject)
     /// Usage: var redItems = FindObjectsInLocationTyped(roomId, obj => obj.color == "red");
     /// </summary>
-    public static List<DynamicGameObject> FindObjectsInLocationTyped(string locationId, Func<DynamicGameObject, bool> predicate)
+    public static List<GameObject> FindObjectsInLocationTyped(string locationId, Func<GameObject, bool> predicate)
     {
         var objects = GetObjectsInLocation(locationId);
-        return objects.Cast<DynamicGameObject>().Where(predicate).ToList();
+        return objects.Cast<GameObject>().Where(predicate).ToList();
     }
 
     /// <summary>
     /// Filter dynamic objects with strongly-typed predicate
     /// Usage: var filtered = FilterObjects(GetObjectsInLocation(roomId), obj => obj.visible == true);
     /// </summary>
-    public static List<DynamicGameObject> FilterObjects(IEnumerable<dynamic> objects, Func<DynamicGameObject, bool> predicate)
+    public static List<GameObject> FilterObjects(IEnumerable<dynamic> objects, Func<GameObject, bool> predicate)
     {
-        return objects.Cast<DynamicGameObject>().Where(predicate).ToList();
+        return objects.Cast<GameObject>().Where(predicate).ToList();
     }
 
     /// <summary>
     /// Transform dynamic objects to another type
     /// Usage: var names = SelectFromObjects(GetObjectsInLocation(roomId), obj => obj.name);
     /// </summary>
-    public static List<T> SelectFromObjects<T>(IEnumerable<dynamic> objects, Func<DynamicGameObject, T> selector)
+    public static List<T> SelectFromObjects<T>(IEnumerable<dynamic> objects, Func<GameObject, T> selector)
     {
-        return objects.Cast<DynamicGameObject>().Select(selector).ToList();
+        return objects.Cast<GameObject>().Select(selector).ToList();
     }
 
     /// <summary>
@@ -1328,21 +1293,21 @@ public static class Builtins
     }
 
     /// <summary>
-    /// Execute C# script code with the same environment as verb/function execution (overload accepting dynamic objects)
+    /// Execute C# script code with the same environment as verb/function execution (GameObject overload)
     /// </summary>
-    public static string ExecuteScript(string scriptCode, dynamic player, Commands.CommandProcessor commandProcessor, dynamic thisObject, string? input = null)
+    public static string ExecuteScript(string scriptCode, Player player, Commands.CommandProcessor commandProcessor, GameObject thisObject, string? input = null)
     {
         try
         {
-            // Extract the underlying Database.Player from the dynamic wrapper
-            var dbPlayer = (player as DynamicGameObject)?.GameObject as Database.Player;
+            // Extract the underlying Database.Player - the player should already be Database.Player type
+            var dbPlayer = player as Database.Player;
             if (dbPlayer == null)
             {
-                throw new ArgumentException("Player parameter must be a Database.Player wrapped in DynamicGameObject");
+                throw new ArgumentException("Player parameter must be a Database.Player");
             }
             
-            // Extract the object ID from the dynamic wrapper
-            var objectId = (thisObject as DynamicGameObject)?.GameObject?.Id ?? "system";
+            // Use the object ID directly from GameObject
+            var objectId = thisObject?.Id ?? "system";
             
             return ExecuteScript(scriptCode, dbPlayer, commandProcessor, objectId, input);
         }
