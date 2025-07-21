@@ -26,6 +26,8 @@ namespace CSMOO.Server.Core
         GameObject? location = null,
         string? objectType = null)
     {
+      Logging.Logger.Debug($"Resolving objects for '{name}' as seen by {looker.Name} (ID: {looker.Id}) in location {location?.Name ?? "none"} with type filter '{objectType}'");
+
       var results = new List<GameObject>();
       if (string.IsNullOrWhiteSpace(name) || looker == null)
         return results;
@@ -66,9 +68,7 @@ namespace CSMOO.Server.Core
           var sysObj = GetSystemObject();
           if (sysObj != null) results.Add(sysObj);
           return results;
-        //case "self": // probably should be the object being invoked, but not sure how to determine that yet.       
-        //case "this":  //this should refer to the object upon which the script is running
-          // and I don't have a good way to determine that yet.
+            // and I don't have a good way to determine that yet.
       }
 
       // 2. DBREF or object ID (global)
