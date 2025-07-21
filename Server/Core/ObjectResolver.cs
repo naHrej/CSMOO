@@ -28,17 +28,14 @@ namespace CSMOO.Server.Core
     {
       Logging.Logger.Debug($"Resolving objects for '{name}' as seen by {looker.Name} (ID: {looker.Id}) in location {location?.Name ?? "none"} with type filter '{objectType}'");
 
-      var results = new List<GameObject>();
       if (string.IsNullOrWhiteSpace(name) || looker == null)
-        return results;
+        return new List<GameObject>();
 
       string normName = name.Trim();
       string lowerName = normName.ToLowerInvariant();
 
       // Determine effective location ONCE.  
-      // If no location is provided and the looker has no location, the looker IS the location.
       GameObject? effectiveLocation = location ?? GameDatabase.Instance.GameObjects.FindById(looker.Location);
-
       if (effectiveLocation == null)
       {
         string? locId = null;
@@ -51,50 +48,90 @@ namespace CSMOO.Server.Core
       }
 
       // 1. Keyword resolution
-      switch (lowerName)
-      {
-        case "me":
-        case "player":
-          results.Add(looker);
-          return results;
-
-        case "here":
-        case "room":
-          if (effectiveLocation != null)
-            results.Add(effectiveLocation);
-          return results;
-
-        case "system":
-          var sysObj = GetSystemObject();
-          if (sysObj != null) results.Add(sysObj);
-          return results;
-            // and I don't have a good way to determine that yet.
-      }
+      var keywordResult = MatchKeyword(lowerName, looker, effectiveLocation);
+      if (keywordResult != null)
+        return [keywordResult];
 
       // 2. DBREF or object ID (global)
-      if (normName.StartsWith('#') && int.TryParse(normName.AsSpan(1), out var dbref))
-      {
-        var obj = GameDatabase.Instance.GameObjects.FindOne(o => o.DbRef == dbref);
-        if (obj != null) { results.Add(obj); return results; }
-      }
-      var byId = GameDatabase.Instance.GameObjects.FindById(normName);
-      if (byId != null) { results.Add(byId); return results; }
+      var dbrefResult = MatchDbref(normName);
+      if (dbrefResult != null)
+        return [dbrefResult];
+
+      var idResult = MatchId(normName);
+      if (idResult != null)
+        return [idResult];
 
       // 3. Local/Inventory search
       var localObjs = effectiveLocation != null ? ObjectManager.GetObjectsInLocation(effectiveLocation.Id).ToList() : new List<GameObject>();
       var inventoryObjs = ObjectManager.GetObjectsInLocation(looker.Id).ToList();
-      var candidates = localObjs.Concat(inventoryObjs).ToList();
+      var candidates = localObjs.Concat(second: inventoryObjs).ToList();
 
       // 4. Type filter
       if (!string.IsNullOrEmpty(objectType))
         candidates = candidates.Where(obj => obj.ClassId == objectType || (obj.Properties.ContainsKey("type") && obj.Properties["type"].AsString == objectType)).ToList();
 
-      // 5. Name/alias/dynamic alias match
+      // 5. Name/alias/dynamic alias/exit alias match
+      return MatchNameOrAlias(normName, candidates: candidates);
+    }
+
+
+
+    /// <summary>
+    /// Implements keyword matching ("me", "here", "system", etc.).
+    /// </summary>
+    private static GameObject? MatchKeyword(string lowerName, GameObject looker, GameObject? effectiveLocation)
+    {
+      switch (lowerName)
+      {
+        case "me":
+        case "player":
+          return looker;
+        case "here":
+        case "room":
+          return effectiveLocation;
+        case "system":
+          return GetSystemObject();
+        default:
+          return null;
+      }
+    }
+
+    /// <summary>
+    /// Implements DBREF matching (e.g., "#123").
+    /// </summary>
+    private static GameObject? MatchDbref(string dbRef)
+    {
+      if (dbRef.StartsWith('#') && int.TryParse(dbRef.AsSpan(1), out var dbref))
+      {
+        return GameDatabase.Instance.GameObjects.FindOne(o => o.DbRef == dbref);
+      }
+      return null;
+    }
+
+    /// <summary>
+    /// Implements object ID matching (by string ID).
+    /// </summary>
+    private static GameObject? MatchId(string objectId)
+    {
+      return GameDatabase.Instance.GameObjects.FindById(objectId);
+    }
+
+    /// <summary>
+    /// Implements name, alias, dynamic alias, and exit alias matching.
+    /// </summary>
+    /// <remarks>
+    /// - Name match: case-insensitive match on object name.
+    /// - Alias match: case-insensitive match on aliases property.
+    /// - Dynamic alias: capital letters and digits in name.
+    /// - Exit alias: direction and abbreviations for exits.
+    /// </remarks>
+    private static List<GameObject> MatchNameOrAlias(string normName, List<GameObject> candidates)
+    {
+      string lowerName = normName.ToLowerInvariant();
+      var results = new List<GameObject>();
       foreach (var obj in candidates)
       {
         // Name match (case-insensitive)
-        // prefer object.Name if available, otherwise use "name" property
-        // This allows for objects to have a "name" property that is different from the Name for some reason
         string? objName = !string.IsNullOrEmpty(obj.Name) ? obj.Name : (obj.Properties.ContainsKey("name") ? obj.Properties["name"].AsString : null);
         if (!string.IsNullOrEmpty(objName) && string.Equals(objName, normName, StringComparison.OrdinalIgnoreCase))
         {
