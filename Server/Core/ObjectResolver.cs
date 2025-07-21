@@ -53,7 +53,6 @@ namespace CSMOO.Server.Core
       {
         case "me":
         case "player":
-        case "self":
           results.Add(looker);
           return results;
 
@@ -67,8 +66,9 @@ namespace CSMOO.Server.Core
           var sysObj = GetSystemObject();
           if (sysObj != null) results.Add(sysObj);
           return results;
+        //case "self": // probably should be the object being invoked, but not sure how to determine that yet.       
         //case "this":  //this should refer to the object upon which the script is running
-        // and I don't have a good way to determine that yet.
+          // and I don't have a good way to determine that yet.
       }
 
       // 2. DBREF or object ID (global)
@@ -198,6 +198,7 @@ namespace CSMOO.Server.Core
     /// Resolves an object reference string to an object ID.
     /// Handles: "me", "here", "system", DBREFs, class names, object IDs, and object names.
     /// </summary>
+    [Obsolete("Prefer ResolveObject instead of ResolveObjectId.  Refactor to pass in GameObject looker and location instead of playerId and roomId. ")]
     public static string? ResolveObjectId(string name, string? currentPlayerId = null, string? currentRoomId = null)
     {
       if (string.IsNullOrEmpty(name))
