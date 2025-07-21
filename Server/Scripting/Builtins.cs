@@ -1295,15 +1295,15 @@ public static class Builtins
     /// <summary>
     /// Execute C# script code with the same environment as verb/function execution (GameObject overload)
     /// </summary>
-    public static string ExecuteScript(string scriptCode, Player player, Commands.CommandProcessor commandProcessor, GameObject thisObject, string? input = null)
+    public static string ExecuteScript(string scriptCode, GameObject player, Commands.CommandProcessor commandProcessor, GameObject thisObject, string? input = null)
     {
         try
         {
-            // Extract the underlying Database.Player - the player should already be Database.Player type
-            var dbPlayer = player as Database.Player;
+            // Look up the Database.Player from the GameObject player
+            var dbPlayer = GameDatabase.Instance.Players.FindById(player.Id);
             if (dbPlayer == null)
             {
-                throw new ArgumentException("Player parameter must be a Database.Player");
+                throw new ArgumentException($"Player with ID '{player.Id}' not found in database");
             }
             
             // Use the object ID directly from GameObject

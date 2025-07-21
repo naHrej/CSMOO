@@ -113,6 +113,74 @@ public class GameObject : DynamicObject
     /// </summary>
     public DateTime ModifiedAt { get; set; } = DateTime.UtcNow;
 
+    // Dynamic property accessors for common properties to satisfy the C# compiler
+    // These forward to the dynamic property system but provide compile-time visibility
+    
+    /// <summary>
+    /// Short description of the object (forwarded to property system)
+    /// </summary>
+    public string? shortDescription
+    {
+        get => ObjectManager.GetProperty(this, "shortDescription")?.AsString;
+        set => ObjectManager.SetProperty(this, "shortDescription", value != null ? new BsonValue(value) : BsonValue.Null);
+    }
+    
+    /// <summary>
+    /// Long description of the object (forwarded to property system)
+    /// </summary>
+    public string? longDescription
+    {
+        get => ObjectManager.GetProperty(this, "longDescription")?.AsString;
+        set => ObjectManager.SetProperty(this, "longDescription", value != null ? new BsonValue(value) : BsonValue.Null);
+    }
+    
+    /// <summary>
+    /// Description of the object (forwarded to property system)
+    /// </summary>
+    public string? description
+    {
+        get => ObjectManager.GetProperty(this, "description")?.AsString;
+        set => ObjectManager.SetProperty(this, "description", value != null ? new BsonValue(value) : BsonValue.Null);
+    }
+    
+    /// <summary>
+    /// Dynamic name property (forwarded to Name field but allows lowercase access)
+    /// </summary>
+    public string? name
+    {
+        get => Name;
+        set => Name = value ?? "";
+    }
+    
+    // Additional common properties that scripts might access
+    
+    /// <summary>
+    /// Whether the object is gettable/takeable (forwarded to property system)
+    /// </summary>
+    public bool? gettable
+    {
+        get => ObjectManager.GetProperty(this, "gettable")?.AsBoolean;
+        set => ObjectManager.SetProperty(this, "gettable", value.HasValue ? new BsonValue(value.Value) : BsonValue.Null);
+    }
+    
+    /// <summary>
+    /// Whether the object is visible (forwarded to property system)
+    /// </summary>
+    public bool? visible
+    {
+        get => ObjectManager.GetProperty(this, "visible")?.AsBoolean;
+        set => ObjectManager.SetProperty(this, "visible", value.HasValue ? new BsonValue(value.Value) : BsonValue.Null);
+    }
+    
+    /// <summary>
+    /// Object size/weight (forwarded to property system)
+    /// </summary>
+    public int? size
+    {
+        get => ObjectManager.GetProperty(this, "size")?.AsInt32;
+        set => ObjectManager.SetProperty(this, "size", value.HasValue ? new BsonValue(value.Value) : BsonValue.Null);
+    }
+
     /// <summary>
     /// Handles property getting: gameObject.propertyName
     /// </summary>
@@ -170,6 +238,13 @@ public class GameObject : DynamicObject
             
             if (propertyValue == null)
             {
+                // Check if this might be a case sensitivity issue with built-in properties
+                var suggestion = GetPropertySuggestion(propertyName);
+                if (!string.IsNullOrEmpty(suggestion))
+                {
+                    throw new InvalidOperationException($"Property '{propertyName}' not found on object {Id}. Did you mean '{suggestion}'? (Property names are case-sensitive)");
+                }
+                
                 result = null;
                 return true; // Return true but with null result - property doesn't exist
             }
@@ -279,7 +354,14 @@ public class GameObject : DynamicObject
             var function = Scripting.FunctionResolver.FindFunction(Id, methodName);
             if (function == null)
             {
-                throw new ArgumentException($"Function '{methodName}' not found on object {Id}");
+                // Check if this might be a case sensitivity issue
+                var suggestion = GetMethodSuggestion(methodName);
+                if (!string.IsNullOrEmpty(suggestion))
+                {
+                    throw new ArgumentException($"Function '{methodName}' not found on object {Id}. Did you mean '{suggestion}'? (Function names are case-sensitive)");
+                }
+                
+                throw new ArgumentException($"Function '{methodName}' not found on object {Id}. Check function name and ensure it's defined on this object or its class.");
             }
 
             // Get the current player from the UnifiedContext if available
@@ -327,6 +409,68 @@ public class GameObject : DynamicObject
         var shortDesc = shortDescProperty?.AsString;
         
         return name ?? shortDesc ?? $"Object #{DbRef}";
+    }
+
+    /// <summary>
+    /// Helper method to suggest correct property names for case sensitivity issues
+    /// </summary>
+    private string? GetPropertySuggestion(string propertyName)
+    {
+        var lowerProperty = propertyName.ToLower();
+        
+        // Check against built-in GameObject properties
+        return lowerProperty switch
+        {
+            "id" => "Id",
+            "name" => "Name", 
+            "aliases" => "Aliases",
+            "dbref" => "DbRef",
+            "classid" => "ClassId",
+            "location" => "Location",
+            "contents" => "Contents",
+            "createdat" => "CreatedAt",
+            "modifiedat" => "ModifiedAt",
+            "owner" => "Owner",
+            "shortdescription" => "shortDescription",
+            "longdescription" => "longDescription",
+            "description" => "description",
+            "gettable" => "gettable",
+            "visible" => "visible",
+            "size" => "size",
+            _ => null
+        };
+    }
+
+    /// <summary>
+    /// Helper method to suggest correct method names for case sensitivity issues
+    /// </summary>
+    private string? GetMethodSuggestion(string methodName)
+    {
+        var lowerMethod = methodName.ToLower();
+        
+        // Check against common method names that might have case issues
+        return lowerMethod switch
+        {
+            "styleddesc" => "StyledDesc",
+            "getdescription" => "GetDescription",
+            "getname" => "GetName",
+            "getlocation" => "GetLocation",
+            _ => null
+        };
+    }
+
+    /// <summary>
+    /// Static helper method to provide better error messages for common collection iteration mistakes
+    /// </summary>
+    public static string GetCollectionIterationHelp()
+    {
+        return @"
+Common iteration mistakes:
+1. If iterating over Contents: use GetObjectsInLocation(objectId) instead of obj.Contents
+2. If iterating over Properties: use ObjectManager.GetProperty() for individual properties
+3. If iterating over BsonDocument: KeyValuePair objects don't have .Name - access .Key and .Value instead
+4. If expecting GameObjects: ensure you're using methods that return GameObject collections
+";
     }
 }
 
