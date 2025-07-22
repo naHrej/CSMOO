@@ -3,6 +3,7 @@ using System.Linq;
 using CSMOO.Server.Database;
 using CSMOO.Server.Database.Models;
 using System.Collections.Generic;
+using Microsoft.CodeAnalysis;
 
 namespace CSMOO.Server.Core
 {
@@ -76,8 +77,9 @@ namespace CSMOO.Server.Core
     /// <summary>
     /// Implements keyword matching ("me", "here", "system", etc.).
     /// </summary>
-    private static GameObject? MatchKeyword(string name, GameObject looker, GameObject? effectiveLocation)
+    private static GameObject? MatchKeyword(string name, GameObject looker, GameObject? location = null)
     {
+      var effectiveLocation = location ?? GameDatabase.Instance.GameObjects.FindById(looker.Location);
       switch (name.ToLowerInvariant())
       {
         // Keywords that refer to the looker

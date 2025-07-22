@@ -69,6 +69,7 @@ public class GameObject : DynamicObject
 
     /// <summary>
     /// Objects name (human-readable identifier)
+    /// Preferred over using name form properties collection
     /// </summary>
     public string Name { get; set; } = string.Empty;
 
@@ -93,6 +94,7 @@ public class GameObject : DynamicObject
     /// <summary>
     /// Location of this object (ID of the room/container it's in)
     /// Null means it's not in the game world currently
+    /// Preferred over using Location property directly
     /// </summary>
     public string? Location { get; set; }
     
@@ -474,35 +476,3 @@ Common iteration mistakes:
     }
 }
 
-/// <summary>
-/// Player-specific data that extends GameObject
-/// </summary>
-public class Player : GameObject
-{
-
-    
-    /// <summary>
-    /// Password hash for authentication
-    /// </summary>
-    public string PasswordHash { get; set; } = string.Empty;
-    
-    /// <summary>
-    /// Current session GUID (if online)
-    /// </summary>
-    public Guid? SessionGuid { get; set; }
-    
-    /// <summary>
-    /// Last login time
-    /// </summary>
-    public DateTime? LastLogin { get; set; }
-    
-    /// <summary>
-    /// Whether the player is currently online
-    /// </summary>
-    public bool IsOnline { get; set; } = false;
-    
-    /// <summary>
-    /// Player permissions/privileges
-    /// </summary>
-    public List<string> Permissions { get; set; } = new List<string>();
-}
