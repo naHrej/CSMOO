@@ -37,6 +37,7 @@ public class UnifiedScriptEngine
             )
             .WithImports(
                 "System",
+                "System.Dynamic",
                 "System.Linq",
                 "System.Collections.Generic",
                 "System.Text",

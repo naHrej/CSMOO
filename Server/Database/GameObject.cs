@@ -150,8 +150,20 @@ public class GameObject : DynamicObject
     /// </summary>
     public string? name
     {
-        get => Name;
-        set => Name = value ?? "";
+        get => !string.IsNullOrEmpty(Name) ? Name : ObjectManager.GetProperty(this, "name")?.AsString;
+        set 
+        {
+            if (value != null)
+            {
+                Name = value;
+                ObjectManager.SetProperty(this, "name", new BsonValue(value));
+            }
+            else
+            {
+                Name = "";
+                ObjectManager.SetProperty(this, "name", BsonValue.Null);
+            }
+        }
     }
     
     // Additional common properties that scripts might access

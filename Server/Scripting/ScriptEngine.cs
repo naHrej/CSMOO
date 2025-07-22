@@ -35,6 +35,7 @@ public class ScriptEngine
             )
             .WithImports(
                 "System",
+                "System.Dynamic",
                 "System.Linq",
                 "System.Collections.Generic",
                 "System.Text",

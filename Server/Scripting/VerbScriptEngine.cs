@@ -27,6 +27,7 @@ namespace CSMOO.Server.Scripting
                 )
                 .WithImports(
                     "System",
+                    "System.Dynamic",
                     "System.Collections.Generic",
                     "System.Linq",
                     "System.Text",

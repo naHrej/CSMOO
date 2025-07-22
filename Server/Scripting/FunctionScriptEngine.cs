@@ -36,6 +36,7 @@ public class FunctionScriptEngine
             )
             .WithImports(
                 "System",
+                "System.Dynamic",
                 "System.Linq",
                 "System.Collections.Generic",
                 "System.Text",
