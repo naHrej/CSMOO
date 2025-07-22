@@ -63,7 +63,7 @@ public static class ServerInitializer
         Logger.Info("No players found. Creating default admin player...");
         
         var startingRoom = RoomManager.GetStartingRoom();
-        var admin = PlayerManager.CreatePlayer("admin", "password", startingRoom?.Id);
+        var admin = PlayerManager.CreatePlayer("Admin", "password", startingRoom?.Id);
         
         // Initialize proper admin permissions using the permission system
         PermissionManager.InitializeAdminPermissions(admin);
