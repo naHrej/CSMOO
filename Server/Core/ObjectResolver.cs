@@ -8,11 +8,8 @@ namespace CSMOO.Server.Core
 {
   /// <summary>
   /// Canonical object resolver for all subsystems (scripting, engine, etc.)
-  /// </summary>
-  /// <summary>
   /// Returns all GameObjects matching the given name, alias, type, and location, as seen by the looker.
   /// </summary>
-
   public static class ObjectResolver
   {
     /// <summary>
@@ -53,7 +50,7 @@ namespace CSMOO.Server.Core
         return [keywordResult];
 
       // 2. DBREF or object ID (global)
-      var dbrefResult = MatchDbref(normName);
+      var dbrefResult = MatchDBref(normName);
       if (dbrefResult != null)
         return [dbrefResult];
 
@@ -79,10 +76,11 @@ namespace CSMOO.Server.Core
     /// <summary>
     /// Implements keyword matching ("me", "here", "system", etc.).
     /// </summary>
-    private static GameObject? MatchKeyword(string lowerName, GameObject looker, GameObject? effectiveLocation)
+    private static GameObject? MatchKeyword(string name, GameObject looker, GameObject? effectiveLocation)
     {
-      switch (lowerName)
+      switch (name.ToLowerInvariant())
       {
+        // Keywords that refer to the looker
         case "me":
         case "player":
           return looker;
@@ -99,7 +97,7 @@ namespace CSMOO.Server.Core
     /// <summary>
     /// Implements DBREF matching (e.g., "#123").
     /// </summary>
-    private static GameObject? MatchDbref(string dbRef)
+    private static GameObject? MatchDBref(string dbRef)
     {
       if (dbRef.StartsWith('#') && int.TryParse(dbRef.AsSpan(1), out var dbref))
       {
@@ -215,7 +213,7 @@ namespace CSMOO.Server.Core
                 { "hubward", new() { "h","hw","hub", "inward" } },
                 { "rimward", new() { "r","rw","rim", "outward" } }
             };
-      return map.TryGetValue(direction, out var aliases) ? aliases : new();
+      return map.TryGetValue(direction, out var aliases) ? aliases : [];
     }
 
     /// <summary>
