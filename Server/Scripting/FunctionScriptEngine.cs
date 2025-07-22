@@ -42,6 +42,7 @@ public class FunctionScriptEngine
                 "CSMOO.Server.Database",
                 "CSMOO.Server.Commands",
                 "CSMOO.Server.Scripting",
+                "CSMOO.Server.Core", // Ensure we can access core functionality
                 "HtmlAgilityPack"
             );
     }

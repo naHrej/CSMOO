@@ -44,6 +44,7 @@ public class UnifiedScriptEngine
                 "CSMOO.Server.Database",
                 "CSMOO.Server.Commands",
                 "CSMOO.Server.Scripting",
+                "CSMOO.Server.Core",
                 "HtmlAgilityPack"
             );
     }

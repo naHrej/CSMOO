@@ -32,7 +32,8 @@ namespace CSMOO.Server.Scripting
                     "System.Text",
                     "CSMOO.Server.Database",
                     "CSMOO.Server.Commands",
-                    "CSMOO.Server.Scripting"
+                    "CSMOO.Server.Scripting",
+                    "CSMOO.Server.Core"
                 );
         }
 
