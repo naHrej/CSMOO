@@ -179,7 +179,7 @@ public static class FunctionInitializer
         if (!existingFunctions.Exists(f => f.ObjectId == targetClass.Id && f.Name == functionDef.Name))
         {
             var function = Scripting.FunctionManager.CreateFunction(
-                targetClass.Id, 
+                targetClass, 
                 functionDef.Name, 
                 functionDef.Parameters,
                 functionDef.ParameterNames,

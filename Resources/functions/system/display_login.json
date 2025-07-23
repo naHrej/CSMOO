@@ -61,7 +61,7 @@
     "var createInstr = Html.P().AppendChild(Html.Element(\"span\", \"> New player: \")).AppendChild(Html.Command(\"create player <username> <password>\"));",
     "",
     "// Add footer",
-    "var footer = Html.Div(\">> Powered by C# and imagination • Built with love for MUD enthusiasts <<\")",
+    "var footer = Html.Div(\">> Powered by C# and imagination • Built with ❤️ for MUD enthusiasts! <<\")",
     "    .WithLessStyle(\"margin-top:@spacing-xlarge; font-size:0.9rem; color:@text-dim; font-style:italic;\", theme);",
     "",
     "// Assemble the complete structure",

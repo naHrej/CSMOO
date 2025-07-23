@@ -132,11 +132,13 @@ public static class ObjectManager
     /// <summary>
     /// Gets a property value by object ID
     /// </summary>
+    [Obsolete("Use GetProperty(GameObject, string) instead")]
     public static BsonValue? GetProperty(string objectId, string propertyName)
     {
         var gameObject = GetObject(objectId);
         return gameObject == null ? null : PropertyManager.GetProperty(gameObject, propertyName);
     }
+  
 
     /// <summary>
     /// Sets a property value on an object instance
@@ -147,6 +149,7 @@ public static class ObjectManager
     /// <summary>
     /// Sets a property value by object ID
     /// </summary>
+    [Obsolete("Use SetProperty(GameObject, string, BsonValue) instead")]
     public static bool SetProperty(string objectId, string propertyName, BsonValue value)
         => PropertyManager.SetProperty(objectId, propertyName, value);
 
@@ -159,6 +162,7 @@ public static class ObjectManager
     /// <summary>
     /// Removes a property by object ID
     /// </summary>
+    [Obsolete("Use RemoveProperty(GameObject, string) instead")]
     public static bool RemoveProperty(string objectId, string propertyName)
         => PropertyManager.RemoveProperty(objectId, propertyName);
 

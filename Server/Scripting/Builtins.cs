@@ -37,6 +37,7 @@ public static class Builtins
     /// <summary>
     /// Get the string value of an object property
     /// </summary>
+    [Obsolete("Use GetProperty(GameObject, string) instead")]
     public static BsonValue? GetProperty(string objectId, string propertyName)
     {
         return ObjectManager.GetProperty(objectId, propertyName);
@@ -49,10 +50,11 @@ public static class Builtins
     {
         return ObjectManager.GetProperty(obj, propertyName);
     }
-    
+
     /// <summary>
     /// Get the string value of an object property with default
     /// </summary>
+    [Obsolete("Use GetProperty(GameObject, string, string) instead")]
     public static string GetProperty(string objectId, string propertyName, string defaultValue)
     {
         var property = ObjectManager.GetProperty(objectId, propertyName) as BsonValue;
@@ -64,7 +66,8 @@ public static class Builtins
     /// </summary>
     public static string GetProperty(GameObject obj, string propertyName, string defaultValue)
     {
-        return GetProperty(obj.Id, propertyName, defaultValue);
+        var property = ObjectManager.GetProperty(obj, propertyName) as BsonValue;
+        return property?.AsString ?? defaultValue;
     }
     
     /// <summary>
@@ -81,19 +84,18 @@ public static class Builtins
     /// </summary>
     public static bool GetBoolProperty(GameObject obj, string propertyName, bool defaultValue = false)
     {
-        return GetBoolProperty(obj.Id, propertyName, defaultValue);
+        var property = ObjectManager.GetProperty(obj, propertyName) as BsonValue;
+        return property?.AsBoolean ?? defaultValue;
     }
     
     /// <summary>
     /// Set a property on an object
     /// </summary>
+    [Obsolete("Use SetProperty(GameObject, string, BsonValue) instead")]
     public static void SetProperty(string objectId, string propertyName, string value)
     {
         var obj = FindObject(objectId);
-        if (obj != null)
-        {
-            ObjectManager.SetProperty(obj, propertyName, value);
-        }
+        SetProperty(obj, propertyName, value);
     }
     
     /// <summary>
@@ -101,15 +103,6 @@ public static class Builtins
     /// </summary>
     public static void SetProperty(GameObject obj, string propertyName, string value)
     {
-        SetProperty(obj.Id, propertyName, value);
-    }
-    
-    /// <summary>
-    /// Set a boolean property on an object
-    /// </summary>
-    public static void SetBoolProperty(string objectId, string propertyName, bool value)
-    {
-        var obj = FindObject(objectId);
         if (obj != null)
         {
             ObjectManager.SetProperty(obj, propertyName, value);
@@ -117,11 +110,24 @@ public static class Builtins
     }
     
     /// <summary>
+    /// Set a boolean property on an object
+    /// </summary>
+    [Obsolete("Use SetBoolProperty(GameObject, string, bool) instead")]
+    public static void SetBoolProperty(string objectId, string propertyName, bool value)
+    {
+        var obj = FindObject(objectId);
+        SetBoolProperty(obj, propertyName, value);
+    }
+    
+    /// <summary>
     /// Set a boolean property on an object (GameObject overload)
     /// </summary>
     public static void SetBoolProperty(GameObject obj, string propertyName, bool value)
     {
-        SetBoolProperty(obj.Id, propertyName, value);
+        if (obj != null)
+        {
+            ObjectManager.SetProperty(obj, propertyName, value);
+        }       
     }
     
     /// <summary>
@@ -134,17 +140,13 @@ public static class Builtins
     }
     
     /// <summary>
-    /// Move an object to a new location
+    /// Move an object to a new location (String id overload)
     /// </summary>
+    [Obsolete("Use MoveObject(GameObject, string) instead")]
     public static bool MoveObject(string objectId, string newLocationId)
     {
         var obj = FindObject(objectId);
-        if (obj != null)
-        {
-            ObjectManager.SetProperty(obj, "location", newLocationId);
-            return true;
-        }
-        return false;
+        return MoveObject(obj, newLocationId);
     }
     
     /// <summary>
@@ -152,7 +154,12 @@ public static class Builtins
     /// </summary>
     public static bool MoveObject(GameObject obj, string newLocationId)
     {
-        return MoveObject(obj.Id, newLocationId);
+        if (obj != null)
+        {
+            ObjectManager.SetProperty(obj, "location", newLocationId);
+            return true;
+        }
+        return false;
     }
     
     /// <summary>
@@ -168,12 +175,13 @@ public static class Builtins
     /// </summary>
     public static string GetObjectName(GameObject obj)
     {
-        return GetObjectName(obj.Id);
+        return GetObjectName(obj);
     }
     
     /// <summary>
     /// Get the short description of an object
     /// </summary>
+    [Obsolete("Use GetObjectShortDesc(GameObject) instead")]
     public static string GetObjectShortDesc(string objectId)
     {
         return GetProperty(objectId, "shortDescription");
@@ -184,7 +192,7 @@ public static class Builtins
     /// </summary>
     public static string GetObjectShortDesc(GameObject obj)
     {
-        return GetObjectShortDesc(obj.Id);
+        return GetObjectShortDesc(obj);
     }
     
     /// <summary>
@@ -200,7 +208,7 @@ public static class Builtins
     /// </summary>
     public static string GetObjectLongDesc(GameObject obj)
     {
-        return GetObjectLongDesc(obj.Id);
+        return GetProperty(obj, "longDescription");
     }
 
 
