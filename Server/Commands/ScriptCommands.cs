@@ -7,8 +7,8 @@ using CSMOO.Server.Database.Models;
 using CSMOO.Server.Logging;
 using CSMOO.Server.Scripting;
 
-namespace CSMOO.Server.Commands
-{
+namespace CSMOO.Server.Commands;
+
     /// <summary>
     /// Handles multi-line script commands
     /// </summary>
@@ -134,4 +134,4 @@ namespace CSMOO.Server.Commands
             return true;
         }
     }
-}
+

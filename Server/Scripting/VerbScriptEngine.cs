@@ -6,12 +6,12 @@ using CSMOO.Server.Database.Models;
 using CSMOO.Server.Logging;
 using System.Text;
 
-namespace CSMOO.Server.Scripting
-{
-    /// <summary>
-    /// Script engine for executing verb code
-    /// </summary>
-    public class VerbScriptEngine
+namespace CSMOO.Server.Scripting;
+
+/// <summary>
+/// Script engine for executing verb code
+/// </summary>
+public class VerbScriptEngine
     {
         private readonly ScriptOptions _scriptOptions;
 
@@ -92,4 +92,4 @@ namespace CSMOO.Server.Scripting
             return completeScript;
         }
     }
-}
+

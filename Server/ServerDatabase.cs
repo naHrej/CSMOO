@@ -6,10 +6,10 @@ using System.Threading.Tasks;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace CSMOO.Server
-{
-    internal class ServerDatabase
-    {
+namespace CSMOO.Server;
 
-    }
+internal class ServerDatabase
+{
+
 }
+

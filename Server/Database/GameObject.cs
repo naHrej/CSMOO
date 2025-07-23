@@ -6,59 +6,6 @@ using LiteDB;
 namespace CSMOO.Server.Database;
 
 /// <summary>
-/// Base class definition that all game objects inherit from
-/// This is the "template" or "prototype" that defines behavior and default properties
-/// </summary>
-public class ObjectClass
-{
-    [BsonId]
-    public string Id { get; set; } = string.Empty;
-    
-    /// <summary>
-    /// Human-readable name of this class (e.g., "Room", "Player", "Sword", "Door")
-    /// </summary>
-    public string Name { get; set; } = string.Empty;
-    
-    /// <summary>
-    /// Parent class this inherits from (null for root classes)
-    /// </summary>
-    public string? ParentClassId { get; set; }
-    
-    /// <summary>
-    /// Default properties that instances of this class will have
-    /// These can be overridden in individual instances
-    /// </summary>
-    public BsonDocument Properties { get; set; } = new BsonDocument();
-    
-    /// <summary>
-    /// Methods/functions defined on this class (stored as code strings)
-    /// Could be C# code, script code, etc.
-    /// </summary>
-    public BsonDocument Methods { get; set; } = new BsonDocument();
-    
-    /// <summary>
-    /// Description of what this class represents
-    /// </summary>
-    public string Description { get; set; } = string.Empty;
-    
-    /// <summary>
-    /// Whether this class can be instantiated directly
-    /// (abstract classes cannot be instantiated)
-    /// </summary>
-    public bool IsAbstract { get; set; } = false;
-    
-    /// <summary>
-    /// Creation timestamp
-    /// </summary>
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-    
-    /// <summary>
-    /// Last modification timestamp
-    /// </summary>
-    public DateTime ModifiedAt { get; set; } = DateTime.UtcNow;
-}
-
-/// <summary>
 /// An actual instance of an ObjectClass - this is what exists in the game world
 /// Now inherits from DynamicObject to provide natural property and method access
 /// </summary>
@@ -479,12 +426,12 @@ public class GameObject : DynamicObject
     public static string GetCollectionIterationHelp()
     {
         return @"
-Common iteration mistakes:
-1. If iterating over Contents: use GetObjectsInLocation(objectId) instead of obj.Contents
-2. If iterating over Properties: use ObjectManager.GetProperty() for individual properties
-3. If iterating over BsonDocument: KeyValuePair objects don't have .Name - access .Key and .Value instead
-4. If expecting GameObjects: ensure you're using methods that return GameObject collections
-";
+        Common iteration mistakes:
+        1. If iterating over Contents: use GetObjectsInLocation(objectId) instead of obj.Contents
+        2. If iterating over Properties: use ObjectManager.GetProperty() for individual properties
+        3. If iterating over BsonDocument: KeyValuePair objects don't have .Name - access .Key and .Value instead
+        4. If expecting GameObjects: ensure you're using methods that return GameObject collections
+        ";
     }
 }
 
