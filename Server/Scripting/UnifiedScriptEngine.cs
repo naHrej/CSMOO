@@ -712,7 +712,7 @@ public class UnifiedScriptGlobals : EnhancedScriptGlobals
         var allObjects = GameDatabase.Instance.GameObjects.FindAll();
         var match = allObjects.FirstOrDefault(obj =>
         {
-            var objName = (Database.ObjectManager.GetProperty(obj.Id, "name") as BsonValue)?.AsString;
+            var objName = (Database.ObjectManager.GetProperty(obj, "name") as BsonValue)?.AsString;
             return objName?.Equals(objectRef, StringComparison.OrdinalIgnoreCase) == true;
         });
         

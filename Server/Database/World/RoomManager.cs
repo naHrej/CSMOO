@@ -152,14 +152,26 @@ public static class RoomManager
             .Where(obj => obj.ClassId == exitClass.Id)
             .ToList();
     }
+    /// <summary>
+    /// Gets all exits from a room
+    /// </summary>
+    public static List<GameObject> GetExitsFromRoom(GameObject room)
+    {
+        var exitClass = GameDatabase.Instance.ObjectClasses.FindOne(c => c.Name == "Exit");
+        if (exitClass == null) return new List<GameObject>();
 
+        return ObjectManager.GetObjectsInLocation(room)
+            .Where(obj => obj.ClassId == exitClass.Id)
+            .ToList();
+    }
+    
     /// <summary>
     /// Finds an exit in a specific direction from a room
     /// </summary>
     public static GameObject? FindExitInDirection(string roomId, string direction)
     {
         var exits = GetExitsFromRoom(roomId);
-        return exits.FirstOrDefault(exit => 
+        return exits.FirstOrDefault(exit =>
         {
             var exitDirection = ObjectManager.GetProperty(exit, "direction")?.AsString?.ToLower();
             return exitDirection == direction.ToLower();

@@ -80,14 +80,19 @@ public static class ObjectManager
     /// <summary>
     /// Moves an object to a new location (alternative signature)
     /// </summary>
-    public static bool MoveObject(GameObject gameObject, string? newLocationId)
-        => InstanceManager.MoveObject(gameObject, newLocationId);
+    public static bool MoveObject(GameObject gameObject, GameObject newLocation)
+        => InstanceManager.MoveObject(gameObject, newLocation);
 
     /// <summary>
     /// Gets all objects in a specific location
     /// </summary>
     public static List<GameObject> GetObjectsInLocation(string? locationId)
         => InstanceManager.GetObjectsInLocation(locationId);
+    /// <summary>
+    /// Gets all objects in a specific location
+    /// </summary>
+    public static List<GameObject> GetObjectsInLocation(GameObject? location)
+        => InstanceManager.GetObjectsInLocation(location);
 
     /// <summary>
     /// Gets all objects of a specific class type (including inheritance)

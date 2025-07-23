@@ -87,9 +87,10 @@ public static class InstanceManager
     /// <summary>
     /// Moves an object to a new location (alternative signature)
     /// </summary>
-    public static bool MoveObject(GameObject gameObject, string? newLocationId)
+    public static bool MoveObject(GameObject gameObject, GameObject newLocation)
     {
-        gameObject.Location = newLocationId;
+        if (gameObject == null || newLocation == null) return false;
+        gameObject.Location = newLocation.Id;
         return GameDatabase.Instance.GameObjects.Update(gameObject);
     }
 
@@ -105,7 +106,18 @@ public static class InstanceManager
         
         return GameDatabase.Instance.GameObjects.Find(obj => obj.Location == locationId).ToList();
     }
-
+    /// <summary>
+    /// Gets all objects in a specific location
+    /// </summary>
+    public static List<GameObject> GetObjectsInLocation(GameObject? location)
+    {
+        if (location is null)
+        {
+            return GameDatabase.Instance.GameObjects.Find(obj => obj.Location == null).ToList();
+        }        
+        return GameDatabase.Instance.GameObjects.Find(obj => obj.Location == location.Id).ToList();
+    }
+    
     /// <summary>
     /// Gets all objects of a specific class type (including inheritance)
     /// </summary>
@@ -128,8 +140,8 @@ public static class InstanceManager
             foundNewClasses = false;
             foreach (var objectClass in allClasses)
             {
-                if (objectClass.ParentClassId != null && 
-                    targetClassIds.Contains(objectClass.ParentClassId) && 
+                if (objectClass.ParentClassId != null &&
+                    targetClassIds.Contains(objectClass.ParentClassId) &&
                     !targetClassIds.Contains(objectClass.Id))
                 {
                     targetClassIds.Add(objectClass.Id);

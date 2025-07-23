@@ -55,7 +55,7 @@ public static class Builtins
     /// Get the string value of an object property with default
     /// </summary>
     [Obsolete("Use GetProperty(GameObject, string, string) instead")]
-    public static string GetProperty(string objectId, string propertyName, string defaultValue)
+    public static string GetProperty(string objectId, string propertyName, string defaultValue = "")
     {
         var property = ObjectManager.GetProperty(objectId, propertyName) as BsonValue;
         return property?.AsString ?? defaultValue;
@@ -64,7 +64,7 @@ public static class Builtins
     /// <summary>
     /// Get the string value of an object property with default (GameObject overload)
     /// </summary>
-    public static string GetProperty(GameObject obj, string propertyName, string defaultValue)
+    public static string GetProperty(GameObject obj, string propertyName, string defaultValue = "")
     {
         var property = ObjectManager.GetProperty(obj, propertyName) as BsonValue;
         return property?.AsString ?? defaultValue;
@@ -73,6 +73,7 @@ public static class Builtins
     /// <summary>
     /// Get the boolean value of an object property
     /// </summary>
+    [Obsolete("Use GetBoolProperty(GameObject, string, bool) instead")]
     public static bool GetBoolProperty(string objectId, string propertyName, bool defaultValue = false)
     {
         var property = ObjectManager.GetProperty(objectId, propertyName) as BsonValue;
@@ -165,6 +166,7 @@ public static class Builtins
     /// <summary>
     /// Get the name of an object
     /// </summary>
+    [Obsolete("Use GetObjectName(GameObject) instead")]
     public static string GetObjectName(string objectId)
     {
         return GetProperty(objectId, "name", "something");
@@ -198,6 +200,7 @@ public static class Builtins
     /// <summary>
     /// Get the long description of an object
     /// </summary>
+    [Obsolete("Use GetObjectLongDesc(GameObject) instead")]
     public static string GetObjectLongDesc(string objectId)
     {
         return GetProperty(objectId, "longDescription");
@@ -519,7 +522,7 @@ public static class Builtins
             {
                 var gameObject = obj.GameObject as GameObject;
                 if (gameObject == null) return false;
-                var objName = GetObjectName(gameObject.Id);
+                var objName = GetObjectName(gameObject);
                 return objName.StartsWith(objectName, StringComparison.OrdinalIgnoreCase);
             });
             
@@ -536,7 +539,7 @@ public static class Builtins
         {
             var gameObject = obj.GameObject as GameObject;
             if (gameObject == null) return false;
-            var objName = GetObjectName(gameObject.Id);
+            var objName = GetObjectName(gameObject);
             return objName.StartsWith(objectName, StringComparison.OrdinalIgnoreCase);
         });
         
@@ -559,7 +562,7 @@ public static class Builtins
         var globalObjects = GameDatabase.Instance.GameObjects.FindAll();
         var globalObject = globalObjects.FirstOrDefault(obj =>
         {
-            var objName = GetObjectName(obj.Id);
+            var objName = GetObjectName(obj);
             return objName.Equals(objectName, StringComparison.OrdinalIgnoreCase) ||
                    objName.StartsWith(objectName, StringComparison.OrdinalIgnoreCase);
         });
@@ -579,7 +582,7 @@ public static class Builtins
         {
             var gameObject = obj.GameObject as GameObject;
             if (gameObject == null) return false;
-            var objName = GetObjectName(gameObject.Id);
+            var objName = GetObjectName(gameObject);
             return objName.StartsWith(objectName, StringComparison.OrdinalIgnoreCase);
         });
         
@@ -596,7 +599,7 @@ public static class Builtins
         {
             var gameObject = obj.GameObject as GameObject;
             if (gameObject == null) return false;
-            var objName = GetObjectName(gameObject.Id);
+            var objName = GetObjectName(gameObject);
             return objName.StartsWith(objectName, StringComparison.OrdinalIgnoreCase);
         });
         
@@ -662,6 +665,7 @@ public static class Builtins
     /// <summary>
     /// Check if an object represents a player and return the player
     /// </summary>
+    [Obsolete("Use Builtins.GetPlayerFromObject(GameObject) instead")]
     public static Player? GetPlayerFromObject(string objectId)
     {
         var playerIdProperty = GetProperty(objectId, "playerId");
@@ -677,12 +681,18 @@ public static class Builtins
     /// </summary>
     public static Player? GetPlayerFromObject(GameObject obj)
     {
-        return GetPlayerFromObject(obj.Id);
+        var playerIdProperty = GetProperty(obj, "playerId");
+        if (!string.IsNullOrEmpty(playerIdProperty))
+        {
+            return FindPlayerById(playerIdProperty);
+        }
+        return null;
     }
-    
+
     /// <summary>
     /// Check if an object ID directly represents a player
     /// </summary>
+    [Obsolete("Use Builtins.IsPlayerObject(GameObject) instead")]
     public static bool IsPlayerObject(string objectId)
     {
         // Check if this objectId is actually a player ID
@@ -692,10 +702,12 @@ public static class Builtins
     
     /// <summary>
     /// Check if an object directly represents a player (GameObject overload)
-    /// </summary>
+    /// </summary>    
     public static bool IsPlayerObject(GameObject obj)
     {
-        return IsPlayerObject(obj.Id);
+                // Check if this objectId is actually a player ID
+        var player = FindPlayerById(obj.Id);
+        return player != null;
     }
     
     #endregion
@@ -725,7 +737,7 @@ public static class Builtins
             var gameObject = obj.GameObject as GameObject;
             if (gameObject != null)
             {
-                var player = GetPlayerFromObject(gameObject.Id);
+                var player = GetPlayerFromObject(gameObject);
                 if (player != null && (excludePlayer == null || player.Id != excludePlayer.Id))
                 {
                     // The script engine will handle the actual notification
@@ -742,6 +754,7 @@ public static class Builtins
     /// <summary>
     /// Get a friendly display name for an object
     /// </summary>
+    [Obsolete("Use Builtins.GetDisplayName(GameObject) instead")]
     public static string GetDisplayName(string objectId)
     {
         var name = GetObjectName(objectId);
@@ -759,12 +772,21 @@ public static class Builtins
     /// </summary>
     public static string GetDisplayName(GameObject obj)
     {
-        return GetDisplayName(obj.Id);
+        var name = GetObjectName(obj);
+        var shortDesc = GetObjectShortDesc(obj);
+        
+        if (!string.IsNullOrEmpty(shortDesc))
+        {
+            return $"{name} ({shortDesc})";
+        }
+        return name;
+        //return GetDisplayName(obj.Id);
     }
     
     /// <summary>
     /// Check if an object is gettable
     /// </summary>
+    [Obsolete("Use Builtins.IsGettable(GameObject) instead")]
     public static bool IsGettable(string objectId)
     {
         return GetBoolProperty(objectId, "gettable", false);
@@ -775,7 +797,7 @@ public static class Builtins
     /// </summary>
     public static bool IsGettable(GameObject obj)
     {
-        return IsGettable(obj.Id);
+         return GetBoolProperty(obj, "gettable", false);
     }
     
     /// <summary>
@@ -790,6 +812,7 @@ public static class Builtins
     /// <summary>
     /// Get the class of an object
     /// </summary>
+    [Obsolete("Use Builtins.GetObjectClass(GameObject) instead")]
     public static ObjectClass? GetObjectClass(string objectId)
     {
         var obj = FindObject(objectId);
@@ -805,7 +828,11 @@ public static class Builtins
     /// </summary>
     public static ObjectClass? GetObjectClass(GameObject obj)
     {
-        return GetObjectClass(obj.Id);
+        if (obj != null && !string.IsNullOrEmpty(obj.ClassId))
+        {
+            return GameDatabase.Instance.ObjectClasses.FindById(obj.ClassId);
+        }
+        return null;
     }
 
     /// <summary>
@@ -835,7 +862,17 @@ public static class Builtins
             .Where(p => p.Location == roomId)
             .ToList();
     }
-
+    
+    /// <summary>
+    /// Get players in a room
+    /// </summary>
+    public static List<Player> GetPlayersInRoom(GameObject room)
+    {
+        if (room is null) return new List<Player>();
+        return PlayerManager.GetOnlinePlayers()
+            .Where(p => p.Location == room.Id)
+            .ToList();
+    }
     #endregion
 
     #region Room and Movement Helpers
@@ -998,7 +1035,7 @@ public static class Builtins
     {
         try
         {
-            ObjectManager.MoveObject(gameObj.Id, destination.Id);
+            ObjectManager.MoveObject(gameObj, destination);
             return true;
         }
         catch (Exception ex)
@@ -1031,9 +1068,17 @@ public static class Builtins
     /// <summary>
     /// Get all exits from a room
     /// </summary>
+    [Obsolete("Use Builtins.GetExitsFromRoom(GameObject) instead")]
     public static List<GameObject> GetExitsFromRoom(string roomId)
     {
         return WorldManager.GetExitsFromRoom(roomId);
+    }
+    /// <summary>
+    /// Get all exits from a room
+    /// </summary>
+    public static List<GameObject> GetExitsFromRoom(GameObject room)
+    {
+        return WorldManager.GetExitsFromRoom(room);
     }
 
     /// <summary>
@@ -1057,7 +1102,7 @@ public static class Builtins
             var item = GameDatabase.Instance.GameObjects.FindById(itemId);
             if (item != null)
             {
-                var name = GetProperty(item.Id, "shortDescription") ?? "something";
+                var name = GetProperty(item, "shortDescription") ?? "something";
                 Notify(currentPlayer, $"  {name}");
             }
         }

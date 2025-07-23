@@ -56,4 +56,11 @@ public static class WorldManager
     {
         return RoomManager.GetExitsFromRoom(roomId);
     }
+        /// <summary>
+    /// Gets all exits from a room
+    /// </summary>
+    public static List<GameObject> GetExitsFromRoom(GameObject room)
+    {
+        return RoomManager.GetExitsFromRoom(room);
+    }
 }
