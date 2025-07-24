@@ -15,6 +15,11 @@
     "notify(Player, $\"You say, \\\"{message}\\\"\");",
     "",
     "// Send to other players in the room",
-    "SayToRoom($\"{Player.Name} says, \\\"{message}\\\"\", true);"
+    "var players = Builtins.GetPlayersInRoom(Player.Location);",
+    "foreach(var plr in players)",
+    "{",
+    "    if(plr.Id != Player.Id)",
+    "        notify(plr, $\"{Player.Name} says, \\\"{message}\\\"\");",
+    "}"
   ]
 }
