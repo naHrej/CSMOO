@@ -244,13 +244,7 @@ public static class Builtins
         return PermissionManager.HasFlag(player, PermissionManager.Flag.Programmer);
     }
     
-    /// <summary>
-    /// Get all flags for a player as a list of strings
-    /// </summary>
-    public static List<string> GetPlayerFlags(Player player)
-    {
-        return PermissionManager.GetPlayerFlags(player).Select(f => f.ToString()).ToList();
-    }
+
     
     /// <summary>
     /// Get formatted flags string for a player
@@ -353,7 +347,7 @@ public static class Builtins
     /// <summary>
     /// Get all flags for a player as a list of strings (dynamic overload for UnifiedScriptEngine)
     /// </summary>
-    public static List<string> GetPlayerFlags(dynamic? player)
+    public static List<string> GetPlayerFlags(GameObject? player)
     {
         if (player == null) return new List<string>();
         

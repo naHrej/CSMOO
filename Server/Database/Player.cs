@@ -55,16 +55,6 @@ public class Player : GameObject
     }
 
     /// <summary>
-    /// Player permissions/privileges
-    /// </summary>
-    public List<string> Permissions
-    {
-        get => Properties.ContainsKey("permissions") && Properties["permissions"].IsArray ?
-            Properties["permissions"].AsArray.Select(v => v.AsString).ToList() : new List<string>();
-        set => Properties["permissions"] = value != null ? new BsonArray(value.Select(s => new BsonValue(s))) : BsonValue.Null;
-    }
-
-    /// <summary>
     /// Ensures legacy fields are synced to Properties after deserialization
     /// Call this after loading a Player from the database for backward compatibility
     /// </summary>

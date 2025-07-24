@@ -136,20 +136,21 @@ public static class PermissionManager
     /// <summary>
     /// Get all flags a player has
     /// </summary>
-    public static List<Flag> GetPlayerFlags(Player player)
-    {
-        if (player?.Permissions == null) return new List<Flag>();
+public static List<Flag> GetPlayerFlags(GameObject go)
+{
+    // Use the Permissions property directly, do not reload from DB
+    if (go?.Permissions == null) return new List<Flag>();
 
-        var flags = new List<Flag>();
-        foreach (var permission in player.Permissions)
+    var flags = new List<Flag>();
+    foreach (var permission in go.Permissions)
+    {
+        if (Enum.TryParse<Flag>(permission, true, out var flag))
         {
-            if (Enum.TryParse<Flag>(permission, true, out var flag))
-            {
-                flags.Add(flag);
-            }
+            flags.Add(flag);
         }
-        return flags;
     }
+    return flags;
+}
 
     /// <summary>
     /// Get a formatted string of all flags a player has
