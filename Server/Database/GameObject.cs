@@ -43,7 +43,11 @@ public class GameObject : DynamicObject
     /// Null means it's not in the game world currently
     /// Preferred over using Location property directly
     /// </summary>
-    public string? Location { get; set; }
+    public string? Location
+    { 
+        get => Properties.ContainsKey("location") ? Properties["location"].AsString : null;
+        set => Properties["location"] = value != null ? new BsonValue(value) : BsonValue.Null;
+    }
     
     /// <summary>
     /// Objects contained within this object (inventory, room contents, etc.)

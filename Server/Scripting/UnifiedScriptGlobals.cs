@@ -46,8 +46,20 @@ public class UnifiedScriptGlobals : EnhancedScriptGlobals
     /// <summary>
     /// The current player as GameObject (now with dynamic support)
     /// </summary>
-    public new GameObject? Player { get; set; }
-    
+    private string? _playerId;
+    public new GameObject? Player
+    {
+        get
+        {
+            if (string.IsNullOrEmpty(_playerId)) return null;
+            return DbProvider.Instance.FindById<Player>("gameobjects", _playerId);
+        }
+        set
+        {
+            _playerId = value?.Id;
+        }
+    }
+
     /// <summary>
     /// Get the underlying GameObject for This (for internal use)
     /// </summary>
@@ -300,7 +312,7 @@ public class UnifiedScriptGlobals : EnhancedScriptGlobals
     {
         // Get Database.Player from GameObject
         var playerGameObject = GetPlayerGameObject();
-        var dbPlayer = playerGameObject as Database.Player ?? 
+        var dbPlayer =
                       DbProvider.Instance.FindById<Database.Player>("players", playerGameObject?.Id ?? "");
         
         if (dbPlayer == null)
