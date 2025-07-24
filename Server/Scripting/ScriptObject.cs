@@ -176,8 +176,8 @@ public class ScriptObject : DynamicObject
             input += " " + string.Join(" ", stringArgs);
         }
 
-        // Execute the verb using the verb script engine
-        var scriptEngine = new VerbScriptEngine();
+        // Execute the verb using the unified script engine
+        var scriptEngine = new UnifiedScriptEngine();
         return scriptEngine.ExecuteVerb(verb, input, _currentPlayer, _commandProcessor, _objectId);
     }
 
@@ -193,8 +193,8 @@ public class ScriptObject : DynamicObject
             throw new ArgumentException($"Function '{functionName}' not found on object {_objectId}");
         }
 
-        // Execute the function using the function script engine
-        var functionEngine = new FunctionScriptEngine();
+        // Execute the function using the unified script engine
+        var functionEngine = new UnifiedScriptEngine();
         return functionEngine.ExecuteFunction(function, args ?? new object[0], _currentPlayer, _commandProcessor, _objectId);
     }
 

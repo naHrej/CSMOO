@@ -91,7 +91,7 @@ namespace CSMOO.Server.Commands;
                     };
                     
                     // Use the verb script engine for consistent behavior with other verbs
-                    var verbEngine = new VerbScriptEngine();
+                    var verbEngine = new UnifiedScriptEngine();
                     var result = verbEngine.ExecuteVerb(tempVerb, "@script", _player, _commandProcessor, "system");
                     
                     // Show result

@@ -580,9 +580,8 @@ public static class VerbResolver
     {
         try
         {
-            var scriptEngine = new VerbScriptEngine();
+            var scriptEngine = new UnifiedScriptEngine();
             var result = scriptEngine.ExecuteVerb(verb, input, player, commandProcessor, thisObjectId, variables);
-            
             return true;
         }
         catch (Exception ex)

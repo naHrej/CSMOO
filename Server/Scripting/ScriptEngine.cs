@@ -289,7 +289,7 @@ public class ScriptGlobals
             throw new ArgumentException($"Function '{functionName}' not found on object '{objectRef}'.");
         }
 
-        var engine = new FunctionScriptEngine();
+        var engine = new UnifiedScriptEngine();
         return engine.ExecuteFunction(function, parameters, Player, CommandProcessor);
     }
 

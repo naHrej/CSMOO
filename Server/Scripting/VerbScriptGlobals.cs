@@ -157,7 +157,7 @@ public class VerbScriptGlobals : EnhancedScriptGlobals
             }
 
             // Execute the verb with the provided arguments
-            var scriptEngine = new VerbScriptEngine();
+            var scriptEngine = new UnifiedScriptEngine();
             
             // Build input string from arguments
             var inputArgs = args.Select(a => a?.ToString() ?? "").ToArray();

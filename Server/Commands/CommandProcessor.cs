@@ -303,7 +303,7 @@ public class CommandProcessor
                 {
                     try
                     {
-                        var functionEngine = new Scripting.FunctionScriptEngine();
+                        var functionEngine = new Scripting.UnifiedScriptEngine();
                         
                         // Create a minimal system player context for login banner
                         var systemPlayer = new Database.Player
