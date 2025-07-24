@@ -55,7 +55,9 @@ public static class PermissionManager
         var flagStr = flag.ToString().ToLower();
         if (!targetPlayer.Permissions.Contains(flagStr))
         {
-            targetPlayer.Permissions.Add(flagStr);
+            var perms = targetPlayer.Permissions;
+            perms.Add(flagStr);
+            targetPlayer.Permissions = perms;
             DbProvider.Instance.Update("players", targetPlayer);
             Logger.Info($"Flag {flag} granted to player {targetPlayer.Name} by {grantingPlayer?.Name}");
             return true;
@@ -92,7 +94,9 @@ public static class PermissionManager
         var flagStr = flag.ToString().ToLower();
         if (targetPlayer.Permissions.Contains(flagStr))
         {
-            targetPlayer.Permissions.Remove(flagStr);
+            var flags = targetPlayer.Permissions;
+            flags.Remove(flagStr);
+            targetPlayer.Permissions = flags;
             DbProvider.Instance.Update("players", targetPlayer);
             Logger.Info($"Flag {flag} removed from player {targetPlayer.Name} by {removingPlayer?.Name}");
             return true;
