@@ -1,0 +1,11 @@
+{
+  "name": "Exits",
+  "targetClass": "Room", 
+  "description": "Returns a list of Exits from the room",
+  "returnType": "string",
+  "parameters": [],
+  "parameterNames": [],
+  "code": [   
+    "return Builtins.GetExitsFromRoom(This);"
+  ]
+}
