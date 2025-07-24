@@ -90,11 +90,22 @@ public static class VerbInitializer
             {
                 var json = File.ReadAllText(file);
                 var verbDef = System.Text.Json.JsonSerializer.Deserialize<VerbDefinition>(json);
-                
+
                 if (verbDef == null || string.IsNullOrEmpty(verbDef.Name) || string.IsNullOrEmpty(verbDef.TargetClass))
                 {
                     Logger.Warning($"Invalid verb definition in {file}");
                     continue;
+                }
+
+                // If code is missing or empty, look for a .cs file with the same base name
+                if (verbDef.Code == null || verbDef.Code.Length == 0)
+                {
+                    var csFile = Path.ChangeExtension(file, ".cs");
+                    if (File.Exists(csFile))
+                    {
+                        verbDef.Code = new[] { File.ReadAllText(csFile) };
+                        Logger.Debug($"Loaded code from {csFile} for verb {verbDef.Name}");
+                    }
                 }
 
                 var verbStats = CreateClassVerb(verbDef);
@@ -139,11 +150,22 @@ public static class VerbInitializer
             {
                 var json = File.ReadAllText(file);
                 var verbDef = System.Text.Json.JsonSerializer.Deserialize<VerbDefinition>(json);
-                
+
                 if (verbDef == null || string.IsNullOrEmpty(verbDef.Name))
                 {
                     Logger.Warning($"Invalid verb definition in {file}");
                     continue;
+                }
+
+                // If code is missing or empty, look for a .cs file with the same base name
+                if (verbDef.Code == null || verbDef.Code.Length == 0)
+                {
+                    var csFile = Path.ChangeExtension(file, ".cs");
+                    if (File.Exists(csFile))
+                    {
+                        verbDef.Code = new[] { File.ReadAllText(csFile) };
+                        Logger.Debug($"Loaded code from {csFile} for verb {verbDef.Name}");
+                    }
                 }
 
                 var verbStats = CreateSystemVerb(systemObjectId, verbDef);

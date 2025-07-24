@@ -1,4 +1,5 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+﻿
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
@@ -21,6 +22,9 @@
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.14.0" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Scripting" Version="4.14.0" />
     <PackageReference Include="Microsoft.Extensions.DependencyModel" Version="8.0.2" />
+  </ItemGroup>
+    <ItemGroup>
+    <Compile Remove="Resources/**/*.cs" />
   </ItemGroup>
 
   <ItemGroup>
