@@ -11,10 +11,12 @@ public class Player : GameObject
 {
     [BsonField("passwordhash")]
     private string _passwordHash = string.Empty;
+
     /// <summary>
     /// Password hash for authentication
     /// </summary>
-    internal string PasswordHash {
+    public string PasswordHash
+    {
         get
         {
             return _passwordHash;
@@ -22,6 +24,7 @@ public class Player : GameObject
         set
         {
             _passwordHash = value;
+            DbProvider.Instance.Update<Player>("players", this);
         }
     }
 

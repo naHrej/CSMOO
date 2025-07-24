@@ -21,7 +21,12 @@ public class GameObject : DynamicObject
     public string Name
     {
         get => Properties.ContainsKey("name") ? Properties["name"].AsString : string.Empty;
-        set => Properties["name"] = value != null ? new BsonValue(value) : BsonValue.Null;
+        set
+        {
+            Properties["name"] = value != null ? new BsonValue(value) : BsonValue.Null;
+            
+
+        }
     }
 
     public List<string> Aliases
@@ -133,26 +138,6 @@ public class GameObject : DynamicObject
         set => Properties["description"] = value != null ? new BsonValue(value) : BsonValue.Null;
     }
 
-    /// <summary>
-    /// Dynamic name property (forwarded to Name field but allows lowercase access)
-    /// </summary>
-    public string? name
-    {
-        get => !string.IsNullOrEmpty(Name) ? Name : (Properties.ContainsKey("name") ? Properties["name"].AsString : null);
-        set
-        {
-            if (value != null)
-            {
-                Name = value;
-                Properties["name"] = new BsonValue(value);
-            }
-            else
-            {
-                Name = "";
-                Properties["name"] = BsonValue.Null;
-            }
-        }
-    }
 
     // Additional common properties that scripts might access
 

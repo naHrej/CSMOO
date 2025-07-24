@@ -8,6 +8,7 @@ using CSMOO.Server.Database;
 using CSMOO.Server.Session;
 using CSMOO.Server.Scripting;
 using CSMOO.Server.Logging;
+using LiteDB;
 
 namespace CSMOO.Server.Commands;
 
@@ -234,6 +235,12 @@ public class CommandProcessor
             case "script":
                 HandleScript(input);
                 break;
+            case "@password":
+                HandlePasswordCommand(parts);
+                break;
+            case "@name":
+                HandleNameCommand(parts);
+                break;
             // case "help":
             //     SendGameHelp();
             //     break;
@@ -280,6 +287,97 @@ public class CommandProcessor
             PlayerManager.DisconnectPlayer(_player.Id);
         }
         _connection.Disconnect();
+    }
+
+    private void HandlePasswordCommand(string[] parts)
+    {
+        if (_player == null)
+        {
+            SendToPlayer("You must be logged in to change your password.");
+            return;
+        }
+        if (parts.Length == 2)
+        {
+            // Change own password
+            var newPassword = parts[1];
+            PlayerManager.ChangePassword(_player.Id, newPassword);
+            SendToPlayer("Your password has been changed.");
+        }
+        else if (parts.Length == 3)
+        {
+            // Admin changing another player's password
+            var targetName = parts[1];
+            var newPassword = parts[2];
+            if (!PermissionManager.HasFlag(_player, PermissionManager.Flag.Admin))
+            {
+                SendToPlayer("You do not have permission to change other players' passwords.");
+                return;
+            }
+            var targetPlayer = PlayerManager.FindPlayerByName(targetName);
+            if (targetPlayer == null)
+            {
+                SendToPlayer($"Player '{targetName}' not found.");
+                return;
+            }
+            PlayerManager.ChangePassword(targetPlayer.Id, newPassword);
+            SendToPlayer($"Password for '{targetName}' has been changed.");
+        }
+        else
+        {
+            SendToPlayer("Usage: @password <newpassword> OR @password <playername> <newpassword> (admin only)");
+        }
+    }
+
+    private void HandleNameCommand(string[] parts)
+    {
+        if (_player == null)
+        {
+            SendToPlayer("You must be logged in to change your name.");
+            return;
+        }
+        if (parts.Length == 2)
+        {
+            // Change own name
+            var newName = parts[1];
+            if (string.IsNullOrWhiteSpace(newName))
+            {
+                SendToPlayer("Name cannot be empty.");
+                return;
+            }
+            _player.Name = newName;
+            _player.Properties["name"] = new BsonValue(newName);
+            DbProvider.Instance.Update("players", _player);
+            SendToPlayer($"Your name has been changed to '{newName}'.");
+        }
+        else if (parts.Length == 3)
+        {
+            // Admin changing another player's name
+            var targetName = parts[1];
+            var newName = parts[2];
+            if (!PermissionManager.HasFlag(_player, PermissionManager.Flag.Admin))
+            {
+                SendToPlayer("You do not have permission to change other players' names.");
+                return;
+            }
+            var targetPlayer = PlayerManager.FindPlayerByName(targetName);
+            if (targetPlayer == null)
+            {
+                SendToPlayer($"Player '{targetName}' not found.");
+                return;
+            }
+            if (string.IsNullOrWhiteSpace(newName))
+            {
+                SendToPlayer("Name cannot be empty.");
+                return;
+            }
+            targetPlayer.Name = newName;
+            DbProvider.Instance.Update("players", targetPlayer);
+            SendToPlayer($"Name for '{targetName}' has been changed to '{newName}'.");
+        }
+        else
+        {
+            SendToPlayer("Usage: @name <newname> OR @name <playername> <newname> (admin only)");
+        }
     }
 
     /// <summary>

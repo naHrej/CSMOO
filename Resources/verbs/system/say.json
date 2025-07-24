@@ -15,6 +15,6 @@
     "notify(Player, $\"You say, \\\"{message}\\\"\");",
     "",
     "// Send to other players in the room",
-    "SayToRoom($\"{Player.name} says, \\\"{message}\\\"\", true);"
+    "SayToRoom($\"{Player.Name} says, \\\"{message}\\\"\", true);"
   ]
 }
