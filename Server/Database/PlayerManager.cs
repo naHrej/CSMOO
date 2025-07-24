@@ -47,7 +47,6 @@ public static class PlayerManager
                 ["permissions"] = new BsonArray(),
                 ["createdAt"] = DateTime.UtcNow,
                 ["modifiedAt"] = DateTime.UtcNow,
-                ["passwordhash"] = HashPassword(password)
             }
         };
 
@@ -77,6 +76,7 @@ public static class PlayerManager
             Contents = new List<string>(),
             CreatedAt = player.CreatedAt,
             ModifiedAt = player.ModifiedAt
+
         };
         DbProvider.Instance.Insert("gameobjects", playerGameObject);
 
@@ -94,10 +94,9 @@ public static class PlayerManager
     /// </summary>
     public static Player? AuthenticatePlayer(string name, string password)
     {
-        Player? player = DbProvider.Instance.FindOne<Player>("gameobjects", p => p.Name.ToLower() == name.ToLower());
+        Player? player = DbProvider.Instance.FindOne<Player>("players", p => p.Name.ToLower() == name.ToLower());
         if (player == null)
             return null;
-        player.FixupFieldsAfterDeserialization();
         return VerifyPassword(password, player.PasswordHash) ? player : null;
     }
 
@@ -109,7 +108,6 @@ public static class PlayerManager
         var player = DbProvider.Instance.FindById<Player>("players", playerId);
         if (player == null)
             throw new ArgumentException($"Player with ID {playerId} not found");
-        player.FixupFieldsAfterDeserialization();
 
         // Disconnect any existing session for this player
         if (player.SessionGuid.HasValue)
@@ -133,7 +131,6 @@ public static class PlayerManager
         var player = DbProvider.Instance.FindById<Player>("players", playerId);
         if (player == null)
             return;
-        player.FixupFieldsAfterDeserialization();
 
         player.SessionGuid = null;
         player.IsOnline = false;
@@ -148,8 +145,6 @@ public static class PlayerManager
     public static Player? GetPlayerBySession(Guid sessionGuid)
     {
         var player = DbProvider.Instance.FindOne<Player>("players", p => p.SessionGuid == sessionGuid);
-        if (player != null)
-            player.FixupFieldsAfterDeserialization();
         return player;
     }
 
@@ -159,7 +154,7 @@ public static class PlayerManager
     public static System.Collections.Generic.List<Player> GetOnlinePlayers()
     {
         return DbProvider.Instance.Find<Player>("players", p => p.IsOnline)
-            .Select(p => { p.FixupFieldsAfterDeserialization(); return p; })
+            .Select(p => { return p; })
             .ToList();
     }
 
@@ -169,8 +164,7 @@ public static class PlayerManager
     public static Player? FindPlayerByName(string name)
     {
         var player = DbProvider.Instance.FindOne<Player>("players", p => p.Name.ToLower() == name.ToLower());
-        if (player != null)
-            player.FixupFieldsAfterDeserialization();
+
         return player;
     }
 
@@ -182,7 +176,7 @@ public static class PlayerManager
         var player = DbProvider.Instance.FindById<Player>("players", playerId);
         if (player == null)
             throw new ArgumentException($"Player with ID {playerId} not found");
-        player.FixupFieldsAfterDeserialization();
+  
 
         player.PasswordHash = HashPassword(newPassword);
         player.ModifiedAt = DateTime.UtcNow;

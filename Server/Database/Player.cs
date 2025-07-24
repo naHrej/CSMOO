@@ -2,30 +2,29 @@ using System;
 using System.Collections.Generic;
 using System.Dynamic;
 using LiteDB;
+using System.ComponentModel;
 
 namespace CSMOO.Server.Database;/// <summary>
 /// Player-specific data that extends GameObject
 /// </summary>
 public class Player : GameObject
 {
+    [BsonField("passwordhash")]
     private string _passwordHash = string.Empty;
     /// <summary>
     /// Password hash for authentication
     /// </summary>
-    public string PasswordHash
-    {
+    internal string PasswordHash {
         get
         {
-            if (Properties.ContainsKey("passwordhash"))
-                return Properties["passwordhash"].AsString;
             return _passwordHash;
         }
         set
         {
-            _passwordHash = value ?? string.Empty;
-            Properties["passwordhash"] = value != null ? new BsonValue(value) : BsonValue.Null;
+            _passwordHash = value;
         }
     }
+
 
     /// <summary>
     /// Current session GUID (if online)
@@ -53,6 +52,7 @@ public class Player : GameObject
         get => Properties.ContainsKey("isonline") ? Properties["isonline"].AsBoolean : false;
         set => Properties["isonline"] = new BsonValue(value);
     }
+
 
     /// <summary>
     /// Ensures legacy fields are synced to Properties after deserialization
