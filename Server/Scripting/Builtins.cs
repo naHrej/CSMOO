@@ -531,10 +531,16 @@ public static class Builtins
         return foundObject?.GameObject as GameObject;
     }
     
+    public static GameObject? FindObjectById(string objectId)
+    {
+        if (string.IsNullOrEmpty(objectId)) return null;
+        return DbProvider.Instance.FindById<GameObject>("gameobjects", objectId);
+    }
+    
     #endregion
-    
+
     #region Verb Management
-    
+
     /// <summary>
     /// Get all verbs on an object
     /// </summary>
