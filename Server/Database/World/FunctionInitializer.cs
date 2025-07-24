@@ -89,11 +89,22 @@ public static class FunctionInitializer
             {
                 var json = File.ReadAllText(file);
                 var functionDef = System.Text.Json.JsonSerializer.Deserialize<FunctionDefinition>(json);
-                
+
                 if (functionDef == null || string.IsNullOrEmpty(functionDef.Name) || string.IsNullOrEmpty(functionDef.TargetClass))
                 {
                     Logger.Warning($"Invalid function definition in {file}");
                     continue;
+                }
+
+                // If code is missing or empty, look for a .cs file with the same base name
+                if (functionDef.Code == null || functionDef.Code.Length == 0)
+                {
+                    var csFile = Path.ChangeExtension(file, ".cs");
+                    if (File.Exists(csFile))
+                    {
+                        functionDef.Code = new[] { File.ReadAllText(csFile) };
+                        Logger.Debug($"Loaded code from {csFile} for function {functionDef.Name}");
+                    }
                 }
 
                 var functionStats = CreateClassFunction(functionDef);
@@ -138,11 +149,22 @@ public static class FunctionInitializer
             {
                 var json = File.ReadAllText(file);
                 var functionDef = System.Text.Json.JsonSerializer.Deserialize<FunctionDefinition>(json);
-                
+
                 if (functionDef == null || string.IsNullOrEmpty(functionDef.Name))
                 {
                     Logger.Warning($"Invalid function definition in {file}");
                     continue;
+                }
+
+                // If code is missing or empty, look for a .cs file with the same base name
+                if (functionDef.Code == null || functionDef.Code.Length == 0)
+                {
+                    var csFile = Path.ChangeExtension(file, ".cs");
+                    if (File.Exists(csFile))
+                    {
+                        functionDef.Code = new[] { File.ReadAllText(csFile) };
+                        Logger.Debug($"Loaded code from {csFile} for function {functionDef.Name}");
+                    }
                 }
 
                 var functionStats = CreateSystemFunction(systemObjectId, functionDef);
