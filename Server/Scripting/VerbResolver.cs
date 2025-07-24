@@ -12,21 +12,6 @@ using CSMOO.Server.Logging;
 namespace CSMOO.Server.Scripting;
 
 /// <summary>
-/// Result of verb matching that includes extracted pattern variables
-/// </summary>
-public class VerbMatchResult
-{
-    public Verb Verb { get; set; }
-    public Dictionary<string, string> Variables { get; set; } = new Dictionary<string, string>();
-    
-    public VerbMatchResult(Verb verb, Dictionary<string, string>? variables = null)
-    {
-        Verb = verb;
-        Variables = variables ?? new Dictionary<string, string>();
-    }
-}
-
-/// <summary>
 /// Resolves and manages verb execution for objects
 /// </summary>
 public static class VerbResolver
@@ -550,10 +535,7 @@ public static class VerbResolver
         if (parts.Length == 1)
         {
             var direction = parts[0].ToLower();
-            if (TryExecuteMovementCommand(direction, player, commandProcessor))
-            {
-                return true;
-            }
+            return TryExecuteMovementCommand(direction, player, commandProcessor);
         }
 
         return false; // No verb found
@@ -573,7 +555,7 @@ public static class VerbResolver
         catch (Exception ex)
         {
             Logger.Error($"Error executing verb '{verb.Name}': {ex.Message}");
-            commandProcessor?.SendToPlayer($"Error executing command: {ex.Message}");
+            commandProcessor?.SendToPlayer($"Error executing command \"{verb.Name.ToUpperInvariant()}\":{ex.Message}");
             return false;
         }
     }

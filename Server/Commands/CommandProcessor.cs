@@ -178,79 +178,88 @@ public class CommandProcessor
 
     private void HandleGameCommand(string input)
     {
-        // Ensure player is still valid (might have been updated after login)
-        if (_player == null)
+        try
         {
-            _player = PlayerManager.GetPlayerBySession(_sessionGuid);
-            if (_player != null && _programmingCommands == null)
+            // Ensure player is still valid (might have been updated after login)
+            if (_player == null)
             {
-                _programmingCommands = new ProgrammingCommands(this, _player);
+                _player = PlayerManager.GetPlayerBySession(_sessionGuid);
+                if (_player != null && _programmingCommands == null)
+                {
+                    _programmingCommands = new ProgrammingCommands(this, _player);
+                }
+            }
+
+            if (_player == null)
+            {
+                SendToPlayer("Error: Player session not found. Please login again.");
+                return;
+            }
+
+            // First check if we're in programming mode
+            if (_programmingCommands?.IsInProgrammingMode == true)
+            {
+                _programmingCommands.HandleProgrammingCommand(input);
+                return;
+            }
+
+            // Check for programming commands
+            if (input.StartsWith("@") && _programmingCommands?.HandleProgrammingCommand(input) == true)
+            {
+                return;
+            }
+
+            // Insert space after special command characters if at the start
+            if (!string.IsNullOrEmpty(input))
+            {
+                char[] specialChars = [';', '\'', '"', ':', '!'];
+                char firstChar = input[0];
+                if (specialChars.Contains(firstChar) && input.Length > 1 && !char.IsWhiteSpace(input[1]))
+                {
+                    input = $"{firstChar} {input.Substring(1)}";
+                }
+            }
+
+            // Try to execute as a verb first
+            if (VerbResolver.TryExecuteVerb(input, _player, this))
+            {
+                return;
+            }
+
+            // Fall back to essential built-in commands only
+            var parts = input.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length == 0) return;
+
+            var command = parts[0].ToLowerInvariant();
+
+            switch (command)
+            {
+                case "script":
+                    HandleScript(input);
+                    break;
+                case "@password":
+                    HandlePasswordCommand(parts);
+                    break;
+                case "@name":
+                    HandleNameCommand(parts);
+                    break;
+                // case "help":
+                //     SendGameHelp();
+                //     break;
+                case "quit":
+                case "exit":
+                    HandleQuit();
+                    break;
+                default:
+                    SendToPlayer($"Unknown command: {command}. Type 'help' for available commands.");
+                    break;
             }
         }
-
-        if (_player == null)
+        catch (Exception ex)
         {
-            SendToPlayer("Error: Player session not found. Please login again.");
-            return;
-        }
-
-        // First check if we're in programming mode
-        if (_programmingCommands?.IsInProgrammingMode == true)
-        {
-            _programmingCommands.HandleProgrammingCommand(input);
-            return;
-        }
-
-        // Check for programming commands
-        if (input.StartsWith("@") && _programmingCommands?.HandleProgrammingCommand(input) == true)
-        {
-            return;
-        }
-
-        // Insert space after special command characters if at the start
-        if (!string.IsNullOrEmpty(input))
-        {
-            char[] specialChars = [';', '\'', '"', ':', '!'];
-            char firstChar = input[0];
-            if (specialChars.Contains(firstChar) && input.Length > 1 && !char.IsWhiteSpace(input[1]))
-            {
-                input = $"{firstChar} {input.Substring(1)}";
-            }
-        }
-
-        // Try to execute as a verb first
-        if (VerbResolver.TryExecuteVerb(input, _player, this))
-        {
-            return;
-        }
-
-        // Fall back to essential built-in commands only
-        var parts = input.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        if (parts.Length == 0) return;
-
-        var command = parts[0].ToLower();
-
-        switch (command)
-        {
-            case "script":
-                HandleScript(input);
-                break;
-            case "@password":
-                HandlePasswordCommand(parts);
-                break;
-            case "@name":
-                HandleNameCommand(parts);
-                break;
-            // case "help":
-            //     SendGameHelp();
-            //     break;
-            case "quit":
-            case "exit":
-                HandleQuit();
-                break;
-            default:
-                SendToPlayer($"Unknown command: {command}. Type 'help' for available commands.");
-                break;
+            SendToPlayer($"Error processing command \"{input.ToUpperInvariant()}\": {ex.Message}");
+            Logger.Error($"Error in command processing: {ex.Message}");
+            Logger.Error($"Stack trace: {ex.StackTrace}");
         }
     }
 
