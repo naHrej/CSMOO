@@ -33,10 +33,11 @@ public static class InstanceManager
             PropertyManager.MergeProperties(mergedProperties, classInChain.Properties);
         }
 
+        mergedProperties["classid"] = classId; // Ensure class ID is set    
         var gameObject = new GameObject
         {
             Id = Guid.NewGuid().ToString(),
-            ClassId = classId,
+            
             Properties = mergedProperties,
             Location = DbProvider.Instance.FindOne<GameObject>("gameobjects", o => o.Properties.ContainsKey("isStartingRoom")) ?? null,
         };
