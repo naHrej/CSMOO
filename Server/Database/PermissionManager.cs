@@ -177,10 +177,11 @@ public static class PermissionManager
     {
         if (adminPlayer?.Permissions == null) return;
 
-        // Clear existing permissions and set the proper ones
-        adminPlayer.Permissions.Clear();
-        adminPlayer.Permissions.Add(Flag.Admin.ToString().ToLower());
-        adminPlayer.Permissions.Add(Flag.Programmer.ToString().ToLower());
+        adminPlayer.Permissions = new List<string>
+        {
+            Flag.Admin.ToString().ToLower(),
+            Flag.Programmer.ToString().ToLower()
+        };
         
         DbProvider.Instance.Update("players", adminPlayer);
         Logger.Info($"Initialized admin permissions for player {adminPlayer.Name}: {GetFlagsString(adminPlayer)}");

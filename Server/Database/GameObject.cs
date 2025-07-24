@@ -183,6 +183,21 @@ public class GameObject : DynamicObject
         set => Properties["size"] = value.HasValue ? new BsonValue(value.Value) : BsonValue.Null;
     }
 
+public List<string> Permissions
+{
+    get
+    {
+        // Defensive: handle null or non-array values gracefully
+        if (!Properties.ContainsKey("permissions") || Properties["permissions"].IsNull)
+            return new List<string>();
+        var arr = Properties["permissions"].AsArray;
+        if (arr == null)
+            return new List<string>();
+        return arr.Select(v => v.AsString).ToList();
+    }
+    set => Properties["permissions"] = value != null ? new BsonArray(value.Select(s => new BsonValue(s))) : BsonValue.Null;
+}
+
     /// <summary>
     /// Handles property getting: gameObject.propertyName
     /// </summary>
