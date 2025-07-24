@@ -281,9 +281,7 @@ public List<string> Permissions
                 case "createdat":
                     throw new InvalidOperationException($"Property '{propertyName}' is read-only");
                 case "name":
-                    Name = value?.ToString() ?? "";
-                    DbProvider.Instance.Update("gameobjects", this);
-                    return true;
+                    throw new InvalidOperationException($"Property '{propertyName}' is read-only");
                 case "aliases":
                     if (value is List<string> aliasesList)
                     {
