@@ -355,6 +355,7 @@ public class CommandProcessor
             }
             _player.Name = newName;
             _player.Properties["name"] = new BsonValue(newName);
+            DbProvider.Instance.Update("gameobjects", _player);
             DbProvider.Instance.Update("players", _player);
             SendToPlayer($"Your name has been changed to '{newName}'.");
         }
@@ -380,6 +381,7 @@ public class CommandProcessor
                 return;
             }
             targetPlayer.Name = newName;
+            DbProvider.Instance.Update("gameobjects", targetPlayer);
             DbProvider.Instance.Update("players", targetPlayer);
             SendToPlayer($"Name for '{targetName}' has been changed to '{newName}'.");
         }
