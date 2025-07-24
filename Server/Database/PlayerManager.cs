@@ -47,6 +47,7 @@ public static class PlayerManager
                 ["permissions"] = new BsonArray(),
                 ["createdAt"] = DateTime.UtcNow,
                 ["modifiedAt"] = DateTime.UtcNow,
+                ["classid"] = playerClass.Id,
             }
         };
 
