@@ -5,12 +5,37 @@ using CSMOO.Server.Database.Managers;
 using CSMOO.Server.Logging;
 
 namespace CSMOO.Server.Database;
-
 /// <summary>
 /// Main facade for object management, delegating to specialized managers
 /// </summary>
 public static class ObjectManager
 {
+    // Singleton cache for loaded GameObject instances
+    private static readonly Dictionary<string, GameObject> _objectCache = new();
+
+    /// <summary>
+    /// Loads all GameObjects from the database into the singleton cache at startup.
+    /// </summary>
+    public static void LoadAllObjectsToCache()
+    {
+        var allObjects = DbProvider.Instance.FindAll<GameObject>("gameobjects");
+        foreach (var obj in allObjects)
+        {
+            CacheGameObject(obj);
+        }
+    }
+
+    /// <summary>
+    /// Adds a GameObject to the singleton cache, or returns the cached instance if already present.
+    /// </summary>
+    public static GameObject CacheGameObject(GameObject obj)
+    {
+        if (obj == null) return null;
+        if (_objectCache.TryGetValue(obj.Id, out var cached))
+            return cached;
+        _objectCache[obj.Id] = obj;
+        return obj;
+    }
     #region Class Management (delegated to ClassManager)
     
     /// <summary>
@@ -122,7 +147,15 @@ public static class ObjectManager
     /// Gets an object by ID
     /// </summary>
     public static GameObject? GetObject(string objectId)
-        => DbProvider.Instance.FindById<GameObject>("gameobjects", objectId);
+    {
+        if (string.IsNullOrEmpty(objectId)) return null;
+        if (_objectCache.TryGetValue(objectId, out var cached))
+            return cached;
+        var obj = DbProvider.Instance.FindById<GameObject>("gameobjects", objectId);
+        if (obj != null)
+            _objectCache[obj.Id] = obj;
+        return obj;
+    }
 
     #endregion
 
@@ -149,7 +182,22 @@ public static class ObjectManager
     /// Sets a property value on an object instance
     /// </summary>
     public static void SetProperty(GameObject gameObject, string propertyName, BsonValue value)
-        => PropertyManager.SetProperty(gameObject, propertyName, value);
+    {
+        // Always update the cached instance
+        if (_objectCache.TryGetValue(gameObject.Id, out var cached))
+        {
+            PropertyManager.SetProperty(cached, propertyName, value);
+            DbProvider.Instance.Update("gameobjects", cached);
+            Logger.Debug($"[ObjectManager] Property '{propertyName}' set on object {cached.Id} (cached instance) and persisted.");
+        }
+        else
+        {
+            PropertyManager.SetProperty(gameObject, propertyName, value);
+            _objectCache[gameObject.Id] = gameObject;
+            DbProvider.Instance.Update("gameobjects", gameObject);
+            Logger.Debug($"[ObjectManager] Property '{propertyName}' set on object {gameObject.Id} (new cache) and persisted.");
+        }
+    }
 
     /// <summary>
     /// Sets a property value by object ID
@@ -162,7 +210,23 @@ public static class ObjectManager
     /// Removes a property from an object instance
     /// </summary>
     public static bool RemoveProperty(GameObject gameObject, string propertyName)
-        => PropertyManager.RemoveProperty(gameObject, propertyName);
+    {
+        // Update the cache with the latest instance
+        if (!_objectCache.ContainsKey(gameObject.Id))
+            _objectCache[gameObject.Id] = gameObject;
+        return PropertyManager.RemoveProperty(gameObject, propertyName);
+    }
+    /// <summary>
+    /// Forces a reload of a GameObject from the database, replacing the cached instance.
+    /// </summary>
+    public static GameObject? ReloadObject(string objectId)
+    {
+        var obj = DbProvider.Instance.FindById<GameObject>("gameobjects", objectId);
+        if (obj != null)
+            _objectCache[obj.Id] = obj;
+        return obj;
+    }
+
 
     /// <summary>
     /// Removes a property by object ID

@@ -28,8 +28,12 @@ public static class ServerInitializer
             Logger.Info("Initializing world...");
             WorldInitializer.InitializeWorld();
             
+
             // Migrate existing objects to have DBREFs
             ObjectManager.MigrateDbRefs();
+
+            // Load all GameObjects into the singleton cache
+            ObjectManager.LoadAllObjectsToCache();
             
             // Create a test admin player if none exists
             CreateDefaultAdminIfNeeded();

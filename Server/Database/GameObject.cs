@@ -70,8 +70,8 @@ public class GameObject : DynamicObject
     /// </summary>
     public string? shortDescription
     {
-        get => ObjectManager.GetProperty(this, "shortDescription")?.AsString;
-        set => ObjectManager.SetProperty(this, "shortDescription", value != null ? new BsonValue(value) : BsonValue.Null);
+        get => Properties.ContainsKey("shortDescription") ? Properties["shortDescription"].AsString : null;
+        set => Properties["shortDescription"] = value != null ? new BsonValue(value) : BsonValue.Null;
     }
     
     /// <summary>
@@ -79,8 +79,8 @@ public class GameObject : DynamicObject
     /// </summary>
     public string? longDescription
     {
-        get => ObjectManager.GetProperty(this, "longDescription")?.AsString;
-        set => ObjectManager.SetProperty(this, "longDescription", value != null ? new BsonValue(value) : BsonValue.Null);
+        get => Properties.ContainsKey("longDescription") ? Properties["longDescription"].AsString : null;
+        set => Properties["longDescription"] = value != null ? new BsonValue(value) : BsonValue.Null;
     }
     
     /// <summary>
@@ -88,8 +88,8 @@ public class GameObject : DynamicObject
     /// </summary>
     public string? description
     {
-        get => ObjectManager.GetProperty(this, "description")?.AsString;
-        set => ObjectManager.SetProperty(this, "description", value != null ? new BsonValue(value) : BsonValue.Null);
+        get => Properties.ContainsKey("description") ? Properties["description"].AsString : null;
+        set => Properties["description"] = value != null ? new BsonValue(value) : BsonValue.Null;
     }
     
     /// <summary>
@@ -97,18 +97,18 @@ public class GameObject : DynamicObject
     /// </summary>
     public string? name
     {
-        get => !string.IsNullOrEmpty(Name) ? Name : ObjectManager.GetProperty(this, "name")?.AsString;
+        get => !string.IsNullOrEmpty(Name) ? Name : (Properties.ContainsKey("name") ? Properties["name"].AsString : null);
         set 
         {
             if (value != null)
             {
                 Name = value;
-                ObjectManager.SetProperty(this, "name", new BsonValue(value));
+                Properties["name"] = new BsonValue(value);
             }
             else
             {
                 Name = "";
-                ObjectManager.SetProperty(this, "name", BsonValue.Null);
+                Properties["name"] = BsonValue.Null;
             }
         }
     }
@@ -120,8 +120,8 @@ public class GameObject : DynamicObject
     /// </summary>
     public bool? gettable
     {
-        get => ObjectManager.GetProperty(this, "gettable")?.AsBoolean;
-        set => ObjectManager.SetProperty(this, "gettable", value.HasValue ? new BsonValue(value.Value) : BsonValue.Null);
+        get => Properties.ContainsKey("gettable") ? Properties["gettable"].AsBoolean : (bool?)null;
+        set => Properties["gettable"] = value.HasValue ? new BsonValue(value.Value) : BsonValue.Null;
     }
     
     /// <summary>
@@ -129,8 +129,8 @@ public class GameObject : DynamicObject
     /// </summary>
     public bool? visible
     {
-        get => ObjectManager.GetProperty(this, "visible")?.AsBoolean;
-        set => ObjectManager.SetProperty(this, "visible", value.HasValue ? new BsonValue(value.Value) : BsonValue.Null);
+        get => Properties.ContainsKey("visible") ? Properties["visible"].AsBoolean : (bool?)null;
+        set => Properties["visible"] = value.HasValue ? new BsonValue(value.Value) : BsonValue.Null;
     }
     
     /// <summary>
@@ -138,8 +138,8 @@ public class GameObject : DynamicObject
     /// </summary>
     public int? size
     {
-        get => ObjectManager.GetProperty(this, "size")?.AsInt32;
-        set => ObjectManager.SetProperty(this, "size", value.HasValue ? new BsonValue(value.Value) : BsonValue.Null);
+        get => Properties.ContainsKey("size") ? Properties["size"].AsInt32 : (int?)null;
+        set => Properties["size"] = value.HasValue ? new BsonValue(value.Value) : BsonValue.Null;
     }
 
     /// <summary>
@@ -194,24 +194,19 @@ public class GameObject : DynamicObject
                 return true; // Return null for any property on a missing object
             }
 
-            // Try to get the property from the object's property system
-            var propertyValue = ObjectManager.GetProperty(this, propertyName);
-            
-            if (propertyValue == null)
+            // Try to get the property from the instance's Properties dictionary only
+            if (Properties.ContainsKey(propertyName))
             {
-                // Check if this might be a case sensitivity issue with built-in properties
-                var suggestion = GetPropertySuggestion(propertyName);
-                if (!string.IsNullOrEmpty(suggestion))
-                {
-                    throw new InvalidOperationException($"Property '{propertyName}' not found on object {Id}. Did you mean '{suggestion}'? (Property names are case-sensitive)");
-                }
-                
-                result = null;
-                return true; // Return true but with null result - property doesn't exist
+                result = Properties[propertyName].RawValue;
+                return true;
             }
-            
-            // Convert BsonValue to appropriate C# type
-            result = propertyValue.RawValue;
+            // Check if this might be a case sensitivity issue with built-in properties
+            var suggestion = GetPropertySuggestion(propertyName);
+            if (!string.IsNullOrEmpty(suggestion))
+            {
+                throw new InvalidOperationException($"Property '{propertyName}' not found on object {Id}. Did you mean '{suggestion}'? (Property names are case-sensitive)");
+            }
+            result = null;
             return true;
         }
         catch (Exception ex)
@@ -285,7 +280,7 @@ public class GameObject : DynamicObject
                 BsonValue bv => bv,
                 _ => new BsonValue(value.ToString() ?? "")
             };
-
+            Properties[propertyName] = bsonValue;
             ObjectManager.SetProperty(this, propertyName, bsonValue);
             return true;
         }
@@ -363,12 +358,8 @@ public class GameObject : DynamicObject
     /// </summary>
     public override string ToString()
     {
-        var nameProperty = ObjectManager.GetProperty(this, "name");
-        var shortDescProperty = ObjectManager.GetProperty(this, "shortDescription");
-        
-        var name = nameProperty?.AsString ?? Name;
-        var shortDesc = shortDescProperty?.AsString;
-        
+        var name = Properties.ContainsKey("name") ? Properties["name"].AsString : Name;
+        var shortDesc = Properties.ContainsKey("shortDescription") ? Properties["shortDescription"].AsString : null;
         return name ?? shortDesc ?? $"Object #{DbRef}";
     }
 

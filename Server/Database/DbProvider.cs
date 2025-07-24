@@ -58,25 +58,62 @@ namespace CSMOO.Server.Database
         // Generic FindAll
         public IEnumerable<T> FindAll<T>(string collectionName)
         {
-            return GetCollection<T>(collectionName).FindAll();
+            var results = GetCollection<T>(collectionName).FindAll();
+            // If T is GameObject, update the singleton cache
+            if (typeof(T) == typeof(GameObject))
+            {
+                var list = new List<T>();
+                foreach (var obj in results)
+                {
+                    var go = obj as GameObject;
+                    if (go != null)
+                    {
+                        ObjectManager.CacheGameObject(go);
+                        list.Add(obj);
+                    }
+                }
+                return list;
+            }
+            return results;
         }
 
         // Generic Find (with predicate)
         public IEnumerable<T> Find<T>(string collectionName, Func<T, bool> predicate)
         {
-            return GetCollection<T>(collectionName).Find(predicate);
+            var results = GetCollection<T>(collectionName).Find(predicate);
+            if (typeof(T) == typeof(GameObject))
+            {
+                var list = new List<T>();
+                foreach (var obj in results)
+                {
+                    var go = obj as GameObject;
+                    if (go != null)
+                    {
+                        ObjectManager.CacheGameObject(go);
+                        list.Add(obj);
+                    }
+                }
+                return list;
+            }
+            return results;
         }
 
         // Generic FindOne
         public T? FindOne<T>(string collectionName, Func<T, bool> predicate)
         {
-            return GetCollection<T>(collectionName).FindOne(predicate);
+            var result = GetCollection<T>(collectionName).FindOne(predicate);
+            if (typeof(T) == typeof(GameObject) && result is GameObject go)
+                return (T)(object)ObjectManager.CacheGameObject(go);
+            return result;
         }
 
         // Generic FindById
         public T? FindById<T>(string collectionName, string id)
         {
-            return GetCollection<T>(collectionName).FindById(id);
+            var result = GetCollection<T>(collectionName).FindById(id);
+            if (typeof(T) == typeof(GameObject) && result is GameObject go)
+                return (T)(object)ObjectManager.CacheGameObject(go);
+            return result;
         }
 
         // Helper to get the collection from GameDatabase (now private)
