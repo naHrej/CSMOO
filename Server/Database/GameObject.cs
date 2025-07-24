@@ -208,7 +208,7 @@ public List<string> Permissions
                     result = DbRef;
                     return true;
                 case "classid":
-                    result = ClassId;
+                    result = Properties.ContainsKey("classid") ? Properties["classid"].AsString : string.Empty;
                     return true;
                 case "location":
                     result = Location;
