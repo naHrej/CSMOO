@@ -56,7 +56,7 @@ public static class PermissionManager
         if (!targetPlayer.Permissions.Contains(flagStr))
         {
             targetPlayer.Permissions.Add(flagStr);
-            GameDatabase.Instance.Players.Update(targetPlayer);
+            DbProvider.Instance.Update("players", targetPlayer);
             Logger.Info($"Flag {flag} granted to player {targetPlayer.Name} by {grantingPlayer?.Name}");
             return true;
         }
@@ -93,7 +93,7 @@ public static class PermissionManager
         if (targetPlayer.Permissions.Contains(flagStr))
         {
             targetPlayer.Permissions.Remove(flagStr);
-            GameDatabase.Instance.Players.Update(targetPlayer);
+            DbProvider.Instance.Update("players", targetPlayer);
             Logger.Info($"Flag {flag} removed from player {targetPlayer.Name} by {removingPlayer?.Name}");
             return true;
         }
@@ -182,7 +182,7 @@ public static class PermissionManager
         adminPlayer.Permissions.Add(Flag.Admin.ToString().ToLower());
         adminPlayer.Permissions.Add(Flag.Programmer.ToString().ToLower());
         
-        GameDatabase.Instance.Players.Update(adminPlayer);
+        DbProvider.Instance.Update("players", adminPlayer);
         Logger.Info($"Initialized admin permissions for player {adminPlayer.Name}: {GetFlagsString(adminPlayer)}");
     }
 }

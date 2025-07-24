@@ -377,9 +377,8 @@ public class ProgrammingCommands
             {
                 // Verb programming mode - save the code
                 VerbManager.UpdateVerbCode(_currentVerbId, code);
-                
-                // Verify the code was saved
-                var savedVerb = GameDatabase.Instance.GetCollection<Verb>("verbs").FindById(_currentVerbId);
+                // Verify the code was saved using DbProvider
+                var savedVerb = DbProvider.Instance.FindById<Verb>("verbs", _currentVerbId);
                 if (savedVerb != null)
                 {
                     _commandProcessor.SendToPlayer("Verb programming complete.");
@@ -394,21 +393,17 @@ public class ProgrammingCommands
             else if (!string.IsNullOrEmpty(_currentFunctionId))
             {
                 // Function programming mode - save the code
-                var functions = GameDatabase.Instance.GetCollection<Function>("functions");
-                var function = functions.FindById(_currentFunctionId);
-                
+                var function = DbProvider.Instance.FindById<Function>("functions", _currentFunctionId);
                 if (function != null)
                 {
                     function.Code = code;
                     var updateResult = FunctionManager.UpdateFunction(function);
-                    
                     if (updateResult)
                     {
                         _commandProcessor.SendToPlayer("Function programming complete.");
                         _commandProcessor.SendToPlayer($"Code saved ({code.Split('\n').Length} lines).");
-                        
                         // Re-fetch to verify
-                        var verifyFunction = functions.FindById(_currentFunctionId);
+                        var verifyFunction = DbProvider.Instance.FindById<Function>("functions", _currentFunctionId);
                         if (verifyFunction != null)
                         {
                             _commandProcessor.SendToPlayer($"Verified: Code length is {verifyFunction.Code?.Length ?? 0} characters.");
@@ -657,9 +652,7 @@ public class ProgrammingCommands
         const string progEditPrefix = "ProgEdit > ";
         const string progEndPrefix = "ProgEnd > ";
 
-        var functions = GameDatabase.Instance.GetCollection<Function>("functions");
-        var function = functions.FindById(functionId);
-
+        var function = DbProvider.Instance.FindById<Function>("functions", functionId);
         if (function == null)
         {
             _commandProcessor.SendToPlayer($"{progStartPrefix}Function with ID '{functionId}' not found.");
@@ -972,7 +965,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
             return true;
         }
 
-        GameDatabase.Instance.GetCollection<Verb>("verbs").Delete(verb.Id);
+        DbProvider.Instance.Delete<Verb>("verbs", verb.Id);
         _commandProcessor.SendToPlayer($"Removed verb '{verbName}' from {GetObjectName(objectId)}.");
 
         return true;
@@ -990,8 +983,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
         }
 
         var verbId = parts[2];
-        var verbCollection = GameDatabase.Instance.GetCollection<Verb>("verbs");
-        var verb = verbCollection.FindById(verbId);
+        var verb = DbProvider.Instance.FindById<Verb>("verbs", verbId);
 
         if (verb == null)
         {
@@ -1009,7 +1001,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
             // For now, just proceed - in a real implementation you'd want confirmation
         }
 
-        verbCollection.Delete(verbId);
+        DbProvider.Instance.Delete<Verb>("verbs", verbId);
         _commandProcessor.SendToPlayer($"Removed verb '{verb.Name}' (ID: {verbId})");
         return true;
     }
@@ -1081,8 +1073,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
             return true;
         }
 
-        var verbCollection = GameDatabase.Instance.GetCollection<Verb>("verbs");
-        var allVerbs = verbCollection.FindAll().ToList();
+        var allVerbs = DbProvider.Instance.FindAll<Verb>("verbs").ToList();
         var objectVerbs = allVerbs.Where(v => v.ObjectId == objectId).ToList();
 
         _commandProcessor.SendToPlayer("=== COMPREHENSIVE VERB DEBUG ===");
@@ -1148,8 +1139,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
             return true;
         }
 
-        var verbCollection = GameDatabase.Instance.GetCollection<Verb>("verbs");
-        var objectVerbs = verbCollection.Find(v => v.ObjectId == objectId).ToList();
+        var objectVerbs = DbProvider.Instance.Find<Verb>("verbs", v => v.ObjectId == objectId).ToList();
 
         _commandProcessor.SendToPlayer("=== FIXING DUPLICATE VERBS ===");
         
@@ -1175,7 +1165,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
                 foreach (var emptyVerb in emptyVerbs)
                 {
                     _commandProcessor.SendToPlayer($"  Removing empty verb: {emptyVerb.Id}");
-                    verbCollection.Delete(emptyVerb.Id);
+                    DbProvider.Instance.Delete<Verb>("verbs", emptyVerb.Id);
                     removedCount++;
                 }
             }
@@ -1186,7 +1176,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
                 foreach (var verb in verbsToRemove)
                 {
                     _commandProcessor.SendToPlayer($"  Removing duplicate empty verb: {verb.Id}");
-                    verbCollection.Delete(verb.Id);
+                    DbProvider.Instance.Delete<Verb>("verbs", verb.Id);
                     removedCount++;
                 }
             }
@@ -1219,26 +1209,26 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
                 // Check if it's a DBREF (starts with # followed by digits)
                 if (objectName.StartsWith("#") && int.TryParse(objectName.Substring(1), out int dbref))
                 {
-                    var obj = GameDatabase.Instance.GameObjects.FindOne(o => o.DbRef == dbref);
+                    var obj = DbProvider.Instance.FindOne<GameObject>("gameobjects", o => o.DbRef == dbref);
                     result = obj?.Id;
                 }
                 // Check if it's a class reference (starts with "class:" or ends with ".class")
                 else if (objectName.StartsWith("class:", StringComparison.OrdinalIgnoreCase))
                 {
                     var className = objectName.Substring(6); // Remove "class:" prefix
-                    var objectClass = GameDatabase.Instance.ObjectClasses.FindOne(c => 
+                    var objectClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => 
                         c.Name.Equals(className, StringComparison.OrdinalIgnoreCase));
                     result = objectClass?.Id;
                 }
                 else if (objectName.EndsWith(".class", StringComparison.OrdinalIgnoreCase))
                 {
                     var className = objectName.Substring(0, objectName.Length - 6); // Remove ".class" suffix
-                    var objectClass = GameDatabase.Instance.ObjectClasses.FindOne(c => 
+                    var objectClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => 
                         c.Name.Equals(className, StringComparison.OrdinalIgnoreCase));
                     result = objectClass?.Id;
                 }
                 // Check if it's a direct class ID (like "obj_room", "obj_exit", etc.)
-                else if (GameDatabase.Instance.ObjectClasses.FindById(objectName) != null)
+                else if (DbProvider.Instance.FindById<ObjectClass>("objectclasses", objectName) != null)
                 {
                     result = objectName; // The objectName itself is the class ID
                 }
@@ -1250,9 +1240,8 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
                     // If not found as an object, try as a class name
                     if (result == null)
                     {
-                        var objectClass = GameDatabase.Instance.ObjectClasses.FindOne(c => 
+                        var objectClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => 
                             c.Name.Equals(objectName, StringComparison.OrdinalIgnoreCase));
-                        
                         if (objectClass != null)
                         {
                             result = objectClass.Id;
@@ -1297,7 +1286,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
         var playerMatch = players.FirstOrDefault(p => p.Name.ToLower().Contains(name));
         if (playerMatch != null)
         {
-            var playerObj = GameDatabase.Instance.GameObjects.FindById(playerMatch.Id);
+            var playerObj = DbProvider.Instance.FindById<GameObject>("gameobjects", playerMatch.Id);
             if (playerObj != null)
             {
                 Logger.Debug($"Found player '{name}': #{playerObj.DbRef} ({playerMatch.Name})");
@@ -1306,7 +1295,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
         }
         
         // Finally, search globally (for admin/building purposes)
-        var allObjects = GameDatabase.Instance.GameObjects.FindAll();
+        var allObjects = DbProvider.Instance.FindAll<GameObject>("gameobjects");
         var globalMatch = allObjects.FirstOrDefault(obj =>
         {
             var objName = ObjectManager.GetProperty(obj, "name")?.AsString?.ToLower();
@@ -1330,7 +1319,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
     private string? GetSystemObjectId()
     {
         // Get all objects and filter in memory (LiteDB doesn't support ContainsKey in expressions)
-        var allObjects = GameDatabase.Instance.GameObjects.FindAll();
+        var allObjects = DbProvider.Instance.FindAll<GameObject>("gameobjects");
         var systemObj = allObjects.FirstOrDefault(obj => 
             obj.Properties.ContainsKey("isSystemObject") && obj.Properties["isSystemObject"].AsBoolean == true);
         
@@ -1339,7 +1328,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
             // System object doesn't exist, create it
             Logger.Debug("System object not found, creating it...");
             // Use Container class instead of abstract Object class
-            var containerClass = GameDatabase.Instance.ObjectClasses.FindOne(c => c.Name == "Container");
+            var containerClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "Container");
             if (containerClass != null)
             {
                 systemObj = ObjectManager.CreateInstance(containerClass.Id);
@@ -1370,7 +1359,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
         if (objectId == _player.Location) return "here";
 
         // Try as a GameObject first
-        var obj = GameDatabase.Instance.GameObjects.FindById(objectId);
+        var obj = DbProvider.Instance.FindById<GameObject>("gameobjects", objectId);
         if (obj != null)
         {
             var name = ObjectManager.GetProperty(obj, "name")?.AsString;
@@ -1381,7 +1370,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
         }
 
         // Try as an ObjectClass
-        var objectClass = GameDatabase.Instance.ObjectClasses.FindById(objectId);
+        var objectClass = DbProvider.Instance.FindById<ObjectClass>("objectclasses", objectId);
         if (objectClass != null)
         {
             return $"class {objectClass.Name}";
@@ -1455,7 +1444,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
     private bool HandleCleanupPlayerCommand(string[] parts)
     {
         // Get the actual player object ID (not the system object)
-        var allObjects = GameDatabase.Instance.GameObjects.FindAll().ToList();
+        var allObjects = DbProvider.Instance.FindAll<GameObject>("gameobjects").ToList();
         var playerObject = allObjects.FirstOrDefault(obj => 
         {
             var playerIdProp = ObjectManager.GetProperty(obj, "playerId");
@@ -1468,8 +1457,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
             return true;
         }
 
-        var verbCollection = GameDatabase.Instance.GetCollection<Verb>("verbs");
-        var playerVerbs = verbCollection.Find(v => v.ObjectId == playerObject.Id).ToList();
+        var playerVerbs = DbProvider.Instance.FindVerbsByObjectId(playerObject.Id).ToList();
 
         _commandProcessor.SendToPlayer($"=== CLEANING PLAYER OBJECT {playerObject.Id} ===");
         _commandProcessor.SendToPlayer($"Found {playerVerbs.Count} verbs on your player object:");
@@ -1495,7 +1483,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
             foreach (var emptyVerb in emptyVerbs)
             {
                 _commandProcessor.SendToPlayer($"  Removing empty verb: {emptyVerb.Id}");
-                verbCollection.Delete(emptyVerb.Id);
+                DbProvider.Instance.Delete<Verb>("verbs", emptyVerb.Id);
                 removedCount++;
             }
         }
@@ -1539,7 +1527,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
         }
 
         // Find the target player
-        var targetPlayer = GameDatabase.Instance.Players.FindOne(p => 
+        var targetPlayer = DbProvider.Instance.FindOne<Player>("players", p => 
             p.Name.Equals(playerName, StringComparison.OrdinalIgnoreCase));
         
         if (targetPlayer == null)
@@ -1612,8 +1600,14 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
         {
             // Show another player's flags
             var playerName = parts[1];
-            targetPlayer = GameDatabase.Instance.Players.FindOne(p => 
+            var foundPlayer = DbProvider.Instance.FindOne<Player>("players", p => 
                 p.Name.Equals(playerName, StringComparison.OrdinalIgnoreCase));
+            if (foundPlayer == null)
+            {
+                _commandProcessor.SendToPlayer($"Player '{playerName}' not found.");
+                return true;
+            }
+            targetPlayer = foundPlayer;
             
             if (targetPlayer == null)
             {
@@ -1672,7 +1666,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
 
         _commandProcessor.SendToPlayer("Updating existing player permissions to new flag system...");
 
-        var allPlayers = GameDatabase.Instance.Players.FindAll().ToList();
+        var allPlayers = DbProvider.Instance.FindAll<Player>("players").ToList();
         int updatedCount = 0;
 
         foreach (var player in allPlayers)
@@ -1702,7 +1696,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
                 if (needsUpdate)
                 {
                     player.Permissions = currentPermissions;
-                    GameDatabase.Instance.Players.Update(player);
+                    DbProvider.Instance.Update<Player>("players", player);
                     updatedCount++;
                     
                     var flags = PermissionManager.GetFlagsString(player);
@@ -2057,9 +2051,10 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
             return true;
         }
 
-        // Create the function
+        // Create the function (new signature expects GameObject)
+        #pragma warning disable CS0618 // Suppress obsolete warning
         var function = FunctionManager.CreateFunction(objectId, functionName, parameterTypes.ToArray(), parameterNames.ToArray(), returnType, "", _player.Name);
-        
+        #pragma warning restore CS0618
         // Set visibility
         function.Permissions = permissions;
         var functions = GameDatabase.Instance.GetCollection<Function>("functions");

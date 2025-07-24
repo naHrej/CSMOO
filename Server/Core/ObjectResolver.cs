@@ -33,7 +33,9 @@ public static class ObjectResolver
     string lowerName = normName.ToLowerInvariant();
 
     // Determine effective location ONCE.  
-    GameObject? effectiveLocation = location ?? GameDatabase.Instance.GameObjects.FindById(looker.Location);
+    GameObject? effectiveLocation = location;
+    if (effectiveLocation == null && !string.IsNullOrEmpty(looker.Location))
+        effectiveLocation = DbProvider.Instance.FindById<GameObject>("gameobjects", looker.Location);
     if (effectiveLocation == null)
     {
       string? locId = null;
@@ -42,7 +44,7 @@ public static class ObjectResolver
       else if (looker.Properties.ContainsKey("location"))
         locId = looker.Properties["location"].AsString;
       if (!string.IsNullOrEmpty(locId))
-        effectiveLocation = GameDatabase.Instance.GameObjects.FindById(locId);
+        effectiveLocation = DbProvider.Instance.FindById<GameObject>("gameobjects", locId);
     }
 
     // 1. Keyword resolution
@@ -79,7 +81,9 @@ public static class ObjectResolver
   /// </summary>
   private static GameObject? MatchKeyword(string name, GameObject looker, GameObject? location = null)
   {
-    var effectiveLocation = location ?? GameDatabase.Instance.GameObjects.FindById(looker.Location);
+    var effectiveLocation = location;
+    if (effectiveLocation == null && !string.IsNullOrEmpty(looker.Location))
+        effectiveLocation = DbProvider.Instance.FindById<GameObject>("gameobjects", looker.Location);
     switch (name.ToLowerInvariant())
     {
       // Keywords that refer to the looker
@@ -103,7 +107,7 @@ public static class ObjectResolver
   {
     if (dbRef.StartsWith('#') && int.TryParse(dbRef.AsSpan(1), out var dbref))
     {
-      return GameDatabase.Instance.GameObjects.FindOne(o => o.DbRef == dbref);
+      return DbProvider.Instance.FindOne<GameObject>("gameobjects", o => o.DbRef == dbref);
     }
     return null;
   }
@@ -113,7 +117,7 @@ public static class ObjectResolver
   /// </summary>
   private static GameObject? MatchId(string objectId)
   {
-    return GameDatabase.Instance.GameObjects.FindById(objectId);
+    return DbProvider.Instance.FindById<GameObject>("gameobjects", objectId);
   }
 
   /// <summary>
@@ -240,8 +244,8 @@ public static class ObjectResolver
   {
     if (string.IsNullOrEmpty(name))
       return null;
-    GameObject? looker = currentPlayerId != null ? GameDatabase.Instance.GameObjects.FindById(currentPlayerId) : null;
-    GameObject? location = currentRoomId != null ? GameDatabase.Instance.GameObjects.FindById(currentRoomId) : null;
+    GameObject? looker = currentPlayerId != null ? DbProvider.Instance.FindById<GameObject>("gameobjects", currentPlayerId) : null;
+    GameObject? location = currentRoomId != null ? DbProvider.Instance.FindById<GameObject>("gameobjects", currentRoomId) : null;
     if (looker == null)
       return null;
     return ResolveObject(name, looker, location)?.Id;
@@ -249,8 +253,7 @@ public static class ObjectResolver
 
   private static GameObject? GetSystemObject()
   {
-    var gameObjects = GameDatabase.Instance.GameObjects;
-    var allObjects = gameObjects.FindAll();
+    var allObjects = DbProvider.Instance.FindAll<GameObject>("gameobjects");
     var systemObject = allObjects.FirstOrDefault(obj =>
         (obj.Properties.ContainsKey("name") && obj.Properties["name"].AsString == "system") ||
         (obj.Properties.ContainsKey("isSystemObject") && obj.Properties["isSystemObject"].AsBoolean == true));

@@ -122,7 +122,7 @@ public static class ObjectManager
     /// Gets an object by ID
     /// </summary>
     public static GameObject? GetObject(string objectId)
-        => GameDatabase.Instance.GameObjects.FindById(objectId);
+        => DbProvider.Instance.FindById<GameObject>("gameobjects", objectId);
 
     #endregion
 

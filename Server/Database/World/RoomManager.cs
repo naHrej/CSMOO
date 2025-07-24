@@ -25,7 +25,7 @@ public static class RoomManager
 
         Logger.Info("Creating starting room and basic world areas...");
 
-        var roomClass = GameDatabase.Instance.ObjectClasses.FindOne(c => c.Name == "Room");
+        var roomClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "Room");
         if (roomClass == null)
         {
             Logger.Error("Room class not found. Core classes must be created first.");
@@ -67,7 +67,7 @@ public static class RoomManager
     /// </summary>
     public static void CreateExit(string fromRoomId, string toRoomId, string direction, string returnDirection)
     {
-        var exitClass = GameDatabase.Instance.ObjectClasses.FindOne(c => c.Name == "Exit");
+        var exitClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "Exit");
         if (exitClass == null)
         {
             Logger.Error("Exit class not found. Core classes must be created first.");
@@ -98,7 +98,7 @@ public static class RoomManager
     /// </summary>
     public static GameObject CreateSimpleItem(string name, string shortDesc, string longDesc, string? locationId = null)
     {
-        var itemClass = GameDatabase.Instance.ObjectClasses.FindOne(c => c.Name == "Item");
+        var itemClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "Item");
         if (itemClass == null)
             throw new InvalidOperationException("Item class not found. Core classes must be created first.");
 
@@ -124,7 +124,7 @@ public static class RoomManager
     /// </summary>
     private static GameObject? FindStartingRoom()
     {
-        var allGameObjects = GameDatabase.Instance.GameObjects.FindAll();
+        var allGameObjects = DbProvider.Instance.FindAll<GameObject>("gameobjects");
         return allGameObjects.FirstOrDefault(obj => 
             obj.Properties.ContainsKey("isStartingRoom") && obj.Properties["isStartingRoom"].AsBoolean == true);
     }
@@ -134,7 +134,7 @@ public static class RoomManager
     /// </summary>
     public static List<GameObject> GetAllRooms()
     {
-        var roomClass = GameDatabase.Instance.ObjectClasses.FindOne(c => c.Name == "Room");
+        var roomClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "Room");
         if (roomClass == null) return new List<GameObject>();
 
         return ObjectManager.FindObjectsByClass(roomClass.Id);
@@ -145,7 +145,7 @@ public static class RoomManager
     /// </summary>
     public static List<GameObject> GetExitsFromRoom(string roomId)
     {
-        var exitClass = GameDatabase.Instance.ObjectClasses.FindOne(c => c.Name == "Exit");
+        var exitClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "Exit");
         if (exitClass == null) return new List<GameObject>();
 
         return ObjectManager.GetObjectsInLocation(roomId)
@@ -157,7 +157,7 @@ public static class RoomManager
     /// </summary>
     public static List<GameObject> GetExitsFromRoom(GameObject room)
     {
-        var exitClass = GameDatabase.Instance.ObjectClasses.FindOne(c => c.Name == "Exit");
+        var exitClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "Exit");
         if (exitClass == null) return new List<GameObject>();
 
         return ObjectManager.GetObjectsInLocation(room)
@@ -197,7 +197,7 @@ public static class RoomManager
         var room = ObjectManager.GetObject(roomId);
         if (room == null) return false;
 
-        var roomClass = GameDatabase.Instance.ObjectClasses.FindOne(c => c.Name == "Room");
+        var roomClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "Room");
         return roomClass != null && ObjectManager.InheritsFrom(room.ClassId, roomClass.Id);
     }
 
@@ -207,8 +207,8 @@ public static class RoomManager
     public static List<GameObject> GetItemsInRoom(string roomId)
     {
         var roomContents = ObjectManager.GetObjectsInLocation(roomId);
-        var exitClass = GameDatabase.Instance.ObjectClasses.FindOne(c => c.Name == "Exit");
-        var playerClass = GameDatabase.Instance.ObjectClasses.FindOne(c => c.Name == "Player");
+        var exitClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "Exit");
+        var playerClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "Player");
 
         return roomContents.Where(obj => 
             (exitClass == null || obj.ClassId != exitClass.Id) &&
@@ -222,7 +222,7 @@ public static class RoomManager
     public static List<GameObject> GetPlayersInRoom(string roomId)
     {
         var roomContents = ObjectManager.GetObjectsInLocation(roomId);
-        var playerClass = GameDatabase.Instance.ObjectClasses.FindOne(c => c.Name == "Player");
+        var playerClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "Player");
         
         if (playerClass == null) return new List<GameObject>();
 

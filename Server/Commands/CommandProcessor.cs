@@ -290,7 +290,7 @@ public class CommandProcessor
         try
         {
             // Find the system object first
-            var allObjects = GameDatabase.Instance.GameObjects.FindAll().ToList();
+            var allObjects = DbProvider.Instance.FindAll<GameObject>("gameobjects").ToList();
             var systemObj = allObjects.FirstOrDefault(obj => 
                 (obj.Properties.ContainsKey("name") && obj.Properties["name"].AsString == "system") ||
                 (obj.Properties.ContainsKey("isSystemObject") && obj.Properties["isSystemObject"].AsBoolean == true));

@@ -49,12 +49,11 @@ public static class FunctionInitializer
         Logger.Info("Hot reloading function definitions...");
 
         // Clear existing function definitions from database
-        var functions = GameDatabase.Instance.GetCollection<Function>("functions");
-        var countBefore = functions.Count();
+        var allFunctions = DbProvider.Instance.FindAll<Function>("functions").ToList();
+        var countBefore = allFunctions.Count;
         Logger.Debug($"Found {countBefore} functions before deletion");
-        
-        functions.DeleteAll();
-        var countAfterDelete = functions.Count();
+        foreach (var f in allFunctions) DbProvider.Instance.Delete<Function>("functions", f.Id);
+        var countAfterDelete = DbProvider.Instance.FindAll<Function>("functions").Count();
         Logger.Debug($"Cleared existing function definitions - {countAfterDelete} functions remaining");
 
         // Reload all functions from JSON files
@@ -63,7 +62,7 @@ public static class FunctionInitializer
 
         var totalLoaded = classStats.Loaded + systemStats.Loaded;
         var totalSkipped = classStats.Skipped + systemStats.Skipped;
-        var countAfterReload = functions.Count();
+        var countAfterReload = DbProvider.Instance.FindAll<Function>("functions").Count();
 
         Logger.Info($"Function definitions reloaded successfully - Created: {totalLoaded}, Skipped: {totalSkipped}, Total in DB: {countAfterReload}");
     }
@@ -166,17 +165,16 @@ public static class FunctionInitializer
     {
         var stats = new FunctionLoadStats();
         
-        var targetClass = GameDatabase.Instance.ObjectClasses.FindOne(c => c.Name == functionDef.TargetClass);
+        var targetClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == functionDef.TargetClass);
         if (targetClass == null)
         {
             Logger.Warning($"Target class '{functionDef.TargetClass}' not found for function '{functionDef.Name}'");
             return stats;
         }
 
-        var existingFunctions = GameDatabase.Instance.GetCollection<Function>("functions");
-        
+        var existingFunctions = DbProvider.Instance.FindAll<Function>("functions").ToList();
         // Only create if it doesn't already exist
-        if (!existingFunctions.Exists(f => f.ObjectId == targetClass.Id && f.Name == functionDef.Name))
+        if (!existingFunctions.Any(f => f.ObjectId == targetClass.Id && f.Name == functionDef.Name))
         {
             var function = Scripting.FunctionManager.CreateFunction(
                 targetClass, 
@@ -187,14 +185,12 @@ public static class FunctionInitializer
                 functionDef.GetCodeString(), 
                 "system"
             );
-
             // Set description if provided
             if (!string.IsNullOrEmpty(functionDef.Description))
             {
                 function.Description = functionDef.Description;
-                existingFunctions.Update(function);
+                DbProvider.Instance.Update("functions", function);
             }
-
             Logger.Debug($"Created class function '{functionDef.Name}' on {functionDef.TargetClass}");
             stats.Loaded = 1;
         }
@@ -213,11 +209,11 @@ public static class FunctionInitializer
     private static FunctionLoadStats CreateSystemFunction(string systemObjectId, FunctionDefinition functionDef)
     {
         var stats = new FunctionLoadStats();
-        var existingFunctions = GameDatabase.Instance.GetCollection<Function>("functions");
-        
+        var existingFunctions = DbProvider.Instance.FindAll<Function>("functions").ToList();
         // Only create if it doesn't already exist
-        if (!existingFunctions.Exists(f => f.ObjectId == systemObjectId && f.Name == functionDef.Name))
+        if (!existingFunctions.Any(f => f.ObjectId == systemObjectId && f.Name == functionDef.Name))
         {
+            // Find the system object GameObject
             var function = Scripting.FunctionManager.CreateFunction(
                 systemObjectId, 
                 functionDef.Name, 
@@ -227,14 +223,12 @@ public static class FunctionInitializer
                 functionDef.GetCodeString(), 
                 "system"
             );
-
             // Set description if provided
             if (!string.IsNullOrEmpty(functionDef.Description))
             {
                 function.Description = functionDef.Description;
-                existingFunctions.Update(function);
+                DbProvider.Instance.Update("functions", function);
             }
-
             Logger.Debug($"Created system function '{functionDef.Name}'");
             stats.Loaded = 1;
         }
@@ -255,11 +249,10 @@ public static class FunctionInitializer
         const string systemObjectName = "system";
         
         // Try to find existing system object
-        var gameObjects = GameDatabase.Instance.GameObjects;
+        var gameObjects = DbProvider.Instance.FindAll<GameObject>("gameobjects");
         
         // Get all objects and search in memory since LiteDB doesn't support ContainsKey in expressions
-        var allObjects = gameObjects.FindAll();
-        var systemObject = allObjects.FirstOrDefault(obj => 
+        var systemObject = gameObjects.FirstOrDefault(obj => 
             (obj.Properties.ContainsKey("name") && obj.Properties["name"].AsString == systemObjectName) ||
             (obj.Properties.ContainsKey("isSystemObject") && obj.Properties["isSystemObject"].AsBoolean == true));
         
@@ -284,7 +277,7 @@ public static class FunctionInitializer
                 Location = null // System object has no location
             };
             
-            gameObjects.Insert(systemObject);
+            DbProvider.Instance.Insert("gameobjects", systemObject);
             Logger.Debug("Created system object for global functions");
             return systemObject.Id;
         }

@@ -37,7 +37,7 @@ public static class PropertyManager
     public static void SetProperty(GameObject gameObject, string propertyName, BsonValue value)
     {
         gameObject.Properties[propertyName] = value;
-        GameDatabase.Instance.GameObjects.Update(gameObject);
+        DbProvider.Instance.Update("gameobjects", gameObject);
         Logger.Debug($"Set property '{propertyName}' on object #{gameObject.DbRef}");
     }
 
@@ -46,7 +46,7 @@ public static class PropertyManager
     /// </summary>
     public static bool SetProperty(string objectId, string propertyName, BsonValue value)
     {
-        var gameObject = GameDatabase.Instance.GameObjects.FindById(objectId);
+        var gameObject = DbProvider.Instance.FindById<GameObject>("gameobjects", objectId);
         if (gameObject == null) return false;
 
         SetProperty(gameObject, propertyName, value);
@@ -62,7 +62,7 @@ public static class PropertyManager
             return false;
 
         gameObject.Properties.Remove(propertyName);
-        GameDatabase.Instance.GameObjects.Update(gameObject);
+        DbProvider.Instance.Update("gameobjects", gameObject);
         Logger.Debug($"Removed property '{propertyName}' from object #{gameObject.DbRef}");
         return true;
     }
@@ -72,7 +72,7 @@ public static class PropertyManager
     /// </summary>
     public static bool RemoveProperty(string objectId, string propertyName)
     {
-        var gameObject = GameDatabase.Instance.GameObjects.FindById(objectId);
+        var gameObject = DbProvider.Instance.FindById<GameObject>("gameobjects", objectId);
         if (gameObject == null) return false;
 
         return RemoveProperty(gameObject, propertyName);
@@ -136,7 +136,7 @@ public static class PropertyManager
             }
         }
 
-        GameDatabase.Instance.GameObjects.Update(target);
+        DbProvider.Instance.Update("gameobjects", target);
         Logger.Debug($"Copied properties from object #{source.DbRef} to #{target.DbRef}");
     }
 

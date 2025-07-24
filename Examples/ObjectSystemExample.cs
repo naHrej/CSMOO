@@ -14,7 +14,7 @@ public static class ObjectSystemExample
         Logger.Info("=== Object-Oriented MUSH System Example ===\n");
 
         // Create a weapon class that inherits from Item
-        var itemClass = GameDatabase.Instance.ObjectClasses.FindOne(c => c.Name == "Item");
+        var itemClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "Item");
         var weaponClass = ObjectManager.CreateClass("Weapon", itemClass?.Id, "A weapon that can be wielded");
         
         // Add weapon-specific properties
@@ -22,14 +22,14 @@ public static class ObjectSystemExample
         weaponClass.Properties["weaponType"] = "melee";
         weaponClass.Properties["durability"] = 100;
         weaponClass.Properties["maxDurability"] = 100;
-        GameDatabase.Instance.ObjectClasses.Update(weaponClass);
+        DbProvider.Instance.Update<ObjectClass>("objectclasses", weaponClass);
 
         // Create a sword class that inherits from Weapon
         var swordClass = ObjectManager.CreateClass("Sword", weaponClass.Id, "A sharp blade for combat");
         swordClass.Properties["damage"] = 15; // Override weapon damage
         swordClass.Properties["weaponType"] = "sword";
         swordClass.Properties["longDescription"] = "A gleaming steel sword with a sharp edge.";
-        GameDatabase.Instance.ObjectClasses.Update(swordClass);
+        DbProvider.Instance.Update<ObjectClass>("objectclasses", swordClass);
 
         // Create an instance of a sword
         var sword = ObjectManager.CreateInstance(swordClass.Id);

@@ -53,7 +53,7 @@ public static class ServerInitializer
     /// </summary>
     private static void CreateDefaultAdminIfNeeded()
     {
-        var existingPlayers = GameDatabase.Instance.Players.FindAll();
+        var existingPlayers = DbProvider.Instance.FindAll<Player>("players");
         if (existingPlayers.Any())
         {
             Logger.Info($"Found {existingPlayers.Count()} existing players in database.");

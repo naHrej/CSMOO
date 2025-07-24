@@ -26,7 +26,7 @@ public static class ClassManager
             Methods = new BsonDocument()
         };
 
-        GameDatabase.Instance.ObjectClasses.Insert(objectClass);
+        DbProvider.Instance.Insert("objectclasses", objectClass);
         return objectClass;
     }
 
@@ -36,7 +36,7 @@ public static class ClassManager
     public static List<ObjectClass> GetInheritanceChain(string classId)
     {
         var chain = new List<ObjectClass>();
-        var currentClass = GameDatabase.Instance.ObjectClasses.FindById(classId);
+        var currentClass = DbProvider.Instance.FindById<ObjectClass>("objectclasses", classId);
         
         while (currentClass != null)
         {
@@ -45,7 +45,7 @@ public static class ClassManager
             if (currentClass.ParentClassId == null)
                 break;
                 
-            currentClass = GameDatabase.Instance.ObjectClasses.FindById(currentClass.ParentClassId);
+            currentClass = DbProvider.Instance.FindById<ObjectClass>("objectclasses", currentClass.ParentClassId);
         }
 
         return chain;
@@ -65,7 +65,7 @@ public static class ClassManager
     /// </summary>
     public static List<ObjectClass> GetSubclasses(string parentClassId, bool recursive = true)
     {
-        var allClasses = GameDatabase.Instance.ObjectClasses.FindAll().ToList();
+        var allClasses = DbProvider.Instance.FindAll<ObjectClass>("objectclasses").ToList();
         var subclasses = new List<ObjectClass>();
 
         if (!recursive)
@@ -100,11 +100,11 @@ public static class ClassManager
     /// </summary>
     public static bool DeleteClass(string classId, bool deleteSubclasses = false)
     {
-        var objectClass = GameDatabase.Instance.ObjectClasses.FindById(classId);
+        var objectClass = DbProvider.Instance.FindById<ObjectClass>("objectclasses", classId);
         if (objectClass == null) return false;
 
         // Check if there are any instances of this class
-        var instances = GameDatabase.Instance.GameObjects.Find(obj => obj.ClassId == classId);
+        var instances = DbProvider.Instance.Find<GameObject>("gameobjects", obj => obj.ClassId == classId);
         if (instances.Any())
         {
             Logger.Warning($"Cannot delete class {objectClass.Name} - it has {instances.Count()} instances");
@@ -127,7 +127,7 @@ public static class ClassManager
             }
         }
 
-        GameDatabase.Instance.ObjectClasses.Delete(classId);
+        DbProvider.Instance.Delete<ObjectClass>("objectclasses", classId);
         Logger.Info($"Deleted class {objectClass.Name}");
         return true;
     }
@@ -138,7 +138,7 @@ public static class ClassManager
     public static bool UpdateClass(ObjectClass objectClass)
     {
         objectClass.ModifiedAt = DateTime.UtcNow;
-        return GameDatabase.Instance.ObjectClasses.Update(objectClass);
+        return DbProvider.Instance.Update("objectclasses", objectClass);
     }
 
     /// <summary>
@@ -146,7 +146,7 @@ public static class ClassManager
     /// </summary>
     public static List<ObjectClass> FindClassesByName(string name, bool exactMatch = false)
     {
-        var allClasses = GameDatabase.Instance.ObjectClasses.FindAll();
+        var allClasses = DbProvider.Instance.FindAll<ObjectClass>("objectclasses");
         
         if (exactMatch)
         {

@@ -29,9 +29,10 @@ public static class Builtins
     /// <summary>
     /// Find a game object by its ID
     /// </summary>
-    public static GameObject FindObject(string objectId)
+    public static GameObject? FindObject(string objectId)
     {
-        return GameDatabase.Instance.GameObjects.FindById(objectId);
+        if (string.IsNullOrEmpty(objectId)) return null;
+        return DbProvider.Instance.FindById<GameObject>("gameobjects", objectId);
     }
     
     /// <summary>
@@ -96,7 +97,10 @@ public static class Builtins
     public static void SetProperty(string objectId, string propertyName, string value)
     {
         var obj = FindObject(objectId);
-        SetProperty(obj, propertyName, value);
+        if (obj != null)
+        {
+            SetProperty(obj, propertyName, value);
+        }
     }
     
     /// <summary>
@@ -117,7 +121,10 @@ public static class Builtins
     public static void SetBoolProperty(string objectId, string propertyName, bool value)
     {
         var obj = FindObject(objectId);
-        SetBoolProperty(obj, propertyName, value);
+        if (obj != null)
+        {
+            SetBoolProperty(obj, propertyName, value);
+        }
     }
     
     /// <summary>
@@ -147,7 +154,11 @@ public static class Builtins
     public static bool MoveObject(string objectId, string newLocationId)
     {
         var obj = FindObject(objectId);
-        return MoveObject(obj, newLocationId);
+        if (obj != null)
+        {
+            return MoveObject(obj, newLocationId);
+        }
+        return false;
     }
     
     /// <summary>
@@ -222,9 +233,10 @@ public static class Builtins
     /// <summary>
     /// Find a player by name
     /// </summary>
-    public static Player FindPlayer(string playerName)
+    public static Player? FindPlayer(string playerName)
     {
-        return GameDatabase.Instance.Players.FindOne(p =>
+        if (string.IsNullOrEmpty(playerName)) return null;
+        return DbProvider.Instance.FindOne<Player>("players", p =>
             p.Name.Equals(playerName, StringComparison.OrdinalIgnoreCase));
     }
     
@@ -233,7 +245,7 @@ public static class Builtins
     /// </summary>
     public static Player? FindPlayerByPartialName(string partialName)
     {
-        return GameDatabase.Instance.Players.FindOne(p => 
+        return DbProvider.Instance.FindOne<Player>("players", p => 
             p.Name.StartsWith(partialName, StringComparison.OrdinalIgnoreCase));
     }
     
@@ -242,7 +254,7 @@ public static class Builtins
     /// </summary>
     public static Player? FindPlayerById(string playerId)
     {
-        return GameDatabase.Instance.Players.FindById(playerId);
+        return DbProvider.Instance.FindById<Player>("players", playerId);
     }
     
     /// <summary>
@@ -258,7 +270,7 @@ public static class Builtins
     /// </summary>
     public static List<Player> GetAllPlayers()
     {
-        return GameDatabase.Instance.Players.FindAll().ToList();
+        return DbProvider.Instance.FindAll<Player>("players").ToList();
     }
     
     /// <summary>
@@ -266,7 +278,7 @@ public static class Builtins
     /// </summary>
     public static List<GameObject> GetAllObjects()
     {
-        return GameDatabase.Instance.GameObjects.FindAll().ToList();
+        return DbProvider.Instance.FindAll<GameObject>("gameobjects").ToList();
     }
     
     /// <summary>
@@ -274,7 +286,7 @@ public static class Builtins
     /// </summary>
     public static List<ObjectClass> GetAllObjectClasses()
     {
-        return GameDatabase.Instance.ObjectClasses.FindAll().ToList();
+        return DbProvider.Instance.FindAll<ObjectClass>("objectclasses").ToList();
     }
     
     /// <summary>
@@ -339,7 +351,7 @@ public static class Builtins
         // Handle GameObject wrapper
         if (player is GameObject gameObject)
         {
-            var dbPlayer = GameDatabase.Instance.Players.FindById(gameObject.Id);
+            var dbPlayer = DbProvider.Instance.FindById<Player>("players", gameObject.Id);
             return dbPlayer != null && PermissionManager.HasFlag(dbPlayer, PermissionManager.Flag.Admin);
         }
         
@@ -352,7 +364,7 @@ public static class Builtins
         // Handle dynamic object with Id property
         if (player.Id != null)
         {
-            var dbPlayer = GameDatabase.Instance.Players.FindById((string)player.Id);
+            var dbPlayer = DbProvider.Instance.FindById<Player>("players", (string)player.Id);
             return dbPlayer != null && PermissionManager.HasFlag(dbPlayer, PermissionManager.Flag.Admin);
         }
         
@@ -369,7 +381,7 @@ public static class Builtins
         // Handle GameObject wrapper
         if (player is GameObject gameObject)
         {
-            var dbPlayer = GameDatabase.Instance.Players.FindById(gameObject.Id);
+            var dbPlayer = DbProvider.Instance.FindById<Player>("players", gameObject.Id);
             return dbPlayer != null && PermissionManager.HasFlag(dbPlayer, PermissionManager.Flag.Moderator);
         }
         
@@ -382,7 +394,7 @@ public static class Builtins
         // Handle dynamic object with Id property
         if (player.Id != null)
         {
-            var dbPlayer = GameDatabase.Instance.Players.FindById((string)player.Id);
+            var dbPlayer = DbProvider.Instance.FindById<Player>("players", (string)player.Id);
             return dbPlayer != null && PermissionManager.HasFlag(dbPlayer, PermissionManager.Flag.Moderator);
         }
         
@@ -399,7 +411,7 @@ public static class Builtins
         // Handle GameObject wrapper
         if (player is GameObject gameObject)
         {
-            var dbPlayer = GameDatabase.Instance.Players.FindById(gameObject.Id);
+            var dbPlayer = DbProvider.Instance.FindById<Player>("players", gameObject.Id);
             return dbPlayer != null && PermissionManager.HasFlag(dbPlayer, PermissionManager.Flag.Programmer);
         }
         
@@ -412,7 +424,7 @@ public static class Builtins
         // Handle dynamic object with Id property
         if (player.Id != null)
         {
-            var dbPlayer = GameDatabase.Instance.Players.FindById((string)player.Id);
+            var dbPlayer = DbProvider.Instance.FindById<Player>("players", (string)player.Id);
             return dbPlayer != null && PermissionManager.HasFlag(dbPlayer, PermissionManager.Flag.Programmer);
         }
         
@@ -429,7 +441,7 @@ public static class Builtins
         // Handle GameObject wrapper
         if (player is GameObject gameObject)
         {
-            var dbPlayer = GameDatabase.Instance.Players.FindById(gameObject.Id);
+            var dbPlayer = DbProvider.Instance.FindById<Player>("players", gameObject.Id);
             return dbPlayer != null ? PermissionManager.GetPlayerFlags(dbPlayer).Select(f => f.ToString()).ToList() : new List<string>();
         }
         
@@ -442,7 +454,7 @@ public static class Builtins
         // Handle dynamic object with Id property
         if (player.Id != null)
         {
-            var dbPlayer = GameDatabase.Instance.Players.FindById((string)player.Id);
+            var dbPlayer = DbProvider.Instance.FindById<Player>("players", (string)player.Id);
             return dbPlayer != null ? PermissionManager.GetPlayerFlags(dbPlayer).Select(f => f.ToString()).ToList() : new List<string>();
         }
         
@@ -469,7 +481,7 @@ public static class Builtins
                 return currentPlayer.Location;
             case "system":
                 // Find the system object
-                var allObjects = GameDatabase.Instance.GameObjects.FindAll();
+                var allObjects = DbProvider.Instance.FindAll<GameObject>("gameobjects");
                 var systemObj = allObjects.FirstOrDefault(obj =>
                     (obj.Properties.ContainsKey("name") && obj.Properties["name"].AsString == "system") ||
                     (obj.Properties.ContainsKey("isSystemObject") && obj.Properties["isSystemObject"].AsBoolean == true));
@@ -479,7 +491,7 @@ public static class Builtins
         // Check if it's a DBREF (starts with # followed by digits)
         if (objectName.StartsWith("#") && int.TryParse(objectName.Substring(1), out int dbref))
         {
-            var obj = GameDatabase.Instance.GameObjects.FindOne(o => o.DbRef == dbref);
+            var obj = DbProvider.Instance.FindOne<GameObject>("gameobjects", o => o.DbRef == dbref);
             return obj?.Id;
         }
 
@@ -487,7 +499,7 @@ public static class Builtins
         if (objectName.StartsWith("class:", StringComparison.OrdinalIgnoreCase))
         {
             var className = objectName.Substring(6); // Remove "class:" prefix
-            var objectClass = GameDatabase.Instance.ObjectClasses.FindOne(c =>
+            var objectClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c =>
                 c.Name.Equals(className, StringComparison.OrdinalIgnoreCase));
             return objectClass?.Id;
         }
@@ -495,13 +507,13 @@ public static class Builtins
         if (objectName.EndsWith(".class", StringComparison.OrdinalIgnoreCase))
         {
             var className = objectName.Substring(0, objectName.Length - 6); // Remove ".class" suffix
-            var objectClass = GameDatabase.Instance.ObjectClasses.FindOne(c => 
+            var objectClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => 
                 c.Name.Equals(className, StringComparison.OrdinalIgnoreCase));
             return objectClass?.Id;
         }
 
         // Check if it's a direct class ID (like "obj_room", "obj_exit", etc.)
-        var classById = GameDatabase.Instance.ObjectClasses.FindById(objectName);
+        var classById = DbProvider.Instance.FindById<ObjectClass>("objectclasses", objectName);
         if (classById != null)
         {
             return classById.Id;
@@ -550,7 +562,7 @@ public static class Builtins
         }
         
         // If not found as an object, try as a class name
-        var directClass = GameDatabase.Instance.ObjectClasses.FindOne(c => 
+        var directClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => 
             c.Name.Equals(objectName, StringComparison.OrdinalIgnoreCase));
         
         if (directClass != null)
@@ -559,7 +571,7 @@ public static class Builtins
         }
 
         // Finally, search globally for any object with a matching name
-        var globalObjects = GameDatabase.Instance.GameObjects.FindAll();
+        var globalObjects = DbProvider.Instance.FindAll<GameObject>("gameobjects");
         var globalObject = globalObjects.FirstOrDefault(obj =>
         {
             var objName = GetObjectName(obj);
@@ -818,7 +830,7 @@ public static class Builtins
         var obj = FindObject(objectId);
         if (obj != null && !string.IsNullOrEmpty(obj.ClassId))
         {
-            return GameDatabase.Instance.ObjectClasses.FindById(obj.ClassId);
+            return DbProvider.Instance.FindById<ObjectClass>("objectclasses", obj.ClassId);
         }
         return null;
     }
@@ -830,7 +842,7 @@ public static class Builtins
     {
         if (obj != null && !string.IsNullOrEmpty(obj.ClassId))
         {
-            return GameDatabase.Instance.ObjectClasses.FindById(obj.ClassId);
+            return DbProvider.Instance.FindById<ObjectClass>("objectclasses", obj.ClassId);
         }
         return null;
     }
@@ -844,10 +856,14 @@ public static class Builtins
         if (((Database.Player?)UnifiedContext?.Player) != null)
         {
             // Convert GameObject to Database.Player
-            return (Database.Player?)UnifiedContext.Player ??
-                   GameDatabase.Instance.Players.FindById(((Database.Player?)UnifiedContext.Player)?.Id);
+            var unifiedPlayer = (Database.Player?)UnifiedContext.Player;
+            if (unifiedPlayer != null)
+                return unifiedPlayer;
+            var id = unifiedPlayer?.Id;
+            if (!string.IsNullOrEmpty(id))
+                return DbProvider.Instance.FindById<Player>("players", id);
+            return null;
         }
-        
         return (Database.Player?)CurrentContext?.Player;
     }
 
@@ -885,7 +901,7 @@ public static class Builtins
         var currentPlayer = GetCurrentPlayer();
         if (currentPlayer?.Location == null) return "You are nowhere.";
 
-        var room = GameDatabase.Instance.GameObjects.FindById(currentPlayer.Location);
+        var room = DbProvider.Instance.FindById<GameObject>("gameobjects", currentPlayer.Location);
         if (room == null) return "You are in a void.";
 
         var name = GetProperty(room, "name")?.AsString ?? "Unknown Room";
@@ -915,12 +931,14 @@ public static class Builtins
             }
 
             // Show objects
+            var exitClassId = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "Exit")?.Id;
+            var playerClassId = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "Player")?.Id;
             var objects = GetObjectsInLocation(currentPlayer.Location)
                 .Where(obj => {
                     var gameObject = obj.GameObject as GameObject;
                     return gameObject != null && 
-                           gameObject.ClassId != GameDatabase.Instance.ObjectClasses.FindOne(c => c.Name == "Exit")?.Id &&
-                           gameObject.ClassId != GameDatabase.Instance.ObjectClasses.FindOne(c => c.Name == "Player")?.Id;
+                           gameObject.ClassId != exitClassId &&
+                           gameObject.ClassId != playerClassId;
                 });
 
             foreach (var obj in objects)
@@ -1012,11 +1030,11 @@ public static class Builtins
         if (currentPlayer == null) return null;
 
         itemName = itemName.ToLower();
-        var playerGameObject = GameDatabase.Instance.GameObjects.FindById(currentPlayer.Id);
+        var playerGameObject = DbProvider.Instance.FindById<GameObject>("gameobjects", currentPlayer.Id);
         if (playerGameObject?.Contents == null) return null;
 
         var foundObject = playerGameObject.Contents
-            .Select(id => GameDatabase.Instance.GameObjects.FindById(id))
+            .Select(id => DbProvider.Instance.FindById<GameObject>("gameobjects", id))
             .FirstOrDefault(obj =>
             {
                 if (obj == null) return false;
@@ -1024,7 +1042,6 @@ public static class Builtins
                 var shortDesc = GetProperty(obj, "shortDescription")?.AsString?.ToLower();
                 return name?.Contains(itemName) == true || shortDesc?.Contains(itemName) == true;
             });
-            
         return foundObject;
     }
 
@@ -1057,7 +1074,7 @@ public static class Builtins
         foreach (var player in playersInRoom)
         {
             if (excludeSelf && player.Id == currentPlayer.Id) continue;
-            var targetPlayer = GameDatabase.Instance.Players.FindById(player.Id);
+            var targetPlayer = DbProvider.Instance.FindById<Player>("players", player.Id);
             if (targetPlayer != null)
             {
                 Notify(targetPlayer, message);
@@ -1089,7 +1106,7 @@ public static class Builtins
         var currentPlayer = GetCurrentPlayer();
         if (currentPlayer == null) return;
 
-        var playerGameObject = GameDatabase.Instance.GameObjects.FindById(currentPlayer.Id);
+        var playerGameObject = DbProvider.Instance.FindById<GameObject>("gameobjects", currentPlayer.Id);
         if (playerGameObject?.Contents == null || !playerGameObject.Contents.Any())
         {
             Notify(currentPlayer, "You are carrying nothing.");
@@ -1099,7 +1116,7 @@ public static class Builtins
         Notify(currentPlayer, "You are carrying:");
         foreach (var itemId in playerGameObject.Contents)
         {
-            var item = GameDatabase.Instance.GameObjects.FindById(itemId);
+            var item = DbProvider.Instance.FindById<GameObject>("gameobjects", itemId);
             if (item != null)
             {
                 var name = GetProperty(item, "shortDescription") ?? "something";
@@ -1130,10 +1147,11 @@ public static class Builtins
             return null;
         }
 
+        var obj = DbProvider.Instance.FindById<GameObject>("gameobjects", objectId);
         return new VerbInfo
         {
             ObjectId = objectId,
-            ObjectName = GetObjectName(objectId),
+            ObjectName = obj != null ? GetObjectName(obj) : objectId,
             VerbName = verb.Name,
             Aliases = verb.Aliases,
             Pattern = verb.Pattern,
@@ -1353,15 +1371,13 @@ public static class Builtins
         try
         {
             // Look up the Database.Player from the GameObject player
-            var dbPlayer = GameDatabase.Instance.Players.FindById(player.Id);
+            var dbPlayer = DbProvider.Instance.FindById<Player>("players", player.Id);
             if (dbPlayer == null)
             {
                 throw new ArgumentException($"Player with ID '{player.Id}' not found in database");
             }
-            
             // Use the object ID directly from GameObject
             var objectId = thisObject?.Id ?? "system";
-            
             return ExecuteScript(scriptCode, dbPlayer, commandProcessor, objectId, input);
         }
         catch (Exception ex)

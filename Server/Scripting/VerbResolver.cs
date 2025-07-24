@@ -119,21 +119,18 @@ public static class VerbResolver
     public static List<Verb> GetVerbsForObject(string objectId, bool includeSystemVerbs = true)
     {
         var allVerbs = new List<Verb>();
-        var verbCollection = GameDatabase.Instance.GetCollection<Verb>("verbs");
-
-        // Get instance-specific verbs first (highest priority)
-        var instanceVerbs = verbCollection.Find(v => v.ObjectId == objectId).ToList();
+        var instanceVerbs = DbProvider.Instance.Find<Verb>("verbs", v => v.ObjectId == objectId).ToList();
         allVerbs.AddRange(instanceVerbs);
 
         // Get the GameObject to access its class
-        var gameObject = GameDatabase.Instance.GameObjects.FindById(objectId);
+        var gameObject = DbProvider.Instance.FindById<GameObject>("gameobjects", objectId);
         if (gameObject != null)
         {
             // Then get verbs from the inheritance chain (classes)
             var inheritanceChain = ObjectManager.GetInheritanceChain(gameObject.ClassId);
             foreach (var objectClass in inheritanceChain.AsEnumerable().Reverse()) // Child to parent order for proper override
             {
-                var classVerbs = verbCollection.Find(v => v.ObjectId == objectClass.Id).ToList();
+                var classVerbs = DbProvider.Instance.Find<Verb>("verbs", v => v.ObjectId == objectClass.Id).ToList();
                 
                 // Add class verbs that aren't already overridden by instance or more specific class
                 foreach (var classVerb in classVerbs)
@@ -167,12 +164,9 @@ public static class VerbResolver
     /// </summary>
     public static List<Verb> GetSystemVerbs()
     {
-        var verbCollection = GameDatabase.Instance.GetCollection<Verb>("verbs");
         var systemObjectId = FindSystemObjectId();
-        
         if (systemObjectId == null) return new List<Verb>();
-        
-        return verbCollection.Find(v => v.ObjectId == systemObjectId).ToList();
+        return DbProvider.Instance.Find<Verb>("verbs", v => v.ObjectId == systemObjectId).ToList();
     }
 
     /// <summary>
@@ -327,7 +321,7 @@ public static class VerbResolver
     /// </summary>
     private static string? FindSystemObjectId()
     {
-        var allObjects = GameDatabase.Instance.GameObjects.FindAll().ToList();
+        var allObjects = DbProvider.Instance.FindAll<GameObject>("gameobjects").ToList();
         var systemObj = allObjects.FirstOrDefault(obj => 
             obj.Properties.ContainsKey("isSystemObject") && 
             obj.Properties["isSystemObject"].AsBoolean == true);
@@ -404,13 +398,11 @@ public static class VerbResolver
         var allVerbs = new List<(Verb verb, string source)>();
         
         // Get the GameObject to access its class
-        var gameObject = GameDatabase.Instance.GameObjects.FindById(objectId);
+        var gameObject = DbProvider.Instance.FindById<GameObject>("gameobjects", objectId);
         if (gameObject != null)
         {
             // First, get verbs directly on the object instance
-            var instanceVerbs = GameDatabase.Instance.GetCollection<Verb>("verbs")
-                .Find(v => v.ObjectId == objectId)
-                .ToList();
+            var instanceVerbs = DbProvider.Instance.Find<Verb>("verbs", v => v.ObjectId == objectId).ToList();
             
             foreach (var verb in instanceVerbs)
             {
@@ -421,10 +413,7 @@ public static class VerbResolver
             var inheritanceChain = ObjectManager.GetInheritanceChain(gameObject.ClassId);
             foreach (var objectClass in inheritanceChain.AsEnumerable().Reverse()) // Child to parent order
             {
-                var classVerbs = GameDatabase.Instance.GetCollection<Verb>("verbs")
-                    .Find(v => v.ObjectId == objectClass.Id)
-                    .ToList();
-                
+                var classVerbs = DbProvider.Instance.Find<Verb>("verbs", v => v.ObjectId == objectClass.Id).ToList();
                 foreach (var classVerb in classVerbs)
                 {
                     // Only add if not already overridden by instance or more specific class
@@ -438,13 +427,10 @@ public static class VerbResolver
         else
         {
             // If not a GameObject, might be a class ID itself
-            var objectClass = GameDatabase.Instance.ObjectClasses.FindById(objectId);
+            var objectClass = DbProvider.Instance.FindById<ObjectClass>("objectclasses", objectId);
             if (objectClass != null)
             {
-                var classVerbs = GameDatabase.Instance.GetCollection<Verb>("verbs")
-                    .Find(v => v.ObjectId == objectId)
-                    .ToList();
-                
+                var classVerbs = DbProvider.Instance.Find<Verb>("verbs", v => v.ObjectId == objectId).ToList();
                 foreach (var classVerb in classVerbs)
                 {
                     allVerbs.Add((classVerb, $"class {objectClass.Name}"));
@@ -467,11 +453,11 @@ public static class VerbResolver
         if (string.IsNullOrEmpty(player.Location))
         {
             // Set default location if none exists
-            var defaultRoom = GameDatabase.Instance.GameObjects.FindOne(obj => obj.ClassId == "Room");
+            var defaultRoom = DbProvider.Instance.FindOne<GameObject>("gameobjects", obj => obj.ClassId == "Room");
             if (defaultRoom != null)
             {
                 player.Location = defaultRoom.Id;
-                GameDatabase.Instance.Players.Update(player);
+                DbProvider.Instance.Update("players", player);
             }
             else
             {
@@ -502,7 +488,7 @@ public static class VerbResolver
         }
 
         // 2. Check the room itself
-        var room = GameDatabase.Instance.GameObjects.FindById(player.Location);
+        var room = DbProvider.Instance.FindById<GameObject>("gameobjects", player.Location);
         if (room != null)
         {
             var roomVerbResult = FindMatchingVerbWithVariables(room.Id, parts);
@@ -598,11 +584,13 @@ public static class VerbResolver
     private static bool TryExecuteMovementCommand(string direction, Database.Player player, Commands.CommandProcessor commandProcessor)
     {
         // Get current room
-        var room = GameDatabase.Instance.GameObjects.FindById(player.Location);
+        if (string.IsNullOrEmpty(player.Location))
+            return false;
+        var room = DbProvider.Instance.FindById<GameObject>("gameobjects", player.Location);
         if (room == null) return false;
 
         // Get exits from current room to check if the direction is valid
-        var exitClass = GameDatabase.Instance.ObjectClasses.FindOne(c => c.Name == "Exit");
+        var exitClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "Exit");
         if (exitClass == null) return false;
 
         var exits = ObjectManager.GetObjectsInLocation(room.Id)
@@ -667,10 +655,8 @@ public static class VerbResolver
     /// </summary>
     private static Database.GameObject GetOrCreateSystemObject()
     {
-        var systemObject = GameDatabase.Instance.GameObjects.Query()
-            .ToList()
-            .FirstOrDefault(obj => obj.Properties.ContainsKey("isSystemObject") && obj.Properties["isSystemObject"].AsBoolean == true);
-        
+        var allObjects = DbProvider.Instance.FindAll<GameObject>("gameobjects").ToList();
+        var systemObject = allObjects.FirstOrDefault(obj => obj.Properties.ContainsKey("isSystemObject") && obj.Properties["isSystemObject"].AsBoolean == true);
         if (systemObject == null)
         {
             // Create system object
@@ -685,9 +671,8 @@ public static class VerbResolver
                     ["description"] = "System object for global verbs"
                 }
             };
-            GameDatabase.Instance.GameObjects.Insert(systemObject);
+            DbProvider.Instance.Insert("gameobjects", systemObject);
         }
-        
         return systemObject;
     }
 }

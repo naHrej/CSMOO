@@ -52,14 +52,12 @@ public class GameDatabase : IDisposable
         }
     }
 
-    public ILiteCollection<ObjectClass> ObjectClasses => _database.GetCollection<ObjectClass>("objectclasses");
-    public ILiteCollection<GameObject> GameObjects => _database.GetCollection<GameObject>("gameobjects");
-    public ILiteCollection<Player> Players => _database.GetCollection<Player>("players");
+    // All direct collection access is now private; use DbProvider for all DB access.
 
     /// <summary>
     /// Generic method to get any collection
     /// </summary>
-    public ILiteCollection<T> GetCollection<T>(string name) => _database.GetCollection<T>(name);
+    internal ILiteCollection<T> GetCollection<T>(string name) => _database.GetCollection<T>(name);
 
     public void Dispose()
     {

@@ -1,0 +1,106 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using CSMOO.Server.Database.Models;
+namespace CSMOO.Server.Database
+{
+    // Adapter to wrap ILiteCollection<T> as ICollection<T>
+    public class LiteCollectionAdapter<T> : ICollection<T>
+    {
+        private readonly LiteDB.ILiteCollection<T> _collection;
+        public LiteCollectionAdapter(LiteDB.ILiteCollection<T> collection) { _collection = collection; }
+        public void Insert(T item) => _collection.Insert(item);
+        public bool Update(T item) => _collection.Update(item);
+        public bool Delete(string id) => _collection.Delete(id);
+        public IEnumerable<T> FindAll() => _collection.FindAll();
+        // For Find/FindOne, require a predicate string or BsonExpression for LiteDB compatibility
+        public IEnumerable<T> Find(Func<T, bool> predicate) => _collection.FindAll().Where(predicate);
+        public T? FindOne(Func<T, bool> predicate) => _collection.FindAll().FirstOrDefault(predicate);
+        public T? FindById(string id) => _collection.FindById(id);
+    }
+    /// <summary>
+    /// Centralized provider for all database operations (CRUD) on collections.
+    /// All DB access should go through this class.
+    /// </summary>
+    public class DbProvider
+    {
+        // Expose: find all verbs for an object
+        public IEnumerable<Verb> FindVerbsByObjectId(string objectId)
+        {
+            return Find<Verb>("verbs", v => v.ObjectId == objectId);
+        }
+        private static DbProvider? _instance;
+        public static DbProvider Instance => _instance ??= new DbProvider(GameDatabase.Instance);
+        private readonly GameDatabase _db;
+        public DbProvider(GameDatabase db)
+        {
+            _db = db;
+        }
+
+        // Generic Insert
+        public void Insert<T>(string collectionName, T item)
+        {
+            GetCollection<T>(collectionName).Insert(item);
+        }
+
+        // Generic Update
+        public bool Update<T>(string collectionName, T item)
+        {
+            return GetCollection<T>(collectionName).Update(item);
+        }
+
+        // Generic Delete
+        public bool Delete<T>(string collectionName, string id)
+        {
+            return GetCollection<T>(collectionName).Delete(id);
+        }
+
+        // Generic FindAll
+        public IEnumerable<T> FindAll<T>(string collectionName)
+        {
+            return GetCollection<T>(collectionName).FindAll();
+        }
+
+        // Generic Find (with predicate)
+        public IEnumerable<T> Find<T>(string collectionName, Func<T, bool> predicate)
+        {
+            return GetCollection<T>(collectionName).Find(predicate);
+        }
+
+        // Generic FindOne
+        public T? FindOne<T>(string collectionName, Func<T, bool> predicate)
+        {
+            return GetCollection<T>(collectionName).FindOne(predicate);
+        }
+
+        // Generic FindById
+        public T? FindById<T>(string collectionName, string id)
+        {
+            return GetCollection<T>(collectionName).FindById(id);
+        }
+
+        // Helper to get the collection from GameDatabase (now private)
+        private ICollection<T> GetCollection<T>(string collectionName)
+        {
+            return new LiteCollectionAdapter<T>(_db.GetCollection<T>(collectionName));
+        }
+
+        // Expose only what FunctionResolver needs: find all functions for an object
+        public IEnumerable<Function> FindFunctionsByObjectId(string objectId)
+        {
+            return Find<Function>("functions", f => f.ObjectId == objectId);
+        }
+    }
+
+    // Define a minimal ICollection<T> interface for compatibility
+    public interface ICollection<T>
+    {
+        void Insert(T item);
+        bool Update(T item);
+        bool Delete(string id);
+        IEnumerable<T> FindAll();
+        IEnumerable<T> Find(Func<T, bool> predicate);
+        T? FindOne(Func<T, bool> predicate);
+        T? FindById(string id);
+    }
+}

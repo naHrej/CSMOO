@@ -53,7 +53,7 @@ public class ScriptHelpers
     public void notify(GameObject playerObj, string message)
     {
         // Convert GameObject to Player
-        var player = GameDatabase.Instance.Players.FindById(playerObj.Id);
+        var player = DbProvider.Instance.FindById<Player>("players", playerObj.Id);
         if (player?.SessionGuid != null)
         {
             _commandProcessor.SendToPlayer(message, player.SessionGuid);
@@ -150,7 +150,7 @@ public class ScriptHelpers
                 // Check if it's a DBREF (starts with # followed by digits)
                 if (objectName.StartsWith("#") && int.TryParse(objectName.Substring(1), out int dbref))
                 {
-                    var obj = GameDatabase.Instance.GameObjects.FindOne(o => o.DbRef == dbref);
+                    var obj = DbProvider.Instance.FindOne<GameObject>("gameobjects", o => o.DbRef == dbref);
                     result = obj?.Id;
                     Logger.Debug($"DBREF lookup #{dbref} -> {result ?? "not found"}");
                 }
@@ -158,7 +158,7 @@ public class ScriptHelpers
                 else if (objectName.StartsWith("class:", StringComparison.OrdinalIgnoreCase))
                 {
                     var className = objectName.Substring(6); // Remove "class:" prefix
-                    var objectClass = GameDatabase.Instance.ObjectClasses.FindOne(c => 
+                    var objectClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => 
                         c.Name.Equals(className, StringComparison.OrdinalIgnoreCase));
                     result = objectClass?.Id;
                     Logger.Debug($"Class lookup '{className}' -> {result ?? "not found"}");
@@ -166,13 +166,13 @@ public class ScriptHelpers
                 else if (objectName.EndsWith(".class", StringComparison.OrdinalIgnoreCase))
                 {
                     var className = objectName.Substring(0, objectName.Length - 6); // Remove ".class" suffix
-                    var objectClass = GameDatabase.Instance.ObjectClasses.FindOne(c => 
+                    var objectClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => 
                         c.Name.Equals(className, StringComparison.OrdinalIgnoreCase));
                     result = objectClass?.Id;
                     Logger.Debug($"Class lookup '{className}' -> {result ?? "not found"}");
                 }
                 // Check if it's a direct class ID (like "obj_room", "obj_exit", etc.)
-                else if (GameDatabase.Instance.ObjectClasses.FindById(objectName) != null)
+                else if (DbProvider.Instance.FindById<ObjectClass>("objectclasses", objectName) != null)
                 {
                     result = objectName; // The objectName itself is the class ID
                     Logger.Debug($"Direct class ID lookup '{objectName}' -> {result}");
@@ -185,9 +185,8 @@ public class ScriptHelpers
                     // If not found as an object, try as a class name
                     if (result == null)
                     {
-                        var objectClass = GameDatabase.Instance.ObjectClasses.FindOne(c => 
+                        var objectClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => 
                             c.Name.Equals(objectName, StringComparison.OrdinalIgnoreCase));
-                        
                         if (objectClass != null)
                         {
                             result = objectClass.Id;
@@ -232,7 +231,7 @@ public class ScriptHelpers
         var playerMatch = players.FirstOrDefault(p => p.Name.ToLower().Contains(name));
         if (playerMatch != null)
         {
-            var playerObj = GameDatabase.Instance.GameObjects.FindById(playerMatch.Id);
+            var playerObj = DbProvider.Instance.FindById<GameObject>("gameobjects", playerMatch.Id);
             if (playerObj != null)
             {
                 Logger.Debug($"Found player '{name}': #{playerObj.DbRef} ({playerMatch.Name})");
@@ -241,7 +240,7 @@ public class ScriptHelpers
         }
         
         // Finally, search globally (for admin/building purposes)
-        var allObjects = GameDatabase.Instance.GameObjects.FindAll();
+        var allObjects = DbProvider.Instance.FindAll<GameObject>("gameobjects");
         var globalMatch = allObjects.FirstOrDefault(obj =>
         {
             var objName = ObjectManager.GetProperty(obj, "name")?.AsString?.ToLower();
@@ -264,7 +263,7 @@ public class ScriptHelpers
     /// </summary>
     public GameObject? GetObject(string objectId)
     {
-        var gameObject = GameDatabase.Instance.GameObjects.FindById(objectId);
+        var gameObject = DbProvider.Instance.FindById<GameObject>("gameobjects", objectId);
         return gameObject;
     }
 
@@ -273,7 +272,7 @@ public class ScriptHelpers
     /// </summary>
     public string GetObjectName(string objectId)
     {
-        var obj = GameDatabase.Instance.GameObjects.FindById(objectId);
+        var obj = DbProvider.Instance.FindById<GameObject>("gameobjects", objectId);
         if (obj == null) return "unknown object";
         
         var name = ObjectManager.GetProperty(obj, "name")?.AsString;
@@ -291,7 +290,7 @@ public class ScriptHelpers
     public string? GetSystemObjectId()
     {
         // Get all objects and filter in memory (LiteDB doesn't support ContainsKey in expressions)
-        var allObjects = GameDatabase.Instance.GameObjects.FindAll();
+        var allObjects = DbProvider.Instance.FindAll<GameObject>("gameobjects");
         var systemObj = allObjects.FirstOrDefault(obj => 
             (obj.Properties.ContainsKey("name") && obj.Properties["name"].AsString == "system") ||
             (obj.Properties.ContainsKey("isSystemObject") && obj.Properties["isSystemObject"].AsBoolean == true));
@@ -301,7 +300,7 @@ public class ScriptHelpers
             // System object doesn't exist, create it
             Logger.Debug("System object not found, creating it...");
             // Use Container class instead of abstract Object class
-            var containerClass = GameDatabase.Instance.ObjectClasses.FindOne(c => c.Name == "Container");
+            var containerClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "Container");
             if (containerClass != null)
             {
                 systemObj = ObjectManager.CreateInstance(containerClass.Id);
@@ -333,7 +332,7 @@ public class ScriptHelpers
     public void UpdatePlayerProperty(Player player, string propertyName, object value)
     {
         // Update the database record
-        var playerRecord = GameDatabase.Instance.Players.FindById(player.Id);
+        var playerRecord = DbProvider.Instance.FindById<Player>("players", player.Id);
         if (playerRecord != null)
         {
             // Use reflection to set the property on the database record
@@ -341,7 +340,7 @@ public class ScriptHelpers
             if (property != null && property.CanWrite)
             {
                 property.SetValue(playerRecord, value);
-                GameDatabase.Instance.Players.Update(playerRecord);
+                DbProvider.Instance.Update<Player>("players", playerRecord);
                 
                 // Also update the in-memory object
                 property.SetValue(player, value);
@@ -382,7 +381,7 @@ public class ScriptHelpers
             return;
         }
 
-        var room = GameDatabase.Instance.GameObjects.FindById(_player.Location);
+        var room = DbProvider.Instance.FindById<GameObject>("gameobjects", _player.Location);
         if (room == null)
         {
             notify(_player, "You are in a void.");
@@ -405,8 +404,8 @@ public class ScriptHelpers
 
         // Show objects
         var objects = ObjectManager.GetObjectsInLocation(_player.Location)
-            .Where(obj => obj.ClassId != GameDatabase.Instance.ObjectClasses.FindOne(c => c.Name == "Exit")?.Id)
-            .Where(obj => obj.ClassId != GameDatabase.Instance.ObjectClasses.FindOne(c => c.Name == "Player")?.Id);
+            .Where(obj => obj.ClassId != DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "Exit")?.Id)
+            .Where(obj => obj.ClassId != DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "Player")?.Id);
 
         foreach (var obj in objects)
         {
@@ -587,7 +586,7 @@ public class ScriptHelpers
     {
         if (_player == null) return;
 
-        var playerGameObject = GameDatabase.Instance.GameObjects.FindById(_player.Id);
+        var playerGameObject = DbProvider.Instance.FindById<GameObject>("gameobjects", _player.Id);
         if (playerGameObject?.Contents == null || !playerGameObject.Contents.Any())
         {
             notify(_player, "You are carrying nothing.");
@@ -597,7 +596,7 @@ public class ScriptHelpers
         notify(_player, "You are carrying:");
         foreach (var itemId in playerGameObject.Contents)
         {
-            var item = GameDatabase.Instance.GameObjects.FindById(itemId);
+            var item = DbProvider.Instance.FindById<GameObject>("gameobjects", itemId);
             if (item != null)
             {
                 var name = ObjectManager.GetProperty(item, "shortDescription")?.AsString ?? "something";
@@ -614,11 +613,11 @@ public class ScriptHelpers
         if (_player == null) return null;
 
         itemName = itemName.ToLower();
-        var playerGameObject = GameDatabase.Instance.GameObjects.FindById(_player.Id);
+        var playerGameObject = DbProvider.Instance.FindById<GameObject>("gameobjects", _player.Id);
         if (playerGameObject?.Contents == null) return null;
 
         var foundObject = playerGameObject.Contents
-            .Select(id => GameDatabase.Instance.GameObjects.FindById(id))
+            .Select(id => DbProvider.Instance.FindById<GameObject>("gameobjects", id))
             .FirstOrDefault(obj =>
             {
                 if (obj == null) return false;

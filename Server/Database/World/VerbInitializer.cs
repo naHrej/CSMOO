@@ -49,12 +49,12 @@ public static class VerbInitializer
         Logger.Info("Hot reloading verb definitions...");
 
         // Clear existing verb definitions from database
-        var verbs = GameDatabase.Instance.GetCollection<Verb>("verbs");
-        var countBefore = verbs.Count();
+        // Use DbProvider to clear all verbs
+        var allVerbs = DbProvider.Instance.FindAll<Verb>("verbs").ToList();
+        var countBefore = allVerbs.Count;
         Logger.Debug($"Found {countBefore} verbs before deletion");
-        
-        verbs.DeleteAll();
-        var countAfterDelete = verbs.Count();
+        foreach (var v in allVerbs) DbProvider.Instance.Delete<Verb>("verbs", v.Id);
+        var countAfterDelete = DbProvider.Instance.FindAll<Verb>("verbs").Count();
         Logger.Debug($"Cleared existing verb definitions - {countAfterDelete} verbs remaining");
 
         // Reload all verbs from JSON files
@@ -63,7 +63,7 @@ public static class VerbInitializer
 
         var totalLoaded = classStats.Loaded + systemStats.Loaded;
         var totalSkipped = classStats.Skipped + systemStats.Skipped;
-        var countAfterReload = verbs.Count();
+        var countAfterReload = DbProvider.Instance.FindAll<Verb>("verbs").Count();
 
         Logger.Info($"Verb definitions reloaded successfully - Created: {totalLoaded}, Skipped: {totalSkipped}, Total in DB: {countAfterReload}");
     }
@@ -166,17 +166,16 @@ public static class VerbInitializer
     {
         var stats = new VerbLoadStats();
         
-        var targetClass = GameDatabase.Instance.ObjectClasses.FindOne(c => c.Name == verbDef.TargetClass);
+        var targetClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == verbDef.TargetClass);
         if (targetClass == null)
         {
             Logger.Warning($"Target class '{verbDef.TargetClass}' not found for verb '{verbDef.Name}'");
             return stats;
         }
 
-        var existingVerbs = GameDatabase.Instance.GetCollection<Verb>("verbs");
-        
+        var existingVerbs = DbProvider.Instance.FindAll<Verb>("verbs").ToList();
         // Only create if it doesn't already exist
-        if (!existingVerbs.Exists(v => v.ObjectId == targetClass.Id && v.Name == verbDef.Name))
+        if (!existingVerbs.Any(v => v.ObjectId == targetClass.Id && v.Name == verbDef.Name))
         {
             var verb = Scripting.VerbManager.CreateVerb(
                 targetClass.Id, 
@@ -185,21 +184,18 @@ public static class VerbInitializer
                 verbDef.GetCodeString(), 
                 "system"
             );
-
             // Set aliases if provided
             if (!string.IsNullOrEmpty(verbDef.Aliases))
             {
                 verb.Aliases = verbDef.Aliases;
-                existingVerbs.Update(verb);
+                DbProvider.Instance.Update("verbs", verb);
             }
-
             // Set description if provided
             if (!string.IsNullOrEmpty(verbDef.Description))
             {
                 verb.Description = verbDef.Description;
-                existingVerbs.Update(verb);
+                DbProvider.Instance.Update("verbs", verb);
             }
-
             Logger.Debug($"Created class verb '{verbDef.Name}' on {verbDef.TargetClass}");
             stats.Loaded = 1;
         }
@@ -218,10 +214,9 @@ public static class VerbInitializer
     private static VerbLoadStats CreateSystemVerb(string systemObjectId, VerbDefinition verbDef)
     {
         var stats = new VerbLoadStats();
-        var existingVerbs = GameDatabase.Instance.GetCollection<Verb>("verbs");
-        
+        var existingVerbs = DbProvider.Instance.FindAll<Verb>("verbs").ToList();
         // Only create if it doesn't already exist
-        if (!existingVerbs.Exists(v => v.ObjectId == systemObjectId && v.Name == verbDef.Name))
+        if (!existingVerbs.Any(v => v.ObjectId == systemObjectId && v.Name == verbDef.Name))
         {
             var verb = Scripting.VerbManager.CreateVerb(
                 systemObjectId, 
@@ -230,21 +225,18 @@ public static class VerbInitializer
                 verbDef.GetCodeString(), 
                 "system"
             );
-
             // Set aliases if provided
             if (!string.IsNullOrEmpty(verbDef.Aliases))
             {
                 verb.Aliases = verbDef.Aliases;
-                existingVerbs.Update(verb);
+                DbProvider.Instance.Update("verbs", verb);
             }
-
             // Set description if provided
             if (!string.IsNullOrEmpty(verbDef.Description))
             {
                 verb.Description = verbDef.Description;
-                existingVerbs.Update(verb);
+                DbProvider.Instance.Update("verbs", verb);
             }
-
             Logger.Debug($"Created system verb '{verbDef.Name}'");
             stats.Loaded = 1;
         }
@@ -263,7 +255,7 @@ public static class VerbInitializer
     private static string? GetOrCreateSystemObject()
     {
         // Get all objects and filter in memory (LiteDB doesn't support ContainsKey in expressions)
-        var allObjects = GameDatabase.Instance.GameObjects.FindAll().ToList();
+        var allObjects = DbProvider.Instance.FindAll<GameObject>("gameobjects").ToList();
         var systemObj = allObjects.FirstOrDefault(obj => 
             obj.Properties.ContainsKey("isSystemObject") && obj.Properties["isSystemObject"].AsBoolean == true);
         
@@ -272,7 +264,7 @@ public static class VerbInitializer
             // System object doesn't exist, create it
             Logger.Debug("System object not found, creating it...");
             // Use Container class instead of abstract Object class
-            var containerClass = GameDatabase.Instance.ObjectClasses.FindOne(c => c.Name == "Container");
+            var containerClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "Container");
             if (containerClass != null)
             {
                 systemObj = ObjectManager.CreateInstance(containerClass.Id);

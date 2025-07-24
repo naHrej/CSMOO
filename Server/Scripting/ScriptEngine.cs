@@ -184,9 +184,8 @@ public class ScriptGlobals
     /// </summary>
     public object? GetProperty(string objectId, string propertyName)
     {
-        var obj = GameDatabase.Instance.GameObjects.FindById(objectId);
+        var obj = DbProvider.Instance.FindById<GameObject>("gameobjects", objectId);
         if (obj == null) return null;
-        
         return Database.ObjectManager.GetProperty(obj, propertyName)?.RawValue;
     }
 
@@ -251,9 +250,8 @@ public class ScriptGlobals
     /// </summary>
     public string CreateObject(string className, string? location = null)
     {
-        var objectClass = GameDatabase.Instance.ObjectClasses.FindOne(c => c.Name == className);
+        var objectClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == className);
         if (objectClass == null) throw new ArgumentException($"Class '{className}' not found");
-        
         var newObject = Database.ObjectManager.CreateInstance(objectClass.Id, location);
         return newObject.Id;
     }
@@ -263,9 +261,8 @@ public class ScriptGlobals
     /// </summary>
     public List<string> FindObjects(string className)
     {
-        var objectClass = GameDatabase.Instance.ObjectClasses.FindOne(c => c.Name == className);
+        var objectClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == className);
         if (objectClass == null) return new List<string>();
-        
         return [.. Database.ObjectManager.FindObjectsByClass(objectClass.Id).Select(obj => obj.Id)];
     }
 
@@ -341,15 +338,14 @@ public class ScriptObjectManager
 {
     public object? GetProperty(string objectId, string propertyName)
     {
-        var obj = GameDatabase.Instance.GameObjects.FindById(objectId);
+        var obj = DbProvider.Instance.FindById<GameObject>("gameobjects", objectId);
         if (obj == null) return null;
-        
         return Database.ObjectManager.GetProperty(obj, propertyName)?.RawValue;
     }
 
     public void SetProperty(string objectId, string propertyName, object value)
     {
-        var obj = GameDatabase.Instance.GameObjects.FindById(objectId);
+        var obj = DbProvider.Instance.FindById<GameObject>("gameobjects", objectId);
         if (obj != null)
         {
             Database.ObjectManager.SetProperty(obj, propertyName, new BsonValue(value));
@@ -405,7 +401,7 @@ public class ScriptPlayerManager
 
     public string? GetPlayerLocation(string playerName)
     {
-        var player = GameDatabase.Instance.Players.FindOne(p => p.Name == playerName);
+        var player = DbProvider.Instance.FindOne<Player>("players", p => p.Name == playerName);
         return player?.Location;
     }
 }

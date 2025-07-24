@@ -39,7 +39,8 @@ public class ScriptObject : DynamicObject
     /// </summary>
     public GameObject? GetGameObject()
     {
-        return GameDatabase.Instance.GameObjects.FindById(_objectId);
+        // Use DbProvider for all DB access
+        return DbProvider.Instance.FindById<GameObject>("gameobjects", _objectId);
     }
 
     /// <summary>
@@ -203,38 +204,35 @@ public class ScriptObject : DynamicObject
     /// </summary>
     private Verb? FindVerb(string verbName)
     {
-        var verbs = GameDatabase.Instance.GetCollection<Verb>("verbs");
-        
-        // First try to find verb directly on this object
-        var objectVerbs = verbs.Find(v => v.ObjectId == _objectId).ToList();
-        var verb = objectVerbs.FirstOrDefault(v => 
+        var verbs = DbProvider.Instance.Find<Verb>("verbs", v => v.ObjectId == _objectId).ToList();
+        var verb = verbs.FirstOrDefault(v =>
             v.Name.Equals(verbName, StringComparison.OrdinalIgnoreCase) ||
-            (!string.IsNullOrEmpty(v.Aliases) && 
+            (!string.IsNullOrEmpty(v.Aliases) &&
              v.Aliases.Split(' ', StringSplitOptions.RemoveEmptyEntries)
                 .Any(alias => alias.Equals(verbName, StringComparison.OrdinalIgnoreCase))));
-        
+
         if (verb != null) return verb;
 
         // If not found, try the object's class hierarchy
         var obj = GetGameObject();
         if (obj != null)
         {
-            var objectClass = GameDatabase.Instance.ObjectClasses.FindById(obj.ClassId);
+            var objectClass = DbProvider.Instance.FindById<ObjectClass>("objectclasses", obj.ClassId);
             while (objectClass != null)
             {
-                var classVerbs = verbs.Find(v => v.ObjectId == objectClass.Id).ToList();
-                verb = classVerbs.FirstOrDefault(v => 
+                var classVerbs = DbProvider.Instance.Find<Verb>("verbs", v => v.ObjectId == objectClass.Id).ToList();
+                verb = classVerbs.FirstOrDefault(v =>
                     v.Name.Equals(verbName, StringComparison.OrdinalIgnoreCase) ||
-                    (!string.IsNullOrEmpty(v.Aliases) && 
+                    (!string.IsNullOrEmpty(v.Aliases) &&
                      v.Aliases.Split(' ', StringSplitOptions.RemoveEmptyEntries)
                         .Any(alias => alias.Equals(verbName, StringComparison.OrdinalIgnoreCase))));
-                
+
                 if (verb != null) return verb;
-                
+
                 // Move up the class hierarchy
                 if (!string.IsNullOrEmpty(objectClass.ParentClassId))
                 {
-                    objectClass = GameDatabase.Instance.ObjectClasses.FindById(objectClass.ParentClassId);
+                    objectClass = DbProvider.Instance.FindById<ObjectClass>("objectclasses", objectClass.ParentClassId);
                 }
                 else
                 {
@@ -306,9 +304,8 @@ public class ScriptObjectFactory
     /// </summary>
     public dynamic? GetObjectById(string objectId)
     {
-        var obj = GameDatabase.Instance.GameObjects.FindById(objectId);
+        var obj = DbProvider.Instance.FindById<GameObject>("gameobjects", objectId);
         if (obj == null) return null;
-        
         return new ScriptObject(objectId, _currentPlayer, _commandProcessor, _helpers);
     }
 }
@@ -334,7 +331,7 @@ public class EnhancedScriptGlobals : ScriptGlobals
             helpers = unifiedGlobals.Helpers;
             // Convert GameObject back to Database.Player if needed
             dbPlayer = (Database.Player?)unifiedGlobals.Player ?? 
-                      GameDatabase.Instance.Players.FindById(((Database.Player?)unifiedGlobals.Player)?.Id ?? "");
+                      DbProvider.Instance.FindById<Database.Player>("players", ((Database.Player?)unifiedGlobals.Player)?.Id ?? "");
         }
         // VerbScriptGlobals merged: handle legacy ThisObjectId
         else if (this is UnifiedScriptGlobals legacyVerbGlobals && !string.IsNullOrEmpty(legacyVerbGlobals.ThisObjectId))

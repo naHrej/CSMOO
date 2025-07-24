@@ -29,8 +29,7 @@ public static class VerbManager
             ModifiedAt = DateTime.UtcNow
         };
 
-        var verbCollection = GameDatabase.Instance.GetCollection<Verb>("verbs");
-        verbCollection.Insert(verb);
+        DbProvider.Instance.Insert("verbs", verb);
         
         Logger.Debug($"Created verb '{name}' on object {objectId} by {createdBy}");
         return verb;
@@ -42,8 +41,7 @@ public static class VerbManager
     public static bool UpdateVerb(Verb verb)
     {
         verb.ModifiedAt = DateTime.UtcNow;
-        var verbCollection = GameDatabase.Instance.GetCollection<Verb>("verbs");
-        var result = verbCollection.Update(verb);
+        var result = DbProvider.Instance.Update("verbs", verb);
         
         if (result)
         {
@@ -58,17 +56,13 @@ public static class VerbManager
     /// </summary>
     public static bool DeleteVerb(string verbId)
     {
-        var verbCollection = GameDatabase.Instance.GetCollection<Verb>("verbs");
-        var verb = verbCollection.FindById(verbId);
-        
+        var verb = DbProvider.Instance.FindById<Verb>("verbs", verbId);
         if (verb == null) return false;
-        
-        var result = verbCollection.Delete(verbId);
+        var result = DbProvider.Instance.Delete<Verb>("verbs", verbId);
         if (result)
         {
             Logger.Debug($"Deleted verb '{verb.Name}' from object {verb.ObjectId}");
         }
-        
         return result;
     }
 
@@ -77,21 +71,17 @@ public static class VerbManager
     /// </summary>
     public static int DeleteVerbsOnObject(string objectId)
     {
-        var verbCollection = GameDatabase.Instance.GetCollection<Verb>("verbs");
-        var verbsToDelete = verbCollection.Find(v => v.ObjectId == objectId).ToList();
-        
+        var verbsToDelete = DbProvider.Instance.Find<Verb>("verbs", v => v.ObjectId == objectId).ToList();
         int deletedCount = 0;
         foreach (var verb in verbsToDelete)
         {
-            if (verbCollection.Delete(verb.Id))
+            if (DbProvider.Instance.Delete<Verb>("verbs", verb.Id))
                 deletedCount++;
         }
-        
         if (deletedCount > 0)
         {
             Logger.Debug($"Deleted {deletedCount} verbs from object {objectId}");
         }
-        
         return deletedCount;
     }
 
@@ -100,8 +90,7 @@ public static class VerbManager
     /// </summary>
     public static Verb? GetVerb(string verbId)
     {
-        var verbCollection = GameDatabase.Instance.GetCollection<Verb>("verbs");
-        return verbCollection.FindById(verbId);
+        return DbProvider.Instance.FindById<Verb>("verbs", verbId);
     }
 
     /// <summary>
@@ -109,8 +98,7 @@ public static class VerbManager
     /// </summary>
     public static Verb? FindVerb(string objectId, string verbName)
     {
-        var verbCollection = GameDatabase.Instance.GetCollection<Verb>("verbs");
-        return verbCollection.FindOne(v => v.ObjectId == objectId && v.Name == verbName);
+        return DbProvider.Instance.FindOne<Verb>("verbs", v => v.ObjectId == objectId && v.Name == verbName);
     }
 
     /// <summary>
@@ -118,8 +106,7 @@ public static class VerbManager
     /// </summary>
     public static List<Verb> GetVerbsOnObject(string objectId)
     {
-        var verbCollection = GameDatabase.Instance.GetCollection<Verb>("verbs");
-        return verbCollection.Find(v => v.ObjectId == objectId).ToList();
+        return DbProvider.Instance.Find<Verb>("verbs", v => v.ObjectId == objectId).ToList();
     }
 
     /// <summary>
@@ -127,8 +114,7 @@ public static class VerbManager
     /// </summary>
     public static List<Verb> GetVerbsByCreator(string createdBy)
     {
-        var verbCollection = GameDatabase.Instance.GetCollection<Verb>("verbs");
-        return verbCollection.Find(v => v.CreatedBy == createdBy).ToList();
+        return DbProvider.Instance.Find<Verb>("verbs", v => v.CreatedBy == createdBy).ToList();
     }
 
     /// <summary>
@@ -153,8 +139,7 @@ public static class VerbManager
             ModifiedAt = DateTime.UtcNow
         };
 
-        var verbCollection = GameDatabase.Instance.GetCollection<Verb>("verbs");
-        verbCollection.Insert(newVerb);
+        DbProvider.Instance.Insert("verbs", newVerb);
         
         Logger.Debug($"Copied verb '{sourceVerb.Name}' from {sourceVerb.ObjectId} to {targetObjectId}");
         return newVerb;
@@ -258,8 +243,7 @@ public static class VerbManager
     /// </summary>
     public static Dictionary<string, int> GetVerbStatistics()
     {
-        var verbCollection = GameDatabase.Instance.GetCollection<Verb>("verbs");
-        var allVerbs = verbCollection.FindAll().ToList();
+        var allVerbs = DbProvider.Instance.FindAll<Verb>("verbs").ToList();
 
         var stats = new Dictionary<string, int>
         {
@@ -279,8 +263,7 @@ public static class VerbManager
     /// </summary>
     public static List<Verb> SearchVerbs(string namePattern, bool useRegex = false)
     {
-        var verbCollection = GameDatabase.Instance.GetCollection<Verb>("verbs");
-        var allVerbs = verbCollection.FindAll().ToList();
+        var allVerbs = DbProvider.Instance.FindAll<Verb>("verbs").ToList();
 
         if (useRegex)
         {
@@ -308,22 +291,16 @@ public static class VerbManager
     /// </summary>
     public static bool UpdateVerbCode(string verbId, string code)
     {
-        var verbCollection = GameDatabase.Instance.GetCollection<Verb>("verbs");
-        var verb = verbCollection.FindById(verbId);
-        
+        var verb = DbProvider.Instance.FindById<Verb>("verbs", verbId);
         if (verb == null)
             return false;
-            
         verb.Code = code;
         verb.ModifiedAt = DateTime.UtcNow;
-        
-        var result = verbCollection.Update(verb);
-        
+        var result = DbProvider.Instance.Update("verbs", verb);
         if (result)
         {
             Logger.Debug($"Updated code for verb '{verb.Name}' (ID: {verbId})");
         }
-        
         return result;
     }
 }

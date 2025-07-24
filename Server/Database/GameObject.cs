@@ -246,13 +246,13 @@ public class GameObject : DynamicObject
                     throw new InvalidOperationException($"Property '{propertyName}' is read-only");
                 case "name":
                     Name = value?.ToString() ?? "";
-                    GameDatabase.Instance.GameObjects.Update(this);
+                    DbProvider.Instance.Update("gameobjects", this);
                     return true;
                 case "aliases":
                     if (value is List<string> aliasesList)
                     {
                         Aliases = aliasesList;
-                        GameDatabase.Instance.GameObjects.Update(this);
+                        DbProvider.Instance.Update("gameobjects", this);
                     }
                     return true;
                 case "location":
@@ -263,11 +263,11 @@ public class GameObject : DynamicObject
                     throw new InvalidOperationException("Contents property cannot be set directly. Use object movement commands instead.");
                 case "modifiedat":
                     ModifiedAt = value is DateTime dt ? dt : DateTime.UtcNow;
-                    GameDatabase.Instance.GameObjects.Update(this);
+                    DbProvider.Instance.Update("gameobjects", this);
                     return true;
                 case "owner":
                     Owner = value as GameObject ?? null!;
-                    GameDatabase.Instance.GameObjects.Update(this);
+                    DbProvider.Instance.Update("gameobjects", this);
                     return true;
             }
 
@@ -335,7 +335,7 @@ public class GameObject : DynamicObject
                 var playerObj = Scripting.Builtins.UnifiedContext.Player;
                 if (playerObj is GameObject playerGameObj)
                 {
-                    currentPlayer = GameDatabase.Instance.Players.FindById(playerGameObj.Id);
+                    currentPlayer = DbProvider.Instance.FindById<Player>("players", playerGameObj.Id);
                 }
                 
                 commandProcessor = Scripting.Builtins.UnifiedContext.CommandProcessor;

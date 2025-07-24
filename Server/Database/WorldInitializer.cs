@@ -44,9 +44,9 @@ public static class WorldInitializer
     /// </summary>
     public static void PrintWorldStatistics()
     {
-        var classCount = GameDatabase.Instance.ObjectClasses.Count();
-        var objectCount = GameDatabase.Instance.GameObjects.Count();
-        var playerCount = GameDatabase.Instance.Players.Count();
+        var classCount = DbProvider.Instance.FindAll<ObjectClass>("objectclasses").Count();
+        var objectCount = DbProvider.Instance.FindAll<GameObject>("gameobjects").Count();
+        var playerCount = DbProvider.Instance.FindAll<Player>("players").Count();
         var roomStats = RoomManager.GetRoomStatistics();
 
         Logger.Game("\n=== World Statistics ===");

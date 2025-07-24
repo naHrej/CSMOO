@@ -154,7 +154,7 @@ public class UnifiedScriptGlobals : EnhancedScriptGlobals
     public void notify(GameObject targetPlayer, string message)
     {
         var dbPlayer = targetPlayer as Database.Player ?? 
-                      GameDatabase.Instance.Players.FindById(targetPlayer.Id);
+                      DbProvider.Instance.FindById<Database.Player>("players", targetPlayer.Id);
         
         if (dbPlayer != null)
         {
@@ -168,13 +168,13 @@ public class UnifiedScriptGlobals : EnhancedScriptGlobals
     public GameObject? GetPlayer(string nameOrId)
     {
         // Try by name first
-        var player = GameDatabase.Instance.Players.FindOne(p => 
+        var player = DbProvider.Instance.FindOne<Database.Player>("players", p => 
             p.Name.Equals(nameOrId, StringComparison.OrdinalIgnoreCase));
         
         if (player != null) return Database.ObjectManager.GetObject(player.Id);
         
         // Try by ID
-        var playerById = GameDatabase.Instance.Players.FindById(nameOrId);
+        var playerById = DbProvider.Instance.FindById<Database.Player>("players", nameOrId);
         return playerById != null ? Database.ObjectManager.GetObject(playerById.Id) : null;
     }
 
@@ -269,7 +269,7 @@ public class UnifiedScriptGlobals : EnhancedScriptGlobals
             // Get Database.Player from GameObject
             var playerGameObject = GetPlayerGameObject();
             var dbPlayer = playerGameObject as Database.Player ?? 
-                          GameDatabase.Instance.Players.FindById(playerGameObject?.Id ?? "");
+                          DbProvider.Instance.FindById<Database.Player>("players", playerGameObject?.Id ?? "");
             
             if (dbPlayer == null || CommandProcessor == null)
             {
@@ -301,7 +301,7 @@ public class UnifiedScriptGlobals : EnhancedScriptGlobals
         // Get Database.Player from GameObject
         var playerGameObject = GetPlayerGameObject();
         var dbPlayer = playerGameObject as Database.Player ?? 
-                      GameDatabase.Instance.Players.FindById(playerGameObject?.Id ?? "");
+                      DbProvider.Instance.FindById<Database.Player>("players", playerGameObject?.Id ?? "");
         
         if (dbPlayer == null)
             throw new InvalidOperationException("No player context available.");
@@ -343,7 +343,7 @@ public class UnifiedScriptGlobals : EnhancedScriptGlobals
         // Check if it's a DBREF (starts with # followed by digits)
         if (objectRef.StartsWith("#") && int.TryParse(objectRef.Substring(1), out int dbref))
         {
-            var obj = GameDatabase.Instance.GameObjects.FindOne(o => o.DbRef == dbref);
+            var obj = DbProvider.Instance.FindOne<GameObject>("gameobjects", o => o.DbRef == dbref);
             return obj?.Id;
         }
         
@@ -351,7 +351,7 @@ public class UnifiedScriptGlobals : EnhancedScriptGlobals
         if (objectRef.StartsWith("class:", StringComparison.OrdinalIgnoreCase))
         {
             var className = objectRef.Substring(6);
-            var objectClass = GameDatabase.Instance.ObjectClasses.FindOne(c => 
+            var objectClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => 
                 c.Name.Equals(className, StringComparison.OrdinalIgnoreCase));
             return objectClass?.Id;
         }
@@ -359,30 +359,30 @@ public class UnifiedScriptGlobals : EnhancedScriptGlobals
         if (objectRef.EndsWith(".class", StringComparison.OrdinalIgnoreCase))
         {
             var className = objectRef.Substring(0, objectRef.Length - 6);
-            var objectClass = GameDatabase.Instance.ObjectClasses.FindOne(c => 
+            var objectClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => 
                 c.Name.Equals(className, StringComparison.OrdinalIgnoreCase));
             return objectClass?.Id;
         }
 
         // Check if it's a direct class ID
-        var classById = GameDatabase.Instance.ObjectClasses.FindById(objectRef);
-        if (classById != null)
+        // var classById = GameDatabase.Instance.ObjectClasses.FindById(objectRef); // removed direct usage
+        if (DbProvider.Instance.FindById<ObjectClass>("objectclasses", objectRef) is { } classByIdObj)
         {
-            return classById.Id;
+            return classByIdObj.Id;
         }
         
         // Try to find by name
-        var allObjects = GameDatabase.Instance.GameObjects.FindAll();
-        var match = allObjects.FirstOrDefault(obj =>
-        {
-            var objName = (Database.ObjectManager.GetProperty(obj, "name") as BsonValue)?.AsString;
-            return objName?.Equals(objectRef, StringComparison.OrdinalIgnoreCase) == true;
-        });
-        
+        // var allObjects = GameDatabase.Instance.GameObjects.FindAll(); // removed direct usage
+        var match = DbProvider.Instance.FindAll<GameObject>("gameobjects")
+            .FirstOrDefault(obj =>
+            {
+                var objName = (Database.ObjectManager.GetProperty(obj, "name") as BsonValue)?.AsString;
+                return objName?.Equals(objectRef, StringComparison.OrdinalIgnoreCase) == true;
+            });
         if (match != null) return match.Id;
         
         // Try as class name
-        var objectClass2 = GameDatabase.Instance.ObjectClasses.FindOne(c => 
+        var objectClass2 = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => 
             c.Name.Equals(objectRef, StringComparison.OrdinalIgnoreCase));
         return objectClass2?.Id;
     }
@@ -392,10 +392,11 @@ public class UnifiedScriptGlobals : EnhancedScriptGlobals
     /// </summary>
     private string GetSystemObjectId()
     {
-        var allObjects = GameDatabase.Instance.GameObjects.FindAll();
-        var systemObj = allObjects.FirstOrDefault(obj => 
-            (obj.Properties.ContainsKey("name") && obj.Properties["name"].AsString == "system") ||
-            (obj.Properties.ContainsKey("isSystemObject") && obj.Properties["isSystemObject"].AsBoolean == true));
+        // var allObjects = GameDatabase.Instance.GameObjects.FindAll(); // removed direct usage
+        var systemObj = DbProvider.Instance.FindAll<GameObject>("gameobjects")
+            .FirstOrDefault(obj => 
+                (obj.Properties.ContainsKey("name") && obj.Properties["name"].AsString == "system") ||
+                (obj.Properties.ContainsKey("isSystemObject") && obj.Properties["isSystemObject"].AsBoolean == true));
         return systemObj?.Id ?? "";
     }
 

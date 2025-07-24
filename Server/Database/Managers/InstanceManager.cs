@@ -16,7 +16,7 @@ public static class InstanceManager
     /// </summary>
     public static GameObject CreateInstance(string classId, string? location = null)
     {
-        var objectClass = GameDatabase.Instance.ObjectClasses.FindById(classId);
+        var objectClass = DbProvider.Instance.FindById<ObjectClass>("objectclasses", classId);
         if (objectClass == null)
             throw new ArgumentException($"Class with ID {classId} not found");
 
@@ -44,7 +44,7 @@ public static class InstanceManager
         // Assign a DbRef
         gameObject.DbRef = GetNextDbRef();
         
-        GameDatabase.Instance.GameObjects.Insert(gameObject);
+        DbProvider.Instance.Insert("gameobjects", gameObject);
         Logger.Debug($"Created instance of {objectClass.Name} with ID {gameObject.Id} (#{gameObject.DbRef})");
         
         return gameObject;
@@ -55,7 +55,7 @@ public static class InstanceManager
     /// </summary>
     public static bool DestroyInstance(string objectId)
     {
-        var gameObject = GameDatabase.Instance.GameObjects.FindById(objectId);
+        var gameObject = DbProvider.Instance.FindById<GameObject>("gameobjects", objectId);
         if (gameObject == null) return false;
 
         // Move any contents to nowhere (they become orphaned)
@@ -63,11 +63,11 @@ public static class InstanceManager
         foreach (var item in contents)
         {
             item.Location = null;
-            GameDatabase.Instance.GameObjects.Update(item);
+            DbProvider.Instance.Update("gameobjects", item);
         }
 
         // Remove from database
-        GameDatabase.Instance.GameObjects.Delete(objectId);
+        DbProvider.Instance.Delete<GameObject>("gameobjects", objectId);
         Logger.Debug($"Destroyed object #{gameObject.DbRef} ({objectId})");
         return true;
     }
@@ -77,11 +77,11 @@ public static class InstanceManager
     /// </summary>
     public static bool MoveObject(string objectId, string? newLocationId)
     {
-        var gameObject = GameDatabase.Instance.GameObjects.FindById(objectId);
+        var gameObject = DbProvider.Instance.FindById<GameObject>("gameobjects", objectId);
         if (gameObject == null) return false;
 
         gameObject.Location = newLocationId;
-        return GameDatabase.Instance.GameObjects.Update(gameObject);
+        return DbProvider.Instance.Update("gameobjects", gameObject);
     }
 
     /// <summary>
@@ -91,7 +91,7 @@ public static class InstanceManager
     {
         if (gameObject == null || newLocation == null) return false;
         gameObject.Location = newLocation.Id;
-        return GameDatabase.Instance.GameObjects.Update(gameObject);
+        return DbProvider.Instance.Update("gameobjects", gameObject);
     }
 
     /// <summary>
@@ -101,10 +101,9 @@ public static class InstanceManager
     {
         if (locationId == null)
         {
-            return GameDatabase.Instance.GameObjects.Find(obj => obj.Location == null).ToList();
+            return DbProvider.Instance.Find<GameObject>("gameobjects", obj => obj.Location == null).ToList();
         }
-        
-        return GameDatabase.Instance.GameObjects.Find(obj => obj.Location == locationId).ToList();
+        return DbProvider.Instance.Find<GameObject>("gameobjects", obj => obj.Location == locationId).ToList();
     }
     /// <summary>
     /// Gets all objects in a specific location
@@ -113,9 +112,9 @@ public static class InstanceManager
     {
         if (location is null)
         {
-            return GameDatabase.Instance.GameObjects.Find(obj => obj.Location == null).ToList();
-        }        
-        return GameDatabase.Instance.GameObjects.Find(obj => obj.Location == location.Id).ToList();
+            return DbProvider.Instance.Find<GameObject>("gameobjects", obj => obj.Location == null).ToList();
+        }
+        return DbProvider.Instance.Find<GameObject>("gameobjects", obj => obj.Location == location.Id).ToList();
     }
     
     /// <summary>
@@ -125,13 +124,11 @@ public static class InstanceManager
     {
         if (!includeSubclasses)
         {
-            return GameDatabase.Instance.GameObjects
-                .Find(obj => obj.ClassId == classId)
-                .ToList();
+            return DbProvider.Instance.Find<GameObject>("gameobjects", obj => obj.ClassId == classId).ToList();
         }
 
         // Find all classes that inherit from the specified class
-        var allClasses = GameDatabase.Instance.ObjectClasses.FindAll().ToList();
+        var allClasses = DbProvider.Instance.FindAll<ObjectClass>("objectclasses").ToList();
         var targetClassIds = new HashSet<string> { classId };
 
         bool foundNewClasses;
@@ -150,9 +147,7 @@ public static class InstanceManager
             }
         } while (foundNewClasses);
 
-        return GameDatabase.Instance.GameObjects
-            .Find(obj => targetClassIds.Contains(obj.ClassId))
-            .ToList();
+        return DbProvider.Instance.Find<GameObject>("gameobjects", obj => targetClassIds.Contains(obj.ClassId)).ToList();
     }
 
     /// <summary>
@@ -160,7 +155,7 @@ public static class InstanceManager
     /// </summary>
     private static int GetNextDbRef()
     {
-        var allObjects = GameDatabase.Instance.GameObjects.FindAll();
+        var allObjects = DbProvider.Instance.FindAll<GameObject>("gameobjects");
         return allObjects.Any() ? allObjects.Max(obj => obj.DbRef) + 1 : 1;
     }
 
@@ -169,7 +164,7 @@ public static class InstanceManager
     /// </summary>
     public static void MigrateDbRefs()
     {
-        var objectsWithoutDbRef = GameDatabase.Instance.GameObjects.Find(obj => obj.DbRef == 0).ToList();
+        var objectsWithoutDbRef = DbProvider.Instance.Find<GameObject>("gameobjects", obj => obj.DbRef == 0).ToList();
         
         if (!objectsWithoutDbRef.Any())
         {
@@ -183,7 +178,7 @@ public static class InstanceManager
         foreach (var obj in objectsWithoutDbRef)
         {
             obj.DbRef = nextDbRef++;
-            GameDatabase.Instance.GameObjects.Update(obj);
+            DbProvider.Instance.Update("gameobjects", obj);
         }
         
         Logger.Info("DbRef migration completed");
@@ -194,7 +189,7 @@ public static class InstanceManager
     /// </summary>
     public static GameObject? FindByDbRef(int dbRef)
     {
-        return GameDatabase.Instance.GameObjects.FindOne(obj => obj.DbRef == dbRef);
+        return DbProvider.Instance.FindOne<GameObject>("gameobjects", obj => obj.DbRef == dbRef);
     }
 
     /// <summary>
@@ -202,7 +197,7 @@ public static class InstanceManager
     /// </summary>
     public static Dictionary<string, int> GetObjectStatistics()
     {
-        var allObjects = GameDatabase.Instance.GameObjects.FindAll().ToList();
+        var allObjects = DbProvider.Instance.FindAll<GameObject>("gameobjects").ToList();
         var stats = new Dictionary<string, int>();
 
         // Count by class
@@ -213,7 +208,7 @@ public static class InstanceManager
         // Convert class IDs to names
         foreach (var kvp in classCounts)
         {
-            var objectClass = GameDatabase.Instance.ObjectClasses.FindById(kvp.Key);
+        var objectClass = DbProvider.Instance.FindById<ObjectClass>("objectclasses", kvp.Key);
             var className = objectClass?.Name ?? "Unknown";
             stats[className] = kvp.Value;
         }

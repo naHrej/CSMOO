@@ -23,7 +23,7 @@ public static class PlayerManager
             throw new ArgumentException("Password cannot be empty");
 
         // Check if player name already exists
-        var existingPlayer = GameDatabase.Instance.Players.FindOne(p => p.Name.ToLower() == name.ToLower());
+        var existingPlayer = DbProvider.Instance.FindOne<Player>("players", p => p.Name.ToLower() == name.ToLower());
         if (existingPlayer != null)
             throw new InvalidOperationException($"Player name '{name}' already exists");
 
@@ -54,7 +54,7 @@ public static class PlayerManager
             }
         }
 
-        GameDatabase.Instance.Players.Insert(player);
+        DbProvider.Instance.Insert("players", player);
 
         // Also insert the player as a GameObject so it can be moved and managed by ObjectManager
         var playerGameObject = new GameObject
@@ -67,7 +67,7 @@ public static class PlayerManager
             CreatedAt = player.CreatedAt,
             ModifiedAt = player.ModifiedAt
         };
-        GameDatabase.Instance.GameObjects.Insert(playerGameObject);
+        DbProvider.Instance.Insert("gameobjects", playerGameObject);
 
         // Add to starting room if specified
         if (startingRoomId != null)
@@ -83,7 +83,7 @@ public static class PlayerManager
     /// </summary>
     public static Player? AuthenticatePlayer(string name, string password)
     {
-        var player = GameDatabase.Instance.Players.FindOne(p => p.Name.ToLower() == name.ToLower());
+        var player = DbProvider.Instance.FindOne<Player>("players", p => p.Name.ToLower() == name.ToLower());
         if (player == null)
             return null;
 
@@ -95,7 +95,7 @@ public static class PlayerManager
     /// </summary>
     public static void ConnectPlayerToSession(string playerId, Guid sessionGuid)
     {
-        var player = GameDatabase.Instance.Players.FindById(playerId);
+        var player = DbProvider.Instance.FindById<Player>("players", playerId);
         if (player == null)
             throw new ArgumentException($"Player with ID {playerId} not found");
 
@@ -110,7 +110,7 @@ public static class PlayerManager
         player.LastLogin = DateTime.UtcNow;
         player.ModifiedAt = DateTime.UtcNow;
 
-        GameDatabase.Instance.Players.Update(player);
+        DbProvider.Instance.Update("players", player);
     }
 
     /// <summary>
@@ -118,7 +118,7 @@ public static class PlayerManager
     /// </summary>
     public static void DisconnectPlayer(string playerId)
     {
-        var player = GameDatabase.Instance.Players.FindById(playerId);
+        var player = DbProvider.Instance.FindById<Player>("players", playerId);
         if (player == null)
             return;
 
@@ -126,7 +126,7 @@ public static class PlayerManager
         player.IsOnline = false;
         player.ModifiedAt = DateTime.UtcNow;
 
-        GameDatabase.Instance.Players.Update(player);
+        DbProvider.Instance.Update("players", player);
     }
 
     /// <summary>
@@ -134,7 +134,7 @@ public static class PlayerManager
     /// </summary>
     public static Player? GetPlayerBySession(Guid sessionGuid)
     {
-        return GameDatabase.Instance.Players.FindOne(p => p.SessionGuid == sessionGuid);
+        return DbProvider.Instance.FindOne<Player>("players", p => p.SessionGuid == sessionGuid);
     }
 
     /// <summary>
@@ -142,7 +142,7 @@ public static class PlayerManager
     /// </summary>
     public static System.Collections.Generic.List<Player> GetOnlinePlayers()
     {
-        return GameDatabase.Instance.Players.Find(p => p.IsOnline).ToList();
+        return DbProvider.Instance.Find<Player>("players", p => p.IsOnline).ToList();
     }
 
     /// <summary>
@@ -150,7 +150,7 @@ public static class PlayerManager
     /// </summary>
     public static Player? FindPlayerByName(string name)
     {
-        return GameDatabase.Instance.Players.FindOne(p => p.Name.ToLower() == name.ToLower());
+        return DbProvider.Instance.FindOne<Player>("players", p => p.Name.ToLower() == name.ToLower());
     }
 
     /// <summary>
@@ -158,19 +158,19 @@ public static class PlayerManager
     /// </summary>
     public static void ChangePassword(string playerId, string newPassword)
     {
-        var player = GameDatabase.Instance.Players.FindById(playerId);
+        var player = DbProvider.Instance.FindById<Player>("players", playerId);
         if (player == null)
             throw new ArgumentException($"Player with ID {playerId} not found");
 
         player.PasswordHash = HashPassword(newPassword);
         player.ModifiedAt = DateTime.UtcNow;
 
-        GameDatabase.Instance.Players.Update(player);
+        DbProvider.Instance.Update("players", player);
     }
 
     private static ObjectClass GetOrCreatePlayerClass()
     {
-        var playerClass = GameDatabase.Instance.ObjectClasses.FindOne(c => c.Name == "Player");
+        var playerClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "Player");
         if (playerClass != null)
             return playerClass;
 
@@ -190,7 +190,7 @@ public static class PlayerManager
             }
         };
 
-        GameDatabase.Instance.ObjectClasses.Insert(playerClass);
+        DbProvider.Instance.Insert("objectclasses", playerClass);
         return playerClass;
     }
 

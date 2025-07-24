@@ -15,7 +15,7 @@ public static class CoreClassFactory
     public static void CreateCoreClasses()
     {
         // Check if core classes already exist
-        if (GameDatabase.Instance.ObjectClasses.FindOne(c => c.Name == "Object") != null)
+        if (DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "Object") != null)
         {
             Logger.Debug("Core classes already exist, skipping creation");
             return;
@@ -56,7 +56,7 @@ public static class CoreClassFactory
             IsAbstract = true
         };
         
-        GameDatabase.Instance.ObjectClasses.Insert(baseObjectClass);
+        DbProvider.Instance.Insert("objectclasses", baseObjectClass);
         Logger.Debug("Created base Object class");
         return baseObjectClass;
     }
@@ -66,7 +66,7 @@ public static class CoreClassFactory
     /// </summary>
     private static ObjectClass CreateRoomClass()
     {
-        var baseObjectClass = GameDatabase.Instance.ObjectClasses.FindOne(c => c.Name == "Object");
+        var baseObjectClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "Object");
         
         var roomClass = new ObjectClass
         {
@@ -85,7 +85,7 @@ public static class CoreClassFactory
             }
         };
         
-        GameDatabase.Instance.ObjectClasses.Insert(roomClass);
+        DbProvider.Instance.Insert("objectclasses", roomClass);
         Logger.Debug("Created Room class");
         return roomClass;
     }
@@ -95,7 +95,7 @@ public static class CoreClassFactory
     /// </summary>
     private static ObjectClass CreateExitClass()
     {
-        var baseObjectClass = GameDatabase.Instance.ObjectClasses.FindOne(c => c.Name == "Object");
+        var baseObjectClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "Object");
         
         var exitClass = new ObjectClass
         {
@@ -117,7 +117,7 @@ public static class CoreClassFactory
             }
         };
         
-        GameDatabase.Instance.ObjectClasses.Insert(exitClass);
+        DbProvider.Instance.Insert("objectclasses", exitClass);
         Logger.Debug("Created Exit class");
         return exitClass;
     }
@@ -127,7 +127,7 @@ public static class CoreClassFactory
     /// </summary>
     private static ObjectClass CreateContainerClass()
     {
-        var baseObjectClass = GameDatabase.Instance.ObjectClasses.FindOne(c => c.Name == "Object");
+        var baseObjectClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "Object");
         
         var containerClass = new ObjectClass
         {
@@ -148,7 +148,7 @@ public static class CoreClassFactory
             }
         };
         
-        GameDatabase.Instance.ObjectClasses.Insert(containerClass);
+        DbProvider.Instance.Insert("objectclasses", containerClass);
         Logger.Debug("Created Container class");
         return containerClass;
     }
@@ -158,7 +158,7 @@ public static class CoreClassFactory
     /// </summary>
     private static ObjectClass CreateItemClass()
     {
-        var baseObjectClass = GameDatabase.Instance.ObjectClasses.FindOne(c => c.Name == "Object");
+        var baseObjectClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "Object");
         
         var itemClass = new ObjectClass
         {
@@ -177,7 +177,7 @@ public static class CoreClassFactory
             }
         };
         
-        GameDatabase.Instance.ObjectClasses.Insert(itemClass);
+        DbProvider.Instance.Insert("objectclasses", itemClass);
         Logger.Debug("Created Item class");
         return itemClass;
     }
@@ -188,14 +188,14 @@ public static class CoreClassFactory
     private static ObjectClass CreatePlayerClass()
     {
         // Check if PlayerManager already created this
-        var existingPlayerClass = GameDatabase.Instance.ObjectClasses.FindOne(c => c.Name == "Player");
+        var existingPlayerClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "Player");
         if (existingPlayerClass != null)
         {
             Logger.Debug("Player class already exists, skipping creation");
             return existingPlayerClass;
         }
 
-        var baseObjectClass = GameDatabase.Instance.ObjectClasses.FindOne(c => c.Name == "Object");
+        var baseObjectClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "Object");
         
         var playerClass = new ObjectClass
         {
@@ -220,7 +220,7 @@ public static class CoreClassFactory
             }
         };
         
-        GameDatabase.Instance.ObjectClasses.Insert(playerClass);
+        DbProvider.Instance.Insert("objectclasses", playerClass);
         Logger.Debug("Created Player class");
         return playerClass;
     }
@@ -230,7 +230,7 @@ public static class CoreClassFactory
     /// </summary>
     public static ObjectClass? GetBaseObjectClass()
     {
-        return GameDatabase.Instance.ObjectClasses.FindOne(c => c.Name == "Object");
+        return DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "Object");
     }
 
     /// <summary>
@@ -238,6 +238,6 @@ public static class CoreClassFactory
     /// </summary>
     public static ObjectClass? GetCoreClass(string className)
     {
-        return GameDatabase.Instance.ObjectClasses.FindOne(c => c.Name == className);
+        return DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == className);
     }
 }
