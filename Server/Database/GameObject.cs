@@ -18,20 +18,36 @@ public class GameObject : DynamicObject
     /// Objects name (human-readable identifier)
     /// Preferred over using name form properties collection
     /// </summary>
-    public string Name { get; set; } = string.Empty;
+    public string Name
+    {
+        get => Properties.ContainsKey("name") ? Properties["name"].AsString : string.Empty;
+        set => Properties["name"] = value != null ? new BsonValue(value) : BsonValue.Null;
+    }
 
-    public List<string> Aliases { get; set; } = new List<string>();
+    public List<string> Aliases
+    {
+        get => Properties.ContainsKey("aliases") && Properties["aliases"].IsArray ?
+            Properties["aliases"].AsArray.Select(v => v.AsString).ToList() : new List<string>();
+        set => Properties["aliases"] = value != null ? new BsonArray(value.Select(s => new BsonValue(s))) : BsonValue.Null;
+    }
 
-    
     /// <summary>
     /// Numeric database reference (like #1, #2, #3, etc.) for easy user addressing
     /// </summary>
-    public int DbRef { get; set; } = 0;
+    public int DbRef
+    {
+        get => Properties.ContainsKey("dbref") ? Properties["dbref"].AsInt32 : 0;
+        set => Properties["dbref"] = new BsonValue(value);
+    }
     
     /// <summary>
     /// The class this object is an instance of
     /// </summary>
-    public string ClassId { get; set; } = string.Empty;
+    public string ClassId
+    {
+        get => Properties.ContainsKey("classid") ? Properties["classid"].AsString : string.Empty;
+        set => Properties["classid"] = value != null ? new BsonValue(value) : BsonValue.Null;
+    }
     
     /// <summary>
     /// Instance-specific properties that override or extend the class defaults
@@ -52,19 +68,36 @@ public class GameObject : DynamicObject
     /// <summary>
     /// Objects contained within this object (inventory, room contents, etc.)
     /// </summary>
-    public List<string> Contents { get; set; } = new List<string>();
-    
+    public List<string> Contents
+    {
+        get => Properties.ContainsKey("contents") && Properties["contents"].IsArray ?
+            Properties["contents"].AsArray.Select(v => v.AsString).ToList() : new List<string>();
+        set => Properties["contents"] = value != null ? new BsonArray(value.Select(s => new BsonValue(s))) : BsonValue.Null;
+    }
+
     /// <summary>
     /// Creation timestamp
     /// </summary>
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime CreatedAt
+    {
+        get => Properties.ContainsKey("createdat") ? Properties["createdat"].AsDateTime : DateTime.UtcNow;
+        set => Properties["createdat"] = new BsonValue(value);
+    }
 
-    public GameObject Owner { get; set; } = null!; // Owner of this object, if applicable
+    public GameObject? Owner
+    {
+        get => Properties.ContainsKey("owner") ? DbProvider.Instance.FindById<GameObject>("gameobjects", Properties["owner"].AsString) : null;
+        set => Properties["owner"] = value != null ? new BsonValue(value.Id) : BsonValue.Null;
+    }
     
     /// <summary>
     /// Last modification timestamp
     /// </summary>
-    public DateTime ModifiedAt { get; set; } = DateTime.UtcNow;
+    public DateTime ModifiedAt
+    {
+        get => Properties.ContainsKey("modifiedat") ? Properties["modifiedat"].AsDateTime : DateTime.UtcNow;
+        set => Properties["modifiedat"] = new BsonValue(value);
+    }
 
     // Dynamic property accessors for common properties to satisfy the C# compiler
     // These forward to the dynamic property system but provide compile-time visibility

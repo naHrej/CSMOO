@@ -8,29 +8,71 @@ namespace CSMOO.Server.Database;/// <summary>
 /// </summary>
 public class Player : GameObject
 {
-    
+    private string _passwordHash = string.Empty;
     /// <summary>
     /// Password hash for authentication
     /// </summary>
-    public string PasswordHash { get; set; } = string.Empty;
-    
+    public string PasswordHash
+    {
+        get
+        {
+            if (Properties.ContainsKey("passwordhash"))
+                return Properties["passwordhash"].AsString;
+            return _passwordHash;
+        }
+        set
+        {
+            _passwordHash = value ?? string.Empty;
+            Properties["passwordhash"] = value != null ? new BsonValue(value) : BsonValue.Null;
+        }
+    }
+
     /// <summary>
     /// Current session GUID (if online)
     /// </summary>
-    public Guid? SessionGuid { get; set; }
-    
+    public Guid? SessionGuid
+    {
+        get => Properties.ContainsKey("sessionguid") && Guid.TryParse(Properties["sessionguid"].AsString, out var guid) ? guid : (Guid?)null;
+        set => Properties["sessionguid"] = value.HasValue ? new BsonValue(value.Value.ToString()) : BsonValue.Null;
+    }
+
     /// <summary>
     /// Last login time
     /// </summary>
-    public DateTime? LastLogin { get; set; }
-    
+    public DateTime? LastLogin
+    {
+        get => Properties.ContainsKey("lastlogin") ? Properties["lastlogin"].AsDateTime : (DateTime?)null;
+        set => Properties["lastlogin"] = value.HasValue ? new BsonValue(value.Value) : BsonValue.Null;
+    }
+
     /// <summary>
     /// Whether the player is currently online
     /// </summary>
-    public bool IsOnline { get; set; } = false;
-    
+    public bool IsOnline
+    {
+        get => Properties.ContainsKey("isonline") ? Properties["isonline"].AsBoolean : false;
+        set => Properties["isonline"] = new BsonValue(value);
+    }
+
     /// <summary>
     /// Player permissions/privileges
     /// </summary>
-    public List<string> Permissions { get; set; } = new List<string>();
+    public List<string> Permissions
+    {
+        get => Properties.ContainsKey("permissions") && Properties["permissions"].IsArray ?
+            Properties["permissions"].AsArray.Select(v => v.AsString).ToList() : new List<string>();
+        set => Properties["permissions"] = value != null ? new BsonArray(value.Select(s => new BsonValue(s))) : BsonValue.Null;
+    }
+
+    /// <summary>
+    /// Ensures legacy fields are synced to Properties after deserialization
+    /// Call this after loading a Player from the database for backward compatibility
+    /// </summary>
+    public void FixupFieldsAfterDeserialization()
+    {
+        if (!Properties.ContainsKey("passwordhash") && !string.IsNullOrEmpty(_passwordHash))
+        {
+            Properties["passwordhash"] = new BsonValue(_passwordHash);
+        }
+    }
 }
