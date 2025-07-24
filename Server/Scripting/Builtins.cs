@@ -15,9 +15,9 @@ namespace CSMOO.Server.Scripting;
 public static class Builtins
 {
     /// <summary>
-    /// Current script context - set by the script engine before execution
+    /// Current script context - set by the script engine before execution (legacy, now UnifiedScriptGlobals)
     /// </summary>
-    public static VerbScriptGlobals? CurrentContext { get; set; }
+    public static UnifiedScriptGlobals? CurrentContext { get; set; }
     
     /// <summary>
     /// Unified script context - set by the UnifiedScriptEngine before execution
@@ -841,14 +841,14 @@ public static class Builtins
     public static Player? GetCurrentPlayer()
     {
         // Check unified context first, then fall back to old context
-        if (UnifiedContext?.Player != null)
+        if (((Database.Player?)UnifiedContext?.Player) != null)
         {
             // Convert GameObject to Database.Player
-            return UnifiedContext.Player as Database.Player ?? 
-                   GameDatabase.Instance.Players.FindById(UnifiedContext.Player.Id);
+            return (Database.Player?)UnifiedContext.Player ??
+                   GameDatabase.Instance.Players.FindById(((Database.Player?)UnifiedContext.Player)?.Id);
         }
         
-        return CurrentContext?.Player;
+        return (Database.Player?)CurrentContext?.Player;
     }
 
     /// <summary>

@@ -333,13 +333,14 @@ public class EnhancedScriptGlobals : ScriptGlobals
         {
             helpers = unifiedGlobals.Helpers;
             // Convert GameObject back to Database.Player if needed
-            dbPlayer = unifiedGlobals.Player as Database.Player ?? 
-                      GameDatabase.Instance.Players.FindById(unifiedGlobals.Player?.Id ?? "");
+            dbPlayer = (Database.Player?)unifiedGlobals.Player ?? 
+                      GameDatabase.Instance.Players.FindById(((Database.Player?)unifiedGlobals.Player)?.Id ?? "");
         }
-        else if (this is VerbScriptGlobals verbGlobals)
+        // VerbScriptGlobals merged: handle legacy ThisObjectId
+        else if (this is UnifiedScriptGlobals legacyVerbGlobals && !string.IsNullOrEmpty(legacyVerbGlobals.ThisObjectId))
         {
-            helpers = verbGlobals.Helpers;
-            dbPlayer = verbGlobals.Player;
+            helpers = legacyVerbGlobals.Helpers;
+            dbPlayer = (Database.Player?)legacyVerbGlobals.Player;
         }
         else
         {
@@ -373,7 +374,7 @@ public class EnhancedScriptGlobals : ScriptGlobals
             string? playerId = null;
             if (this is UnifiedScriptGlobals unifiedGlobals)
             {
-                playerId = unifiedGlobals.Player?.Id;
+                playerId = ((Database.Player?)unifiedGlobals.Player)?.Id;
             }
             else
             {
@@ -393,11 +394,11 @@ public class EnhancedScriptGlobals : ScriptGlobals
         {
             if (this is UnifiedScriptGlobals unifiedGlobals)
             {
-                return _objectFactory?.GetObjectById(unifiedGlobals.This?.Id ?? "");
+                return _objectFactory?.GetObjectById((unifiedGlobals.This as GameObject)?.Id ?? "");
             }
-            else if (this is VerbScriptGlobals verbGlobals && !string.IsNullOrEmpty(verbGlobals.ThisObject))
+            else if (this is UnifiedScriptGlobals legacyVerbGlobals && !string.IsNullOrEmpty(legacyVerbGlobals.ThisObjectId))
             {
-                return _objectFactory?.GetObjectById(verbGlobals.ThisObject);
+                return _objectFactory?.GetObjectById(legacyVerbGlobals.ThisObjectId);
             }
             return null;
         }
@@ -414,7 +415,7 @@ public class EnhancedScriptGlobals : ScriptGlobals
             string? location = null;
             if (this is UnifiedScriptGlobals unifiedGlobals)
             {
-                location = unifiedGlobals.Player?.Location;
+                location = ((Database.Player?)unifiedGlobals.Player)?.Location;
             }
             else
             {
@@ -440,11 +441,11 @@ public class EnhancedScriptGlobals : ScriptGlobals
         {
             if (this is UnifiedScriptGlobals unifiedGlobals)
             {
-                return _objectFactory?.GetObjectById(unifiedGlobals.This?.Id ?? "");
+                return _objectFactory?.GetObjectById((unifiedGlobals.This as GameObject)?.Id ?? "");
             }
-            else if (this is VerbScriptGlobals verbGlobals && !string.IsNullOrEmpty(verbGlobals.ThisObject))
+            else if (this is UnifiedScriptGlobals legacyVerbGlobals && !string.IsNullOrEmpty(legacyVerbGlobals.ThisObjectId))
             {
-                return _objectFactory?.GetObjectById(verbGlobals.ThisObject);
+                return _objectFactory?.GetObjectById(legacyVerbGlobals.ThisObjectId);
             }
             return null;
         }

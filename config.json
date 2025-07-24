@@ -1,7 +1,7 @@
 {
   "Server": {
     "Port": 1701,
-    "ShowDebugInConsole": false
+    "ShowDebugInConsole": true
   },
   "HotReload": {
     "Enabled": false

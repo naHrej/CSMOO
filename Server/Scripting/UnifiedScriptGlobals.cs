@@ -38,6 +38,10 @@ public class UnifiedScriptGlobals : EnhancedScriptGlobals
         get => This; 
         set => This = value; 
     }
+    // Unique: string-based ThisObjectId for legacy verb scripts (keep for legacy support)
+    public string ThisObjectId { get; set; } = string.Empty;
+
+    // (No unique methods from VerbScriptGlobals needed; retain only original UnifiedScriptGlobals logic)
     
     /// <summary>
     /// The current player as GameObject (now with dynamic support)

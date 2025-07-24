@@ -74,7 +74,7 @@ public class UnifiedScriptEngine
 
             var globals = new UnifiedScriptGlobals
             {
-                Player = playerObject,
+                Player = player, // Always the Database.Player
                 This = thisObject ?? CreateNullGameObject(actualThisObjectId),
                 CommandProcessor = commandProcessor,
                 Helpers = new ScriptHelpers(player, commandProcessor),
@@ -157,7 +157,7 @@ public class UnifiedScriptEngine
             // Create globals for function execution
             var globals = new UnifiedScriptGlobals
             {
-                Player = playerObject,
+                Player = player, // Always the Database.Player
                 This = thisObject ?? CreateNullGameObject(actualThisObjectId),
                 CommandProcessor = commandProcessor,
                 CallingObjectId = actualThisObjectId,
