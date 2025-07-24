@@ -94,12 +94,9 @@ public static class PlayerManager
     /// </summary>
     public static Player? AuthenticatePlayer(string name, string password)
     {
-        Logger.Debug($"Authenticating player '{name}' with password {password}");
         Player? player = DbProvider.Instance.FindOne<Player>("gameobjects", p => p.Name.ToLower() == name.ToLower());
         if (player == null)
             return null;
-
-        Logger.Debug($"Found player {player.Id} for authentication with passwordhash {player.PasswordHash}");
         player.FixupFieldsAfterDeserialization();
         return VerifyPassword(password, player.PasswordHash) ? player : null;
     }
