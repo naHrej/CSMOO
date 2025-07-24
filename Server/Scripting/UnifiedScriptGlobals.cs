@@ -318,7 +318,7 @@ public class UnifiedScriptGlobals : EnhancedScriptGlobals
         if (dbPlayer == null)
             throw new InvalidOperationException("No player context available.");
 
-        var objectId = FunctionResolver.ResolveObjectReference(objectRef, dbPlayer.Id, dbPlayer.Location ?? "");
+        var objectId = FunctionResolver.ResolveObjectReference(objectRef, dbPlayer.Id, dbPlayer.Location?.Id ?? "");
         if (objectId == null)
         {
             throw new ArgumentException($"Object '{objectRef}' not found.");
@@ -347,7 +347,7 @@ public class UnifiedScriptGlobals : EnhancedScriptGlobals
             case "me":
                 return GetPlayerGameObject()?.Id;
             case "here":
-                return GetPlayerGameObject()?.Location;
+                return GetPlayerGameObject()?.Location?.Id;
             case "system":
                 return GetSystemObjectId();
         }

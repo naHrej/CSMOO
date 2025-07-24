@@ -83,7 +83,7 @@ public class ScriptHelpers
     {
         if (_player?.Location == null) return;
 
-        var playersInRoom = GetPlayersInRoom(_player.Location);
+        var playersInRoom = GetPlayersInRoom(_player.Location.Id);
         foreach (var player in playersInRoom)
         {
             if (excludeSelf && player.Id == _player.Id) continue;
@@ -107,7 +107,7 @@ public class ScriptHelpers
         if (roomId == null) return new List<Player>();
         
         return PlayerManager.GetOnlinePlayers()
-            .Where(p => p.Location == roomId)
+            .Where(p => p.Location?.Id == roomId)
             .ToList();
     }
 
@@ -141,7 +141,7 @@ public class ScriptHelpers
                 result = _player.Id;
                 break;
             case "here":
-                result = _player.Location;
+                result = _player.Location?.Id;
                 break;
             case "system":
                 result = GetSystemObjectId();
@@ -381,7 +381,7 @@ public class ScriptHelpers
             return;
         }
 
-        var room = DbProvider.Instance.FindById<GameObject>("gameobjects", _player.Location);
+        var room = DbProvider.Instance.FindById<GameObject>("gameobjects", _player.Location.Id);
         if (room == null)
         {
             notify(_player, "You are in a void.");
@@ -418,7 +418,7 @@ public class ScriptHelpers
         }
 
         // Show other players
-        var otherPlayers = GetPlayersInRoom(_player.Location).Where(p => p.Id != _player.Id);
+        var otherPlayers = GetPlayersInRoom(_player.Location.Id).Where(p => p.Id != _player.Id);
         foreach (var otherPlayer in otherPlayers)
         {
             notify(_player, $"{otherPlayer.Name} is here.");
@@ -682,7 +682,7 @@ public class ScriptHelpers
     /// </summary>
     public string? GetCurrentLocation()
     {
-        return _player?.Location;
+        return _player?.Location?.Id;
     }
 
     #endregion

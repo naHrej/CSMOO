@@ -34,17 +34,12 @@ public static class ObjectResolver
 
     // Determine effective location ONCE.  
     GameObject? effectiveLocation = location;
-    if (effectiveLocation == null && !string.IsNullOrEmpty(looker.Location))
-        effectiveLocation = DbProvider.Instance.FindById<GameObject>("gameobjects", looker.Location);
+    if (effectiveLocation == null && looker.Location != null)
+      effectiveLocation = looker.Location;
     if (effectiveLocation == null)
     {
-      string? locId = null;
-      if (!string.IsNullOrEmpty(looker.Location))
-        locId = looker.Location;
-      else if (looker.Properties.ContainsKey("location"))
-        locId = looker.Properties["location"].AsString;
-      if (!string.IsNullOrEmpty(locId))
-        effectiveLocation = DbProvider.Instance.FindById<GameObject>("gameobjects", locId);
+      if(looker.Location != null)
+        effectiveLocation = looker.Location;
     }
 
     // 1. Keyword resolution
@@ -82,8 +77,8 @@ public static class ObjectResolver
   private static GameObject? MatchKeyword(string name, GameObject looker, GameObject? location = null)
   {
     var effectiveLocation = location;
-    if (effectiveLocation == null && !string.IsNullOrEmpty(looker.Location))
-        effectiveLocation = DbProvider.Instance.FindById<GameObject>("gameobjects", looker.Location);
+    if (effectiveLocation == null && looker.Location != null)
+      effectiveLocation = looker.Location;
     switch (name.ToLowerInvariant())
     {
       // Keywords that refer to the looker

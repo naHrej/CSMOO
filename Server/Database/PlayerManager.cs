@@ -37,7 +37,7 @@ public static class PlayerManager
             Id = Guid.NewGuid().ToString(),
             ClassId = playerClass.Id,
             PasswordHash = HashPassword(password),
-            Location = startingRoomId,
+            Location = DbProvider.Instance.FindOne<GameObject>("gameobjects", o => o.Properties.ContainsKey("isStartingRoom")),
             Properties = new BsonDocument
             {
                 ["name"] = name,
@@ -73,7 +73,7 @@ public static class PlayerManager
             Id = player.Id,
             ClassId = player.ClassId,
             Properties = player.Properties,
-            Location = startingRoomId,
+            Location = DbProvider.Instance.FindOne<GameObject>("gameobjects", o => o.Properties.ContainsKey("isStartingRoom")),
             Contents = new List<string>(),
             CreatedAt = player.CreatedAt,
             ModifiedAt = player.ModifiedAt

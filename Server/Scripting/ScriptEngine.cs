@@ -274,7 +274,7 @@ public class ScriptGlobals
         if (Player == null)
             throw new InvalidOperationException("No player context available for function calls.");
 
-        var objectId = FunctionResolver.ResolveObjectReference(objectRef, Player.Id, Player.Location ?? "");
+        var objectId = FunctionResolver.ResolveObjectReference(objectRef, Player.Id, Player.Location?.Id ?? "");
         if (objectId == null)
         {
             throw new ArgumentException($"Object '{objectRef}' not found.");
@@ -402,6 +402,6 @@ public class ScriptPlayerManager
     public string? GetPlayerLocation(string playerName)
     {
         var player = DbProvider.Instance.FindOne<Player>("players", p => p.Name == playerName);
-        return player?.Location;
+        return player?.Location?.Id;
     }
 }

@@ -412,11 +412,11 @@ public class EnhancedScriptGlobals : ScriptGlobals
             string? location = null;
             if (this is UnifiedScriptGlobals unifiedGlobals)
             {
-                location = ((Database.Player?)unifiedGlobals.Player)?.Location;
+                location = ((Database.Player?)unifiedGlobals.Player)?.Location?.Id;
             }
             else
             {
-                location = Player?.Location;
+                location = Player?.Location?.Id;
             }
             return _objectFactory?.GetObjectById(location ?? "");
         }

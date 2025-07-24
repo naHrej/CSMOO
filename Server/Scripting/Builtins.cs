@@ -397,7 +397,7 @@ public static class Builtins
             case "me":
                 return currentPlayer.Id;
             case "here":
-                return currentPlayer.Location;
+                return currentPlayer.Location?.Id;
             case "system":
                 // Find the system object
                 var allObjects = DbProvider.Instance.FindAll<GameObject>("gameobjects");
@@ -448,7 +448,7 @@ public static class Builtins
         // Try to find object by name in current location
         if (currentPlayer.Location != null)
         {
-            var objectsInRoom = GetObjectsInLocation(currentPlayer.Location);
+            var objectsInRoom = GetObjectsInLocation(currentPlayer.Location.Id);
             var foundObject = objectsInRoom.FirstOrDefault(obj =>
             {
                 var gameObject = obj.GameObject as GameObject;
@@ -508,7 +508,7 @@ public static class Builtins
     {
         if (currentPlayer.Location == null) return null;
         
-        var objectsInRoom = GetObjectsInLocation(currentPlayer.Location);
+        var objectsInRoom = GetObjectsInLocation(currentPlayer.Location.Id);
         var foundObject = objectsInRoom.FirstOrDefault(obj =>
         {
             var gameObject = obj.GameObject as GameObject;
@@ -738,7 +738,7 @@ public static class Builtins
         if (roomId == null) return new List<Player>();
         
         return PlayerManager.GetOnlinePlayers()
-            .Where(p => p.Location == roomId)
+            .Where(p => p.Location?.Id == roomId)
             .ToList();
     }
     
@@ -749,7 +749,7 @@ public static class Builtins
     {
         if (room is null) return new List<Player>();
         return PlayerManager.GetOnlinePlayers()
-            .Where(p => p.Location == room.Id)
+            .Where(p => p.Location?.Id == room.Id)
             .ToList();
     }
     #endregion
@@ -764,7 +764,7 @@ public static class Builtins
         var currentPlayer = GetCurrentPlayer();
         if (currentPlayer?.Location == null) return "You are nowhere.";
 
-        var room = DbProvider.Instance.FindById<GameObject>("gameobjects", currentPlayer.Location);
+        var room = DbProvider.Instance.FindById<GameObject>("gameobjects", currentPlayer.Location.Id);
         if (room == null) return "You are in a void.";
 
         var name = GetProperty(room, "name")?.AsString ?? "Unknown Room";
@@ -796,7 +796,7 @@ public static class Builtins
             // Show objects
             var exitClassId = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "Exit")?.Id;
             var playerClassId = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "Player")?.Id;
-            var objects = GetObjectsInLocation(currentPlayer.Location)
+            var objects = GetObjectsInLocation(currentPlayer.Location.Id)
                 .Where(obj => {
                     var gameObject = obj.GameObject as GameObject;
                     return gameObject != null && 
@@ -836,7 +836,7 @@ public static class Builtins
         if (currentPlayer?.Location == null) return;
 
         target = target.ToLower();
-        var objects = GetObjectsInLocation(currentPlayer.Location);
+        var objects = GetObjectsInLocation(currentPlayer.Location.Id);
         
         var targetObject = objects.FirstOrDefault(obj =>
         {
@@ -870,7 +870,7 @@ public static class Builtins
         if (currentPlayer?.Location == null) return null;
 
         itemName = itemName.ToLower();
-        var roomObjects = GetObjectsInLocation(currentPlayer.Location);
+        var roomObjects = GetObjectsInLocation(currentPlayer.Location.Id);
         
         var foundObject = roomObjects.FirstOrDefault(obj =>
         {

@@ -38,7 +38,7 @@ public static class InstanceManager
             Id = Guid.NewGuid().ToString(),
             ClassId = classId,
             Properties = mergedProperties,
-            Location = location
+            Location = DbProvider.Instance.FindOne<GameObject>("gameobjects", o => o.Properties.ContainsKey("isStartingRoom")) ?? null,
         };
 
         // Assign a DbRef
@@ -79,8 +79,18 @@ public static class InstanceManager
     {
         var gameObject = DbProvider.Instance.FindById<GameObject>("gameobjects", objectId);
         if (gameObject == null) return false;
-
-        gameObject.Location = newLocationId;
+        if (newLocationId == null)
+        {
+            gameObject.Location = null; // Move to nowhere
+        }
+        else
+        {
+            var newLocation = DbProvider.Instance.FindById<GameObject>("gameobjects", newLocationId);
+            if (newLocation == null)
+                throw new ArgumentException($"Location with ID {newLocationId} not found");
+            
+            gameObject.Location = newLocation;
+        }
         return DbProvider.Instance.Update("gameobjects", gameObject);
     }
 
@@ -90,7 +100,7 @@ public static class InstanceManager
     public static bool MoveObject(GameObject gameObject, GameObject newLocation)
     {
         if (gameObject == null || newLocation == null) return false;
-        gameObject.Location = newLocation.Id;
+        gameObject.Location = newLocation;
         return DbProvider.Instance.Update("gameobjects", gameObject);
     }
 
@@ -103,7 +113,7 @@ public static class InstanceManager
         {
             return DbProvider.Instance.Find<GameObject>("gameobjects", obj => obj.Location == null).ToList();
         }
-        return DbProvider.Instance.Find<GameObject>("gameobjects", obj => obj.Location == locationId).ToList();
+        return DbProvider.Instance.Find<GameObject>("gameobjects", obj => obj.Location?.Id == locationId).ToList();
     }
     /// <summary>
     /// Gets all objects in a specific location
@@ -114,7 +124,7 @@ public static class InstanceManager
         {
             return DbProvider.Instance.Find<GameObject>("gameobjects", obj => obj.Location == null).ToList();
         }
-        return DbProvider.Instance.Find<GameObject>("gameobjects", obj => obj.Location == location.Id).ToList();
+        return DbProvider.Instance.Find<GameObject>("gameobjects", obj => obj.Location?.Id == location.Id).ToList();
     }
     
     /// <summary>

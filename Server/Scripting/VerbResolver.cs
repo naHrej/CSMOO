@@ -450,13 +450,13 @@ public static class VerbResolver
             return false;
 
         // Ensure player has a valid location
-        if (string.IsNullOrEmpty(player.Location))
+        if (string.IsNullOrEmpty(player.Location?.Id))
         {
             // Set default location if none exists
             var defaultRoom = DbProvider.Instance.FindOne<GameObject>("gameobjects", obj => obj.ClassId == "Room");
             if (defaultRoom != null)
             {
-                player.Location = defaultRoom.Id;
+                player.Location = defaultRoom;
                 DbProvider.Instance.Update("players", player);
             }
             else
@@ -488,7 +488,7 @@ public static class VerbResolver
         }
 
         // 2. Check the room itself
-        var room = DbProvider.Instance.FindById<GameObject>("gameobjects", player.Location);
+        var room = player.Location;
         if (room != null)
         {
             var roomVerbResult = FindMatchingVerbWithVariables(room.Id, parts);
@@ -584,9 +584,9 @@ public static class VerbResolver
     private static bool TryExecuteMovementCommand(string direction, Database.Player player, Commands.CommandProcessor commandProcessor)
     {
         // Get current room
-        if (string.IsNullOrEmpty(player.Location))
+        if (string.IsNullOrEmpty(player.Location?.Id))
             return false;
-        var room = DbProvider.Instance.FindById<GameObject>("gameobjects", player.Location);
+        var room = player.Location;
         if (room == null) return false;
 
         // Get exits from current room to check if the direction is valid

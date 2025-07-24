@@ -424,7 +424,7 @@ public class ProgrammingCommands
                 // Script mode - execute the code immediately
                 try
                 {
-                    var result = Builtins.ExecuteScript(code, _player, _commandProcessor, _player.Location, "");
+                    var result = Builtins.ExecuteScript(code, _player, _commandProcessor, _player.Location!, "");
                     
                     _commandProcessor.SendToPlayer("Script executed successfully.");
                     if (!string.IsNullOrEmpty(result) && result != "null")
@@ -1200,7 +1200,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
                 result = _player.Id;
                 break;
             case "here":
-                result = _player.Location;
+                result = _player.Location?.Id;
                 break;
             case "system":
                 result = GetSystemObjectId();
@@ -1356,7 +1356,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
     private string GetObjectName(string objectId)
     {
         if (objectId == _player.Id) return "you";
-        if (objectId == _player.Location) return "here";
+        if (objectId == _player.Location?.Id) return "here";
 
         // Try as a GameObject first
         var obj = DbProvider.Instance.FindById<GameObject>("gameobjects", objectId);

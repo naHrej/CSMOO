@@ -39,7 +39,7 @@ public class GameObject : DynamicObject
         get => Properties.ContainsKey("dbref") ? Properties["dbref"].AsInt32 : 0;
         set => Properties["dbref"] = new BsonValue(value);
     }
-    
+
     /// <summary>
     /// The class this object is an instance of
     /// </summary>
@@ -48,23 +48,27 @@ public class GameObject : DynamicObject
         get => Properties.ContainsKey("classid") ? Properties["classid"].AsString : string.Empty;
         set => Properties["classid"] = value != null ? new BsonValue(value) : BsonValue.Null;
     }
-    
+
     /// <summary>
     /// Instance-specific properties that override or extend the class defaults
     /// </summary>
     public BsonDocument Properties { get; set; } = new BsonDocument();
-    
+
     /// <summary>
     /// Location of this object (ID of the room/container it's in)
     /// Null means it's not in the game world currently
     /// Preferred over using Location property directly
     /// </summary>
-    public string? Location
-    { 
-        get => Properties.ContainsKey("location") ? Properties["location"].AsString : null;
-        set => Properties["location"] = value != null ? new BsonValue(value) : BsonValue.Null;
+    public GameObject? Location
+    {
+        get
+        {
+            var loc = Properties.ContainsKey("location") ? Properties["location"].AsString : null;
+            return loc != null ? DbProvider.Instance.FindById<GameObject>("gameobjects", loc) : null;
+        }
+        set => Properties["location"] = value?.Id != null ? new BsonValue(value.Id) : BsonValue.Null;
     }
-    
+
     /// <summary>
     /// Objects contained within this object (inventory, room contents, etc.)
     /// </summary>
@@ -89,7 +93,7 @@ public class GameObject : DynamicObject
         get => Properties.ContainsKey("owner") ? DbProvider.Instance.FindById<GameObject>("gameobjects", Properties["owner"].AsString) : null;
         set => Properties["owner"] = value != null ? new BsonValue(value.Id) : BsonValue.Null;
     }
-    
+
     /// <summary>
     /// Last modification timestamp
     /// </summary>
@@ -101,7 +105,7 @@ public class GameObject : DynamicObject
 
     // Dynamic property accessors for common properties to satisfy the C# compiler
     // These forward to the dynamic property system but provide compile-time visibility
-    
+
     /// <summary>
     /// Short description of the object (forwarded to property system)
     /// </summary>
@@ -110,7 +114,7 @@ public class GameObject : DynamicObject
         get => Properties.ContainsKey("shortDescription") ? Properties["shortDescription"].AsString : null;
         set => Properties["shortDescription"] = value != null ? new BsonValue(value) : BsonValue.Null;
     }
-    
+
     /// <summary>
     /// Long description of the object (forwarded to property system)
     /// </summary>
@@ -119,7 +123,7 @@ public class GameObject : DynamicObject
         get => Properties.ContainsKey("longDescription") ? Properties["longDescription"].AsString : null;
         set => Properties["longDescription"] = value != null ? new BsonValue(value) : BsonValue.Null;
     }
-    
+
     /// <summary>
     /// Description of the object (forwarded to property system)
     /// </summary>
@@ -128,14 +132,14 @@ public class GameObject : DynamicObject
         get => Properties.ContainsKey("description") ? Properties["description"].AsString : null;
         set => Properties["description"] = value != null ? new BsonValue(value) : BsonValue.Null;
     }
-    
+
     /// <summary>
     /// Dynamic name property (forwarded to Name field but allows lowercase access)
     /// </summary>
     public string? name
     {
         get => !string.IsNullOrEmpty(Name) ? Name : (Properties.ContainsKey("name") ? Properties["name"].AsString : null);
-        set 
+        set
         {
             if (value != null)
             {
@@ -149,9 +153,9 @@ public class GameObject : DynamicObject
             }
         }
     }
-    
+
     // Additional common properties that scripts might access
-    
+
     /// <summary>
     /// Whether the object is gettable/takeable (forwarded to property system)
     /// </summary>
@@ -160,7 +164,7 @@ public class GameObject : DynamicObject
         get => Properties.ContainsKey("gettable") ? Properties["gettable"].AsBoolean : (bool?)null;
         set => Properties["gettable"] = value.HasValue ? new BsonValue(value.Value) : BsonValue.Null;
     }
-    
+
     /// <summary>
     /// Whether the object is visible (forwarded to property system)
     /// </summary>
@@ -169,7 +173,7 @@ public class GameObject : DynamicObject
         get => Properties.ContainsKey("visible") ? Properties["visible"].AsBoolean : (bool?)null;
         set => Properties["visible"] = value.HasValue ? new BsonValue(value.Value) : BsonValue.Null;
     }
-    
+
     /// <summary>
     /// Object size/weight (forwarded to property system)
     /// </summary>
@@ -185,7 +189,7 @@ public class GameObject : DynamicObject
     public override bool TryGetMember(GetMemberBinder binder, out object? result)
     {
         var propertyName = binder.Name;
-        
+
         try
         {
             // Handle special GameObject properties first
@@ -224,7 +228,7 @@ public class GameObject : DynamicObject
             }
 
             // Check if this is a null object (missing from database)
-            if (Properties.ContainsKey("_isNullObject") && 
+            if (Properties.ContainsKey("_isNullObject") &&
                 Properties["_isNullObject"].AsBoolean)
             {
                 result = null;
@@ -258,11 +262,11 @@ public class GameObject : DynamicObject
     public override bool TrySetMember(SetMemberBinder binder, object? value)
     {
         var propertyName = binder.Name;
-        
+
         try
         {
             // Check if this is a null object (missing from database)
-            if (Properties.ContainsKey("_isNullObject") && 
+            if (Properties.ContainsKey("_isNullObject") &&
                 Properties["_isNullObject"].AsBoolean)
             {
                 throw new InvalidOperationException($"Cannot set property '{propertyName}' on missing object {Id}");
@@ -333,11 +337,11 @@ public class GameObject : DynamicObject
     public override bool TryInvokeMember(InvokeMemberBinder binder, object?[]? args, out object? result)
     {
         var methodName = binder.Name;
-        
+
         try
         {
             // Check if this is a null object (missing from database)
-            if (Properties.ContainsKey("_isNullObject") && 
+            if (Properties.ContainsKey("_isNullObject") &&
                 Properties["_isNullObject"].AsBoolean)
             {
                 throw new InvalidOperationException($"Cannot call method '{methodName}' on missing object {Id}");
@@ -353,14 +357,14 @@ public class GameObject : DynamicObject
                 {
                     throw new ArgumentException($"Function '{methodName}' not found on object {Id}. Did you mean '{suggestion}'? (Function names are case-sensitive)");
                 }
-                
+
                 throw new ArgumentException($"Function '{methodName}' not found on object {Id}. Check function name and ensure it's defined on this object or its class.");
             }
 
             // Get the current player from the UnifiedContext if available
             Player? currentPlayer = null;
             Commands.CommandProcessor? commandProcessor = null;
-            
+
             if (Scripting.Builtins.UnifiedContext != null)
             {
                 // Try to get Database.Player from the dynamic Player object
@@ -369,7 +373,7 @@ public class GameObject : DynamicObject
                 {
                     currentPlayer = DbProvider.Instance.FindById<Player>("players", playerGameObj.Id);
                 }
-                
+
                 commandProcessor = Scripting.Builtins.UnifiedContext.CommandProcessor;
             }
 
@@ -380,7 +384,7 @@ public class GameObject : DynamicObject
 
             // Execute the function using the UnifiedScriptEngine
             var engine = new Scripting.UnifiedScriptEngine();
-            result = engine.ExecuteFunction(function, args ?? new object[0], 
+            result = engine.ExecuteFunction(function, args ?? new object[0],
                 currentPlayer, commandProcessor, Id);
             return true;
         }
@@ -406,12 +410,12 @@ public class GameObject : DynamicObject
     private string? GetPropertySuggestion(string propertyName)
     {
         var lowerProperty = propertyName.ToLower();
-        
+
         // Check against built-in GameObject properties
         return lowerProperty switch
         {
             "id" => "Id",
-            "name" => "Name", 
+            "name" => "Name",
             "aliases" => "Aliases",
             "dbref" => "DbRef",
             "classid" => "ClassId",
@@ -436,7 +440,7 @@ public class GameObject : DynamicObject
     private string? GetMethodSuggestion(string methodName)
     {
         var lowerMethod = methodName.ToLower();
-        
+
         // Check against common method names that might have case issues
         return lowerMethod switch
         {
