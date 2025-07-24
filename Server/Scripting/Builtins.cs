@@ -35,14 +35,6 @@ public static class Builtins
         return DbProvider.Instance.FindById<GameObject>("gameobjects", objectId);
     }
     
-    /// <summary>
-    /// Get the string value of an object property
-    /// </summary>
-    [Obsolete("Use GetProperty(GameObject, string) instead")]
-    public static BsonValue? GetProperty(string objectId, string propertyName)
-    {
-        return ObjectManager.GetProperty(objectId, propertyName);
-    }
     
     /// <summary>
     /// Get the string value of an object property (GameObject overload)
@@ -52,15 +44,7 @@ public static class Builtins
         return ObjectManager.GetProperty(obj, propertyName);
     }
 
-    /// <summary>
-    /// Get the string value of an object property with default
-    /// </summary>
-    [Obsolete("Use GetProperty(GameObject, string, string) instead")]
-    public static string GetProperty(string objectId, string propertyName, string defaultValue = "")
-    {
-        var property = ObjectManager.GetProperty(objectId, propertyName) as BsonValue;
-        return property?.AsString ?? defaultValue;
-    }
+  
     
     /// <summary>
     /// Get the string value of an object property with default (GameObject overload)
@@ -71,15 +55,6 @@ public static class Builtins
         return property?.AsString ?? defaultValue;
     }
     
-    /// <summary>
-    /// Get the boolean value of an object property
-    /// </summary>
-    [Obsolete("Use GetBoolProperty(GameObject, string, bool) instead")]
-    public static bool GetBoolProperty(string objectId, string propertyName, bool defaultValue = false)
-    {
-        var property = ObjectManager.GetProperty(objectId, propertyName) as BsonValue;
-        return property?.AsBoolean ?? defaultValue;
-    }
     
     /// <summary>
     /// Get the boolean value of an object property (GameObject overload)
@@ -90,18 +65,7 @@ public static class Builtins
         return property?.AsBoolean ?? defaultValue;
     }
     
-    /// <summary>
-    /// Set a property on an object
-    /// </summary>
-    [Obsolete("Use SetProperty(GameObject, string, BsonValue) instead")]
-    public static void SetProperty(string objectId, string propertyName, string value)
-    {
-        var obj = FindObject(objectId);
-        if (obj != null)
-        {
-            SetProperty(obj, propertyName, value);
-        }
-    }
+
     
     /// <summary>
     /// Set a property on an object (GameObject overload)
@@ -114,18 +78,7 @@ public static class Builtins
         }
     }
     
-    /// <summary>
-    /// Set a boolean property on an object
-    /// </summary>
-    [Obsolete("Use SetBoolProperty(GameObject, string, bool) instead")]
-    public static void SetBoolProperty(string objectId, string propertyName, bool value)
-    {
-        var obj = FindObject(objectId);
-        if (obj != null)
-        {
-            SetBoolProperty(obj, propertyName, value);
-        }
-    }
+
     
     /// <summary>
     /// Set a boolean property on an object (GameObject overload)
@@ -147,19 +100,7 @@ public static class Builtins
         return gameObjects.Cast<dynamic>().ToList();
     }
     
-    /// <summary>
-    /// Move an object to a new location (String id overload)
-    /// </summary>
-    [Obsolete("Use MoveObject(GameObject, string) instead")]
-    public static bool MoveObject(string objectId, string newLocationId)
-    {
-        var obj = FindObject(objectId);
-        if (obj != null)
-        {
-            return MoveObject(obj, newLocationId);
-        }
-        return false;
-    }
+
     
     /// <summary>
     /// Move an object to a new location (GameObject overload)
@@ -174,14 +115,6 @@ public static class Builtins
         return false;
     }
     
-    /// <summary>
-    /// Get the name of an object
-    /// </summary>
-    [Obsolete("Use GetObjectName(GameObject) instead")]
-    public static string GetObjectName(string objectId)
-    {
-        return GetProperty(objectId, "name", "something");
-    }
     
     /// <summary>
     /// Get the name of an object (GameObject overload)
@@ -191,14 +124,7 @@ public static class Builtins
         return GetObjectName(obj);
     }
     
-    /// <summary>
-    /// Get the short description of an object
-    /// </summary>
-    [Obsolete("Use GetObjectShortDesc(GameObject) instead")]
-    public static string GetObjectShortDesc(string objectId)
-    {
-        return GetProperty(objectId, "shortDescription");
-    }
+  
     
     /// <summary>
     /// Get the short description of an object (GameObject overload)
@@ -208,14 +134,7 @@ public static class Builtins
         return GetObjectShortDesc(obj);
     }
     
-    /// <summary>
-    /// Get the long description of an object
-    /// </summary>
-    [Obsolete("Use GetObjectLongDesc(GameObject) instead")]
-    public static string GetObjectLongDesc(string objectId)
-    {
-        return GetProperty(objectId, "longDescription");
-    }
+
     
     /// <summary>
     /// Get the long description of an object (GameObject overload)
@@ -674,19 +593,7 @@ public static class Builtins
     
     #region Player Identification
     
-    /// <summary>
-    /// Check if an object represents a player and return the player
-    /// </summary>
-    [Obsolete("Use Builtins.GetPlayerFromObject(GameObject) instead")]
-    public static Player? GetPlayerFromObject(string objectId)
-    {
-        var playerIdProperty = GetProperty(objectId, "playerId");
-        if (!string.IsNullOrEmpty(playerIdProperty))
-        {
-            return FindPlayerById(playerIdProperty);
-        }
-        return null;
-    }
+
     
     /// <summary>
     /// Check if an object represents a player and return the player (GameObject overload)
@@ -701,16 +608,6 @@ public static class Builtins
         return null;
     }
 
-    /// <summary>
-    /// Check if an object ID directly represents a player
-    /// </summary>
-    [Obsolete("Use Builtins.IsPlayerObject(GameObject) instead")]
-    public static bool IsPlayerObject(string objectId)
-    {
-        // Check if this objectId is actually a player ID
-        var player = FindPlayerById(objectId);
-        return player != null;
-    }
     
     /// <summary>
     /// Check if an object directly represents a player (GameObject overload)
@@ -763,21 +660,7 @@ public static class Builtins
     
     #region Utility Functions
     
-    /// <summary>
-    /// Get a friendly display name for an object
-    /// </summary>
-    [Obsolete("Use Builtins.GetDisplayName(GameObject) instead")]
-    public static string GetDisplayName(string objectId)
-    {
-        var name = GetObjectName(objectId);
-        var shortDesc = GetObjectShortDesc(objectId);
-        
-        if (!string.IsNullOrEmpty(shortDesc))
-        {
-            return $"{name} ({shortDesc})";
-        }
-        return name;
-    }
+
     
     /// <summary>
     /// Get a friendly display name for an object (GameObject overload)
@@ -795,15 +678,7 @@ public static class Builtins
         //return GetDisplayName(obj.Id);
     }
     
-    /// <summary>
-    /// Check if an object is gettable
-    /// </summary>
-    [Obsolete("Use Builtins.IsGettable(GameObject) instead")]
-    public static bool IsGettable(string objectId)
-    {
-        return GetBoolProperty(objectId, "gettable", false);
-    }
-    
+
     /// <summary>
     /// Check if an object is gettable (GameObject overload)
     /// </summary>
@@ -821,19 +696,7 @@ public static class Builtins
         return string.Join(" ", args.Skip(startIndex));
     }
     
-    /// <summary>
-    /// Get the class of an object
-    /// </summary>
-    [Obsolete("Use Builtins.GetObjectClass(GameObject) instead")]
-    public static ObjectClass? GetObjectClass(string objectId)
-    {
-        var obj = FindObject(objectId);
-        if (obj != null && !string.IsNullOrEmpty(obj.ClassId))
-        {
-            return DbProvider.Instance.FindById<ObjectClass>("objectclasses", obj.ClassId);
-        }
-        return null;
-    }
+
     
     /// <summary>
     /// Get the class of an object (GameObject overload)
@@ -1082,14 +945,6 @@ public static class Builtins
         }
     }
 
-    /// <summary>
-    /// Get all exits from a room
-    /// </summary>
-    [Obsolete("Use Builtins.GetExitsFromRoom(GameObject) instead")]
-    public static List<GameObject> GetExitsFromRoom(string roomId)
-    {
-        return WorldManager.GetExitsFromRoom(roomId);
-    }
     /// <summary>
     /// Get all exits from a room
     /// </summary>

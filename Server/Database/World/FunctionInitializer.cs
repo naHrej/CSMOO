@@ -165,7 +165,7 @@ public static class FunctionInitializer
     {
         var stats = new FunctionLoadStats();
         
-        var targetClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == functionDef.TargetClass);
+        var targetClass = DbProvider.Instance.FindOne<GameObject>("objectclasses", c => c.Name == functionDef.TargetClass);
         if (targetClass == null)
         {
             Logger.Warning($"Target class '{functionDef.TargetClass}' not found for function '{functionDef.Name}'");
@@ -213,9 +213,15 @@ public static class FunctionInitializer
         // Only create if it doesn't already exist
         if (!existingFunctions.Any(f => f.ObjectId == systemObjectId && f.Name == functionDef.Name))
         {
+            var systemObject = DbProvider.Instance.FindById<GameObject>("gameobjects", systemObjectId);
+            if (systemObject == null)
+            {
+                Logger.Error($"System object with ID {systemObjectId} not found for function '{functionDef.Name}'");
+                return stats;
+            }
             // Find the system object GameObject
             var function = Scripting.FunctionManager.CreateFunction(
-                systemObjectId, 
+                systemObject, 
                 functionDef.Name, 
                 functionDef.Parameters,
                 functionDef.ParameterNames,

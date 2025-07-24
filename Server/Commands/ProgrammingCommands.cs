@@ -2052,9 +2052,15 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
         }
 
         // Create the function (new signature expects GameObject)
-        #pragma warning disable CS0618 // Suppress obsolete warning
-        var function = FunctionManager.CreateFunction(objectId, functionName, parameterTypes.ToArray(), parameterNames.ToArray(), returnType, "", _player.Name);
-        #pragma warning restore CS0618
+        var gameObject = DbProvider.Instance.FindById<GameObject>("gameobjects", objectId);
+        if (gameObject == null)
+        {
+            _commandProcessor.SendToPlayer($"Object with ID '{objectId}' not found.");
+            return true;
+        }
+
+        var function = FunctionManager.CreateFunction(gameObject, functionName, parameterTypes.ToArray(), parameterNames.ToArray(), returnType, "", _player.Name);
+
         // Set visibility
         function.Permissions = permissions;
         var functions = GameDatabase.Instance.GetCollection<Function>("functions");

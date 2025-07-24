@@ -95,12 +95,12 @@ public static class PlayerManager
     public static Player? AuthenticatePlayer(string name, string password)
     {
         Logger.Debug($"Authenticating player '{name}' with password {password}");
-        Player player = DbProvider.Instance.FindOne<Player>("gameobjects", p => p.Name.ToLower() == name.ToLower());
+        Player? player = DbProvider.Instance.FindOne<Player>("gameobjects", p => p.Name.ToLower() == name.ToLower());
         if (player == null)
             return null;
 
         Logger.Debug($"Found player {player.Id} for authentication with passwordhash {player.PasswordHash}");
-        //player.FixupFieldsAfterDeserialization();
+        player.FixupFieldsAfterDeserialization();
         return VerifyPassword(password, player.PasswordHash) ? player : null;
     }
 
@@ -112,7 +112,7 @@ public static class PlayerManager
         var player = DbProvider.Instance.FindById<Player>("players", playerId);
         if (player == null)
             throw new ArgumentException($"Player with ID {playerId} not found");
-        //player.FixupFieldsAfterDeserialization();
+        player.FixupFieldsAfterDeserialization();
 
         // Disconnect any existing session for this player
         if (player.SessionGuid.HasValue)

@@ -13,35 +13,11 @@ namespace CSMOO.Server.Scripting;
 /// </summary>
 public static class FunctionManager
 {
-    /// <summary>
-    /// Creates a new function on an object
-    /// </summary>
-    [Obsolete("Use CreateFunction(GameObject, string, string[], string[], string, string, string) instead")]
-    public static Function CreateFunction(string objectId, string name, string[] parameterTypes, string[] parameterNames, string returnType = "void", string code = "", string createdBy = "system")
-    {
-        var function = new Function
-        {
-            ObjectId = objectId,
-            Name = name,
-            ParameterTypes = parameterTypes,
-            ParameterNames = parameterNames,
-            ReturnType = returnType,
-            Code = code,
-            CreatedBy = createdBy,
-            CreatedAt = DateTime.UtcNow,
-            ModifiedAt = DateTime.UtcNow
-        };
 
-        var functionCollection = GameDatabase.Instance.GetCollection<Function>("functions");
-        functionCollection.Insert(function);
-        
-        Logger.Debug($"Created function '{name}' on object {objectId} by {createdBy}");
-        return function;
-    }
     /// <summary>
     /// Creates a new function on an object
     /// </summary>
-    public static Function CreateFunction(ObjectClass obj, string name, string[] parameterTypes, string[] parameterNames, string returnType = "void", string code = "", string createdBy = "system")
+    public static Function CreateFunction(GameObject obj, string name, string[] parameterTypes, string[] parameterNames, string returnType = "void", string code = "", string createdBy = "system")
     {
         var function = new Function
         {

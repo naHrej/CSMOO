@@ -103,7 +103,10 @@ namespace CSMOO.Server.Database
         {
             var result = GetCollection<T>(collectionName).FindOne(predicate);
             if (typeof(T) == typeof(GameObject) && result is GameObject go)
-                return (T)(object)ObjectManager.CacheGameObject(go);
+            {
+                var cached = ObjectManager.CacheGameObject(go);
+                return cached is T t ? t : default;
+            }
             return result;
         }
 
@@ -112,7 +115,10 @@ namespace CSMOO.Server.Database
         {
             var result = GetCollection<T>(collectionName).FindById(id);
             if (typeof(T) == typeof(GameObject) && result is GameObject go)
-                return (T)(object)ObjectManager.CacheGameObject(go);
+            {
+                var cached = ObjectManager.CacheGameObject(go);
+                return cached is T t ? t : default;
+            }
             return result;
         }
 

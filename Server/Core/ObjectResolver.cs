@@ -235,21 +235,6 @@ public static class ObjectResolver
     return matches.FirstOrDefault();
   }
 
-  /// <summary>
-  /// Resolves an object reference string to an object ID.
-  /// Handles: "me", "here", "system", DBREFs, class names, object IDs, and object names.
-  /// </summary>
-  [Obsolete("Prefer ResolveObject instead of ResolveObjectId.  Refactor to pass in GameObject looker and location instead of playerId and roomId. ")]
-  public static string? ResolveObjectId(string name, string? currentPlayerId = null, string? currentRoomId = null)
-  {
-    if (string.IsNullOrEmpty(name))
-      return null;
-    GameObject? looker = currentPlayerId != null ? DbProvider.Instance.FindById<GameObject>("gameobjects", currentPlayerId) : null;
-    GameObject? location = currentRoomId != null ? DbProvider.Instance.FindById<GameObject>("gameobjects", currentRoomId) : null;
-    if (looker == null)
-      return null;
-    return ResolveObject(name, looker, location)?.Id;
-  }
 
   private static GameObject? GetSystemObject()
   {

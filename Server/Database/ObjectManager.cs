@@ -28,7 +28,7 @@ public static class ObjectManager
     /// <summary>
     /// Adds a GameObject to the singleton cache, or returns the cached instance if already present.
     /// </summary>
-    public static GameObject CacheGameObject(GameObject obj)
+    public static GameObject? CacheGameObject(GameObject obj)
     {
         if (obj == null) return null;
         if (_objectCache.TryGetValue(obj.Id, out var cached))
@@ -167,15 +167,6 @@ public static class ObjectManager
     public static BsonValue? GetProperty(GameObject gameObject, string propertyName)
         => PropertyManager.GetProperty(gameObject, propertyName);
 
-    /// <summary>
-    /// Gets a property value by object ID
-    /// </summary>
-    [Obsolete("Use GetProperty(GameObject, string) instead")]
-    public static BsonValue? GetProperty(string objectId, string propertyName)
-    {
-        var gameObject = GetObject(objectId);
-        return gameObject == null ? null : PropertyManager.GetProperty(gameObject, propertyName);
-    }
   
 
     /// <summary>
@@ -199,12 +190,6 @@ public static class ObjectManager
         }
     }
 
-    /// <summary>
-    /// Sets a property value by object ID
-    /// </summary>
-    [Obsolete("Use SetProperty(GameObject, string, BsonValue) instead")]
-    public static bool SetProperty(string objectId, string propertyName, BsonValue value)
-        => PropertyManager.SetProperty(objectId, propertyName, value);
 
     /// <summary>
     /// Removes a property from an object instance
@@ -226,14 +211,6 @@ public static class ObjectManager
             _objectCache[obj.Id] = obj;
         return obj;
     }
-
-
-    /// <summary>
-    /// Removes a property by object ID
-    /// </summary>
-    [Obsolete("Use RemoveProperty(GameObject, string) instead")]
-    public static bool RemoveProperty(string objectId, string propertyName)
-        => PropertyManager.RemoveProperty(objectId, propertyName);
 
     /// <summary>
     /// Checks if an object has a property (including inherited properties)
