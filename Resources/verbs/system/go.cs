@@ -55,14 +55,14 @@ notify(Player, "<p class='error'>There are no exits from here.</p>");
 return;
 }
 dynamic destination = chosenExit.destination;
+notify(player, destination.Name);
 if (destination == null)
 {
 notify(Player, "<p class='error'>That exit doesn't lead anywhere.</p>");
 return;
 }
-var dst = Builtins.FindObjectById(destination);
 // Move the player
-if (Builtins.MoveObject(Player, dst))
+if (Builtins.MoveObject(Player, destination))
 {
 notify(Player, $"<p class='success'>You go <span class='param'>{chosenDirection}</span>.</p>");
 Builtins.ShowRoom();

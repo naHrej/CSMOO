@@ -24,7 +24,7 @@ public class GameObject : DynamicObject
         set
         {
             Properties["name"] = value != null ? new BsonValue(value) : BsonValue.Null;
-            
+
 
         }
     }
@@ -168,20 +168,20 @@ public class GameObject : DynamicObject
         set => Properties["size"] = value.HasValue ? new BsonValue(value.Value) : BsonValue.Null;
     }
 
-public List<string> Permissions
-{
-    get
+    public List<string> Permissions
     {
-        // Defensive: handle null or non-array values gracefully
-        if (!Properties.ContainsKey("permissions") || Properties["permissions"].IsNull)
-            return new List<string>();
-        var arr = Properties["permissions"].AsArray;
-        if (arr == null)
-            return new List<string>();
-        return arr.Select(v => v.AsString).ToList();
+        get
+        {
+            // Defensive: handle null or non-array values gracefully
+            if (!Properties.ContainsKey("permissions") || Properties["permissions"].IsNull)
+                return new List<string>();
+            var arr = Properties["permissions"].AsArray;
+            if (arr == null)
+                return new List<string>();
+            return arr.Select(v => v.AsString).ToList();
+        }
+        set => Properties["permissions"] = value != null ? new BsonArray(value.Select(s => new BsonValue(s))) : BsonValue.Null;
     }
-    set => Properties["permissions"] = value != null ? new BsonArray(value.Select(s => new BsonValue(s))) : BsonValue.Null;
-}
 
     /// <summary>
     /// Handles property getting: gameObject.propertyName
@@ -227,6 +227,8 @@ public List<string> Permissions
                     return true;
             }
 
+
+
             // Check if this is a null object (missing from database)
             if (Properties.ContainsKey("_isNullObject") &&
                 Properties["_isNullObject"].AsBoolean)
@@ -235,10 +237,26 @@ public List<string> Permissions
                 return true; // Return null for any property on a missing object
             }
 
+
+
             // Try to get the property from the instance's Properties dictionary only
             if (Properties.ContainsKey(propertyName))
             {
-                result = Properties[propertyName].RawValue;
+                var rawValue = Properties[propertyName].RawValue;
+                // Try to resolve as a GameObject if it's a Guid string
+                if (rawValue is string strValue && Guid.TryParse(strValue, out var guid))
+                {
+                    var obj = DbProvider.Instance.FindById<GameObject>("gameobjects", strValue);
+                    if (obj != null)
+                    {
+                        result = obj as dynamic;
+                        return true;
+                    }
+                    // If not found, return the string value
+                    result = strValue;
+                    return true;
+                }
+                result = rawValue;
                 return true;
             }
             // Check if this might be a case sensitivity issue with built-in properties
