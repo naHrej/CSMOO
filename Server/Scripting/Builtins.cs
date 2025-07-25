@@ -29,7 +29,7 @@ public static class Builtins
     /// <summary>
     /// Find a game object by its ID
     /// </summary>
-    public static GameObject? FindObject(string objectId)
+    public static dynamic? FindObject(string objectId)
     {
         if (string.IsNullOrEmpty(objectId)) return null;
         return DbProvider.Instance.FindById<GameObject>("gameobjects", objectId);
@@ -498,7 +498,7 @@ public static class Builtins
     /// <summary>
     /// Find an object by name in the current room
     /// </summary>
-    public static GameObject? FindObjectInRoom(string objectName, Player currentPlayer)
+    public static dynamic? FindObjectInRoom(string objectName, Player currentPlayer)
     {
         if (currentPlayer.Location == null) return null;
         
@@ -517,7 +517,7 @@ public static class Builtins
     /// <summary>
     /// Find an object by name in player's inventory
     /// </summary>
-    public static GameObject? FindObjectInInventory(string objectName, Player currentPlayer)
+    public static dynamic? FindObjectInInventory(string objectName, Player currentPlayer)
     {
         var inventory = GetObjectsInLocation(currentPlayer.Id);
         var foundObject = inventory.FirstOrDefault(obj =>
@@ -531,7 +531,7 @@ public static class Builtins
         return foundObject?.GameObject as GameObject;
     }
     
-    public static GameObject? FindObjectById(string objectId)
+    public static dynamic? FindObjectById(string objectId)
     {
         if (string.IsNullOrEmpty(objectId)) return null;
         return DbProvider.Instance.FindById<GameObject>("gameobjects", objectId);
@@ -701,7 +701,7 @@ public static class Builtins
     /// <summary>
     /// Get the class of an object (GameObject overload)
     /// </summary>
-    public static ObjectClass? GetObjectClass(GameObject obj)
+    public static dynamic? GetObjectClass(GameObject obj)
     {
         if (obj != null && !string.IsNullOrEmpty(obj.ClassId))
         {
@@ -713,7 +713,7 @@ public static class Builtins
     /// <summary>
     /// Get current player from script context
     /// </summary>
-    public static Player? GetCurrentPlayer()
+    public static dynamic? GetCurrentPlayer()
     {
         // Check unified context first, then fall back to old context
         if (((Database.Player?)UnifiedContext?.Player) != null)
@@ -733,23 +733,24 @@ public static class Builtins
     /// <summary>
     /// Get players in a room
     /// </summary>
-    public static List<Player> GetPlayersInRoom(string roomId)
+    public static List<dynamic> GetPlayersInRoom(string roomId)
     {
-        if (roomId == null) return new List<Player>();
+        if (roomId == null) return new List<dynamic>();
         
         return PlayerManager.GetOnlinePlayers()
             .Where(p => p.Location?.Id == roomId)
-            .ToList();
+            .ToList<dynamic>();
     }
     
     /// <summary>
     /// Get players in a room
     /// </summary>
-    public static List<Player> GetPlayersInRoom(GameObject room)
+    public static List<dynamic> GetPlayersInRoom(GameObject room)
     {
-        if (room is null) return new List<Player>();
+        if (room is null) return new List<dynamic>();
         return PlayerManager.GetOnlinePlayers()
             .Where(p => p.Location?.Id == room.Id)
+            .Cast<dynamic>()
             .ToList();
     }
     #endregion
@@ -789,14 +790,14 @@ public static class Builtins
             var exits = WorldManager.GetExitsFromRoom(currentPlayer.Location);
             if (exits.Any())
             {
-                var exitNames = exits.Select(e => GetProperty(e, "direction")?.AsString).Where(d => d != null);
+                var exitNames = ((IEnumerable<GameObject>)exits).Select(e => GetProperty(e, "direction")?.AsString).Where(d => d != null);
                 Notify(currentPlayer, $"Exits: {string.Join(", ", exitNames)}");
             }
 
             // Show objects
             var exitClassId = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "Exit")?.Id;
             var playerClassId = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "Player")?.Id;
-            var objects = GetObjectsInLocation(currentPlayer.Location.Id)
+            var objects = ((IEnumerable<dynamic>)GetObjectsInLocation(currentPlayer.Location.Id))
                 .Where(obj => {
                     var gameObject = obj.GameObject as GameObject;
                     return gameObject != null && 
@@ -819,7 +820,7 @@ public static class Builtins
             }
 
             // Show other players
-            var otherPlayers = GetPlayersInRoom(currentPlayer.Location).Where(p => p.Id != currentPlayer.Id);
+            var otherPlayers = ((IEnumerable<dynamic>)GetPlayersInRoom(currentPlayer.Location)).Where(p => p.Id != currentPlayer.Id);
             foreach (var otherPlayer in otherPlayers)
             {
                 Notify(currentPlayer, $"{otherPlayer.Name} is here.");
@@ -838,7 +839,7 @@ public static class Builtins
         target = target.ToLower();
         var objects = GetObjectsInLocation(currentPlayer.Location.Id);
         
-        var targetObject = objects.FirstOrDefault(obj =>
+        var targetObject = ((IEnumerable<dynamic>)objects).FirstOrDefault(obj =>
         {
             var gameObject = obj.GameObject as GameObject;
             if (gameObject == null) return false;
@@ -872,9 +873,8 @@ public static class Builtins
         itemName = itemName.ToLower();
         var roomObjects = GetObjectsInLocation(currentPlayer.Location.Id);
         
-        var foundObject = roomObjects.FirstOrDefault(obj =>
+        var foundObject = ((IEnumerable<GameObject>)roomObjects).FirstOrDefault(gameObject =>
         {
-            var gameObject = obj as GameObject;
             if (gameObject == null) return false;
             var name = GetProperty(gameObject, "name")?.AsString?.ToLower();
             var shortDesc = GetProperty(gameObject, "shortDescription")?.AsString?.ToLower();
@@ -896,7 +896,7 @@ public static class Builtins
         var playerGameObject = DbProvider.Instance.FindById<GameObject>("gameobjects", currentPlayer.Id);
         if (playerGameObject?.Contents == null) return null;
 
-        var foundObject = playerGameObject.Contents
+        var foundObject = ((IEnumerable<string>)playerGameObject.Contents)
             .Select(id => DbProvider.Instance.FindById<GameObject>("gameobjects", id))
             .FirstOrDefault(obj =>
             {
@@ -994,7 +994,7 @@ public static class Builtins
             return null;
         }
 
-        var verb = VerbManager.GetVerbsOnObject(objectId)
+        var verb = ((IEnumerable<Verb>)VerbManager.GetVerbsOnObject(objectId))
             .FirstOrDefault(v => v.Name.ToLower() == verbName.ToLower());
 
         if (verb == null)
