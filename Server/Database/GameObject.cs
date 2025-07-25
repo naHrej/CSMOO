@@ -323,10 +323,11 @@ public class GameObject : DynamicObject
                     return true;
             }
 
-            // Convert value to BsonValue for property storage
+            // If value is a GameObject, store its Id instead
             BsonValue bsonValue = value switch
             {
                 null => BsonValue.Null,
+                GameObject go => new BsonValue(go.Id),
                 string s => new BsonValue(s),
                 int i => new BsonValue(i),
                 long l => new BsonValue(l),
