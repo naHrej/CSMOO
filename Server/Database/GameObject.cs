@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Dynamic;
 using LiteDB;
+using CSMOO.Server.Logging;
 
 namespace CSMOO.Server.Database;
 
@@ -69,9 +71,14 @@ public class GameObject : DynamicObject
         get
         {
             var loc = Properties.ContainsKey("location") ? Properties["location"].AsString : null;
-            return loc != null ? DbProvider.Instance.FindById<GameObject>("gameobjects", loc) : null;
+            return loc != null ? ObjectManager.GetObject(loc) : null;
         }
-        set => Properties["location"] = value?.Id != null ? new BsonValue(value.Id) : BsonValue.Null;
+        set
+        {
+            Logger.Debug($"Setting location of object {Id} to {value?.Id}");
+            Properties["location"] = value?.Id != null ? new BsonValue(value.Id) : BsonValue.Null;
+
+        }
     }
 
     /// <summary>
@@ -95,7 +102,7 @@ public class GameObject : DynamicObject
 
     public GameObject? Owner
     {
-        get => Properties.ContainsKey("owner") ? DbProvider.Instance.FindById<GameObject>("gameobjects", Properties["owner"].AsString) : null;
+        get => Properties.ContainsKey("owner") ? ObjectManager.GetObject(Properties["owner"].AsString) : null;
         set => Properties["owner"] = value != null ? new BsonValue(value.Id) : BsonValue.Null;
     }
 
@@ -246,7 +253,7 @@ public class GameObject : DynamicObject
                 // Try to resolve as a GameObject if it's a Guid string
                 if (rawValue is string strValue && Guid.TryParse(strValue, out var guid))
                 {
-                    var obj = DbProvider.Instance.FindById<GameObject>("gameobjects", strValue);
+                    var obj = ObjectManager.GetObject( strValue);
                     if (obj != null)
                     {
                         result = obj as dynamic;
@@ -388,7 +395,7 @@ public class GameObject : DynamicObject
                 var playerObj = Scripting.Builtins.UnifiedContext.Player;
                 if (playerObj is GameObject playerGameObj)
                 {
-                    currentPlayer = DbProvider.Instance.FindById<Player>("players", playerGameObj.Id);
+                    currentPlayer = ObjectManager.GetObject<Player>(playerGameObj.Id);
                 }
 
                 commandProcessor = Scripting.Builtins.UnifiedContext.CommandProcessor;

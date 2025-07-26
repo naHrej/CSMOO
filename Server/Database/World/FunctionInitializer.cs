@@ -235,7 +235,7 @@ public static class FunctionInitializer
         // Only create if it doesn't already exist
         if (!existingFunctions.Any(f => f.ObjectId == systemObjectId && f.Name == functionDef.Name))
         {
-            var systemObject = DbProvider.Instance.FindById<GameObject>("gameobjects", systemObjectId);
+            var systemObject = ObjectManager.GetObject(systemObjectId);
             if (systemObject == null)
             {
                 Logger.Error($"System object with ID {systemObjectId} not found for function '{functionDef.Name}'");

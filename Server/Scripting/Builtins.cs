@@ -32,7 +32,7 @@ public static class Builtins
     public static dynamic? FindObject(string objectId)
     {
         if (string.IsNullOrEmpty(objectId)) return null;
-        return DbProvider.Instance.FindById<GameObject>("gameobjects", objectId);
+        return ObjectManager.GetObject(objectId);
     }
     
     
@@ -173,7 +173,7 @@ public static class Builtins
     /// </summary>
     public static Player? FindPlayerById(string playerId)
     {
-        return DbProvider.Instance.FindById<Player>("players", playerId);
+        return ObjectManager.GetObject<Player>(playerId);
     }
     
     /// <summary>
@@ -264,7 +264,7 @@ public static class Builtins
         // Handle GameObject wrapper
         if (player is GameObject gameObject)
         {
-            var dbPlayer = DbProvider.Instance.FindById<Player>("players", gameObject.Id);
+            var dbPlayer = ObjectManager.GetObject<Player>( gameObject.Id);
             return dbPlayer != null && PermissionManager.HasFlag(dbPlayer, PermissionManager.Flag.Admin);
         }
         
@@ -277,7 +277,7 @@ public static class Builtins
         // Handle dynamic object with Id property
         if (player.Id != null)
         {
-            var dbPlayer = DbProvider.Instance.FindById<Player>("players", (string)player.Id);
+            var dbPlayer = ObjectManager.GetObject<Player>( (string)player.Id);
             return dbPlayer != null && PermissionManager.HasFlag(dbPlayer, PermissionManager.Flag.Admin);
         }
         
@@ -294,7 +294,7 @@ public static class Builtins
         // Handle GameObject wrapper
         if (player is GameObject gameObject)
         {
-            var dbPlayer = DbProvider.Instance.FindById<Player>("players", gameObject.Id);
+            var dbPlayer = ObjectManager.GetObject<Player>(gameObject.Id);
             return dbPlayer != null && PermissionManager.HasFlag(dbPlayer, PermissionManager.Flag.Moderator);
         }
         
@@ -307,7 +307,7 @@ public static class Builtins
         // Handle dynamic object with Id property
         if (player.Id != null)
         {
-            var dbPlayer = DbProvider.Instance.FindById<Player>("players", (string)player.Id);
+            var dbPlayer = ObjectManager.GetObject<Player>( (string)player.Id);
             return dbPlayer != null && PermissionManager.HasFlag(dbPlayer, PermissionManager.Flag.Moderator);
         }
         
@@ -324,7 +324,7 @@ public static class Builtins
         // Handle GameObject wrapper
         if (player is GameObject gameObject)
         {
-            var dbPlayer = DbProvider.Instance.FindById<Player>("players", gameObject.Id);
+            var dbPlayer = ObjectManager.GetObject<Player>( gameObject.Id);
             return dbPlayer != null && PermissionManager.HasFlag(dbPlayer, PermissionManager.Flag.Programmer);
         }
         
@@ -337,7 +337,7 @@ public static class Builtins
         // Handle dynamic object with Id property
         if (player.Id != null)
         {
-            var dbPlayer = DbProvider.Instance.FindById<Player>("players", (string)player.Id);
+            var dbPlayer = ObjectManager.GetObject<Player>( (string)player.Id);
             return dbPlayer != null && PermissionManager.HasFlag(dbPlayer, PermissionManager.Flag.Programmer);
         }
         
@@ -354,7 +354,7 @@ public static class Builtins
         // Handle GameObject wrapper
         if (player is GameObject gameObject)
         {
-            var dbPlayer = DbProvider.Instance.FindById<Player>("players", gameObject.Id);
+            var dbPlayer = ObjectManager.GetObject<Player>(gameObject.Id);
             return dbPlayer != null ? PermissionManager.GetPlayerFlags(dbPlayer).Select(f => f.ToString()).ToList() : new List<string>();
         }
         
@@ -367,7 +367,7 @@ public static class Builtins
         // Handle dynamic object with Id property
         if (player.Id != null)
         {
-            var dbPlayer = DbProvider.Instance.FindById<Player>("players", (string)player.Id);
+            var dbPlayer = ObjectManager.GetObject<Player>((string)player.Id);
             return dbPlayer != null ? PermissionManager.GetPlayerFlags(dbPlayer).Select(f => f.ToString()).ToList() : new List<string>();
         }
         
@@ -534,7 +534,7 @@ public static class Builtins
     public static dynamic? FindObjectById(string objectId)
     {
         if (string.IsNullOrEmpty(objectId)) return null;
-        return DbProvider.Instance.FindById<GameObject>("gameobjects", objectId);
+        return ObjectManager.GetObject(objectId);
     }
     
     #endregion
@@ -724,7 +724,7 @@ public static class Builtins
                 return unifiedPlayer;
             var id = unifiedPlayer?.Id;
             if (!string.IsNullOrEmpty(id))
-                return DbProvider.Instance.FindById<Player>("players", id);
+                return ObjectManager.GetObject<Player>(id);
             return null;
         }
         return (Database.Player?)CurrentContext?.Player;
@@ -765,7 +765,7 @@ public static class Builtins
         var currentPlayer = GetCurrentPlayer();
         if (currentPlayer?.Location == null) return "You are nowhere.";
 
-        var room = DbProvider.Instance.FindById<GameObject>("gameobjects", currentPlayer.Location.Id);
+        var room = ObjectManager.GetObject(currentPlayer.Location.Id);
         if (room == null) return "You are in a void.";
 
         var name = GetProperty(room, "name")?.AsString ?? "Unknown Room";
@@ -893,11 +893,11 @@ public static class Builtins
         if (currentPlayer == null) return null;
 
         itemName = itemName.ToLower();
-        var playerGameObject = DbProvider.Instance.FindById<GameObject>("gameobjects", currentPlayer.Id);
+        var playerGameObject = ObjectManager.GetObject(currentPlayer.Id);
         if (playerGameObject?.Contents == null) return null;
 
         var foundObject = ((IEnumerable<string>)playerGameObject.Contents)
-            .Select(id => DbProvider.Instance.FindById<GameObject>("gameobjects", id))
+            .Select(id => ObjectManager.GetObject(id))
             .FirstOrDefault(obj =>
             {
                 if (obj == null) return false;
@@ -937,7 +937,7 @@ public static class Builtins
         foreach (var player in playersInRoom)
         {
             if (excludeSelf && player.Id == currentPlayer.Id) continue;
-            var targetPlayer = DbProvider.Instance.FindById<Player>("players", player.Id);
+            var targetPlayer = ObjectManager.GetObject<Player>(player.Id);
             if (targetPlayer != null)
             {
                 Notify(targetPlayer, message);
@@ -961,7 +961,7 @@ public static class Builtins
         var currentPlayer = GetCurrentPlayer();
         if (currentPlayer == null) return;
 
-        var playerGameObject = DbProvider.Instance.FindById<GameObject>("gameobjects", currentPlayer.Id);
+        var playerGameObject = ObjectManager.GetObject(currentPlayer.Id);
         if (playerGameObject?.Contents == null || !playerGameObject.Contents.Any())
         {
             Notify(currentPlayer, "You are carrying nothing.");
@@ -971,7 +971,7 @@ public static class Builtins
         Notify(currentPlayer, "You are carrying:");
         foreach (var itemId in playerGameObject.Contents)
         {
-            var item = DbProvider.Instance.FindById<GameObject>("gameobjects", itemId);
+            var item = ObjectManager.GetObject(itemId);
             if (item != null)
             {
                 var name = GetProperty(item, "shortDescription") ?? "something";
@@ -1002,7 +1002,7 @@ public static class Builtins
             return null;
         }
 
-        var obj = DbProvider.Instance.FindById<GameObject>("gameobjects", objectId);
+        var obj = ObjectManager.GetObject(objectId);
         return new VerbInfo
         {
             ObjectId = objectId,
@@ -1226,7 +1226,7 @@ public static class Builtins
         try
         {
             // Look up the Database.Player from the GameObject player
-            var dbPlayer = DbProvider.Instance.FindById<Player>("players", player.Id);
+            var dbPlayer = ObjectManager.GetObject<Player>(player.Id);
             if (dbPlayer == null)
             {
                 throw new ArgumentException($"Player with ID '{player.Id}' not found in database");

@@ -56,7 +56,7 @@ public static class InstanceManager
     /// </summary>
     public static bool DestroyInstance(string objectId)
     {
-        var gameObject = DbProvider.Instance.FindById<GameObject>("gameobjects", objectId);
+        var gameObject = ObjectManager.GetObject(objectId);
         if (gameObject == null) return false;
 
         // Move any contents to nowhere (they become orphaned)
@@ -78,7 +78,7 @@ public static class InstanceManager
     /// </summary>
     public static bool MoveObject(string objectId, string? newLocationId)
     {
-        var gameObject = DbProvider.Instance.FindById<GameObject>("gameobjects", objectId);
+        var gameObject = ObjectManager.GetObject(objectId);
         if (gameObject == null) return false;
         if (newLocationId == null)
         {
@@ -86,7 +86,7 @@ public static class InstanceManager
         }
         else
         {
-            var newLocation = DbProvider.Instance.FindById<GameObject>("gameobjects", newLocationId);
+            var newLocation = ObjectManager.GetObject(newLocationId);
             if (newLocation == null)
                 throw new ArgumentException($"Location with ID {newLocationId} not found");
             

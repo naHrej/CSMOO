@@ -26,7 +26,7 @@ public static class FunctionResolver
         }
 
         // Check if this is a game object with a class
-        var gameObject = DbProvider.Instance.FindById<GameObject>("gameobjects", objectId);
+        var gameObject = ObjectManager.GetObject(objectId);
         if (gameObject?.ClassId != null)
         {
             // Get inheritance chain and search from most specific to most general
@@ -56,7 +56,7 @@ public static class FunctionResolver
         allFunctions.AddRange(instanceFunctions);
 
         // Check if this is a game object with class inheritance
-        var gameObject = DbProvider.Instance.FindById<GameObject>("gameobjects", objectId);
+        var gameObject = ObjectManager.GetObject(objectId);
         if (gameObject?.ClassId != null)
         {
             var inheritanceChain = ObjectManager.GetInheritanceChain(gameObject.ClassId);
@@ -109,8 +109,8 @@ public static class FunctionResolver
         }
 
         // Check if this is a game object with class inheritance
-        var gameObject = DbProvider.Instance.FindById<GameObject>("gameobjects", objectId);
-        
+        var gameObject = ObjectManager.GetObject(objectId);
+
         if (gameObject?.ClassId != null)
         {
             var inheritanceChain = ObjectManager.GetInheritanceChain(gameObject.ClassId);

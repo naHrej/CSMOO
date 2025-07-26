@@ -20,9 +20,9 @@ public static class WorldManager
     /// <summary>
     /// Creates bidirectional exits between two rooms
     /// </summary>
-    public static void CreateExit(string fromRoomId, string toRoomId, string direction, string returnDirection)
+    public static void CreateExit(GameObject fromRoom, GameObject toRoom, string direction, string returnDirection)
     {
-        RoomManager.CreateExit(fromRoomId, toRoomId, direction, returnDirection);
+        RoomManager.CreateExit(fromRoom, toRoom, direction, returnDirection);
     }
 
     /// <summary>

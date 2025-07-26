@@ -156,6 +156,29 @@ public static class ObjectManager
             _objectCache[obj.Id] = obj;
         return obj;
     }
+    /// <summary>
+    /// Gets a typed object by ID
+    /// </summary>
+    public static T? GetObject<T>(string objectId) where T : GameObject 
+    {
+        if (string.IsNullOrEmpty(objectId)) return default;
+        if (_objectCache.TryGetValue(objectId, out var cachedObj) && cachedObj is T cached)
+            return cached;
+        T? obj;
+        if (typeof(T) == typeof(Player)){
+            obj = DbProvider.Instance.FindById<T>("players", objectId);
+        }
+        else
+        {
+            obj = DbProvider.Instance.FindById<T>("gameobjects", objectId);
+        }
+
+
+
+        if (obj != null)
+            _objectCache[obj.Id] = obj;
+        return obj;
+    }
 
     #endregion
 

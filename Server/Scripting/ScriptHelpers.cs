@@ -53,7 +53,7 @@ public class ScriptHelpers
     public void notify(GameObject playerObj, string message)
     {
         // Convert GameObject to Player
-        var player = DbProvider.Instance.FindById<Player>("players", playerObj.Id);
+        var player = ObjectManager.GetObject<Player>(playerObj.Id);
         if (player?.SessionGuid != null)
         {
             _commandProcessor.SendToPlayer(message, player.SessionGuid);
@@ -231,7 +231,7 @@ public class ScriptHelpers
         var playerMatch = players.FirstOrDefault(p => p.Name.ToLower().Contains(name));
         if (playerMatch != null)
         {
-            var playerObj = DbProvider.Instance.FindById<GameObject>("gameobjects", playerMatch.Id);
+            var playerObj = ObjectManager.GetObject(playerMatch.Id);
             if (playerObj != null)
             {
                 Logger.Debug($"Found player '{name}': #{playerObj.DbRef} ({playerMatch.Name})");
@@ -263,8 +263,7 @@ public class ScriptHelpers
     /// </summary>
     public GameObject? GetObject(string objectId)
     {
-        var gameObject = DbProvider.Instance.FindById<GameObject>("gameobjects", objectId);
-        return gameObject;
+        return ObjectManager.GetObject(objectId);
     }
 
     /// <summary>
@@ -272,7 +271,7 @@ public class ScriptHelpers
     /// </summary>
     public string GetObjectName(string objectId)
     {
-        var obj = DbProvider.Instance.FindById<GameObject>("gameobjects", objectId);
+        var obj = ObjectManager.GetObject(objectId);
         if (obj == null) return "unknown object";
         
         var name = ObjectManager.GetProperty(obj, "name")?.AsString;
@@ -332,7 +331,7 @@ public class ScriptHelpers
     public void UpdatePlayerProperty(Player player, string propertyName, object value)
     {
         // Update the database record
-        var playerRecord = DbProvider.Instance.FindById<Player>("players", player.Id);
+        var playerRecord =ObjectManager.GetObject<Player>( player.Id);
         if (playerRecord != null)
         {
             // Use reflection to set the property on the database record
@@ -381,7 +380,7 @@ public class ScriptHelpers
             return;
         }
 
-        var room = DbProvider.Instance.FindById<GameObject>("gameobjects", _player.Location.Id);
+        var room = ObjectManager.GetObject(_player.Location.Id);
         if (room == null)
         {
             notify(_player, "You are in a void.");
@@ -586,7 +585,7 @@ public class ScriptHelpers
     {
         if (_player == null) return;
 
-        var playerGameObject = DbProvider.Instance.FindById<GameObject>("gameobjects", _player.Id);
+        var playerGameObject = ObjectManager.GetObject(_player.Id);
         if (playerGameObject?.Contents == null || !playerGameObject.Contents.Any())
         {
             notify(_player, "You are carrying nothing.");
@@ -596,7 +595,7 @@ public class ScriptHelpers
         notify(_player, "You are carrying:");
         foreach (var itemId in playerGameObject.Contents)
         {
-            var item = DbProvider.Instance.FindById<GameObject>("gameobjects", itemId);
+            var item = ObjectManager.GetObject(itemId);
             if (item != null)
             {
                 var name = ObjectManager.GetProperty(item, "shortDescription")?.AsString ?? "something";
@@ -613,11 +612,11 @@ public class ScriptHelpers
         if (_player == null) return null;
 
         itemName = itemName.ToLower();
-        var playerGameObject = DbProvider.Instance.FindById<GameObject>("gameobjects", _player.Id);
+        var playerGameObject = ObjectManager.GetObject(_player.Id);
         if (playerGameObject?.Contents == null) return null;
 
         var foundObject = playerGameObject.Contents
-            .Select(id => DbProvider.Instance.FindById<GameObject>("gameobjects", id))
+            .Select(id => ObjectManager.GetObject(id))
             .FirstOrDefault(obj =>
             {
                 if (obj == null) return false;

@@ -1286,7 +1286,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
         var playerMatch = players.FirstOrDefault(p => p.Name.ToLower().Contains(name));
         if (playerMatch != null)
         {
-            var playerObj = DbProvider.Instance.FindById<GameObject>("gameobjects", playerMatch.Id);
+            var playerObj = ObjectManager.GetObject(playerMatch.Id);
             if (playerObj != null)
             {
                 Logger.Debug($"Found player '{name}': #{playerObj.DbRef} ({playerMatch.Name})");
@@ -1359,7 +1359,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
         if (objectId == _player.Location?.Id) return "here";
 
         // Try as a GameObject first
-        var obj = DbProvider.Instance.FindById<GameObject>("gameobjects", objectId);
+        var obj = ObjectManager.GetObject(objectId);
         if (obj != null)
         {
             var name = ObjectManager.GetProperty(obj, "name")?.AsString;
@@ -2052,7 +2052,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
         }
 
         // Create the function (new signature expects GameObject)
-        var gameObject = DbProvider.Instance.FindById<GameObject>("gameobjects", objectId);
+        var gameObject = ObjectManager.GetObject(objectId);
         if (gameObject == null)
         {
             _commandProcessor.SendToPlayer($"Object with ID '{objectId}' not found.");

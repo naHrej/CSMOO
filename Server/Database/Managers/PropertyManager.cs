@@ -46,7 +46,7 @@ public static class PropertyManager
     /// </summary>
     public static bool SetProperty(string objectId, string propertyName, BsonValue value)
     {
-        var gameObject = DbProvider.Instance.FindById<GameObject>("gameobjects", objectId);
+        var gameObject = ObjectManager.GetObject(objectId);
         if (gameObject == null) return false;
 
         SetProperty(gameObject, propertyName, value);
@@ -72,7 +72,7 @@ public static class PropertyManager
     /// </summary>
     public static bool RemoveProperty(string objectId, string propertyName)
     {
-        var gameObject = DbProvider.Instance.FindById<GameObject>("gameobjects", objectId);
+        var gameObject = ObjectManager.GetObject(objectId);
         if (gameObject == null) return false;
 
         return RemoveProperty(gameObject, propertyName);
