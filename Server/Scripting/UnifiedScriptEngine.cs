@@ -103,10 +103,10 @@ public class UnifiedScriptEngine
         }
         catch (Exception ex)
         {
-            Logger.Error($"Script execution error in verb '{verb.Name}': {ex.Message}");
+            Logger.Error($"Script execution error in verb '{verb.Name}': {ex}");
             if (ex.InnerException != null)
             {
-                Logger.Error($"Inner exception: {ex.InnerException.Message}");
+                Logger.Error($"Inner exception: {ex.InnerException}");
             }
             throw;
         }

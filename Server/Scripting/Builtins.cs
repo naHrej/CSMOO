@@ -911,17 +911,17 @@ public static class Builtins
     /// <summary>
     /// Move an object to a new location
     /// </summary>
-    public static bool MoveObject(GameObject gameObj, GameObject destination)
+    public static bool MoveObject(dynamic gameObj, dynamic destination)
     {
         try
         {
-            ObjectManager.MoveObject(gameObj, destination);
+            ObjectManager.MoveObject(gameObj, destination as GameObject);
             return true;
         }
         catch (Exception ex)
         {
             Logger.Error($"Failed to move object {gameObj.Id} to {destination.Id}: {ex.Message}");
-            return false;
+            throw;
         }
     }
 

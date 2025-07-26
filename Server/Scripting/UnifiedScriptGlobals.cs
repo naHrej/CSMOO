@@ -177,7 +177,7 @@ public class UnifiedScriptGlobals : EnhancedScriptGlobals
     /// <summary>
     /// Get a player by name or ID for use with notify()
     /// </summary>
-    public GameObject? GetPlayer(string nameOrId)
+    public dynamic? GetPlayer(string nameOrId)
     {
         // Try by name first
         var player = DbProvider.Instance.FindOne<Database.Player>("players", p => 
@@ -200,16 +200,34 @@ public class UnifiedScriptGlobals : EnhancedScriptGlobals
     /// </summary>
     public new dynamic? player => Player;
 
+    
+    public new dynamic? here
+    {
+        get
+        {
+            dynamic? location = null;
+            if ((Player as dynamic).Location != null)
+                return (Player as dynamic).Location;
+            return DbProvider.Instance.FindOne<dynamic>("gameobjects",
+            o => o.Properties.ContainsKey("isStartingRoom"));
+                
+        }
+    }
+
+    public dynamic? room => here;
+    public dynamic? Room => here;
+
+
     /// <summary>
     /// Send a message to all players in the same room as the current player
     /// </summary>
     public new void SayToRoom(string message, bool includePlayer = false)
     {
-        var playerGameObject = GetPlayerGameObject();
+        var playerGameObject = GetPlayerGameObject() as dynamic;
         if (playerGameObject?.Location == null) return;
 
         var playersInRoom = Database.PlayerManager.GetOnlinePlayers()
-            .Where(p => p.Location == playerGameObject.Location)
+            .Where(p => ((dynamic)p).Location == playerGameObject.Location)
             .ToList();
 
         foreach (var otherPlayer in playersInRoom)
@@ -226,11 +244,11 @@ public class UnifiedScriptGlobals : EnhancedScriptGlobals
     /// </summary>
     public string? FindObjectInRoom(string name)
     {
-        var playerGameObject = GetPlayerGameObject();
+        var playerGameObject = GetPlayerGameObject() as dynamic;
         if (playerGameObject?.Location == null) return null;
 
         var objects = Database.ObjectManager.GetObjectsInLocation(playerGameObject.Location);
-        var targetObject = objects.FirstOrDefault(obj =>
+        var targetObject = objects.FirstOrDefault<GameObject>(obj =>
         {
             var objName = Database.ObjectManager.GetProperty(obj, "name")?.AsString?.ToLower();
             var shortDesc = Database.ObjectManager.GetProperty(obj, "shortDescription")?.AsString?.ToLower();
