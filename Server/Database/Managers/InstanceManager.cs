@@ -101,19 +101,8 @@ public static class InstanceManager
     public static bool MoveObject(GameObject gameObject, GameObject newLocation)
     {
         if (gameObject == null || newLocation == null) return false;
-        dynamic go = gameObject;
-        Logger.Debug($"InstanceManager: Moving object {go.Id} to {newLocation.Id}");
-        go.Location = newLocation;
-        try
-        {
-            var result = DbProvider.Instance.Update<dynamic>("gameobjects", go);
-            return true;
-        }
-        catch (Exception ex)
-        {
-            Logger.Error($"InstanceManager: Failed to move object {go.Id} to {newLocation.Id}: {ex.Message}");
-            throw new InvalidOperationException($"InstanceManager: Failed to move object {go.Id} to {newLocation.Id}", ex);
-        }
+        gameObject.Location = newLocation;
+        return DbProvider.Instance.Update("gameobjects", gameObject);
     }
 
     /// <summary>
