@@ -74,7 +74,7 @@ public static class ObjectResolver
   /// <summary>
   /// Implements keyword matching ("me", "here", "system", etc.).
   /// </summary>
-  private static GameObject? MatchKeyword(string name, dynamic looker, dynamic? location = null)
+  private static GameObject? MatchKeyword(string name, GameObject looker, GameObject? location = null)
   {
     var effectiveLocation = location;
     if (effectiveLocation == null && looker.Location != null)

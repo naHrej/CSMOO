@@ -16,7 +16,7 @@ namespace CSMOO.Server.Commands;
 public class ProgrammingCommands
 {
     private readonly CommandProcessor _commandProcessor;
-    private readonly dynamic _player;
+    private readonly Player _player;
     
     // For multi-line programming
     private bool _isInProgrammingMode = false;

@@ -59,6 +59,20 @@ public class GameObject : DynamicObject
     /// </summary>
     public BsonDocument Properties { get; set; } = new BsonDocument();
 
+    /// <summary>
+    /// Location of this object (ID of the room/container it's in)
+    /// Null means it's not in the game world currently
+    /// Preferred over using Location property directly
+    /// </summary>
+    public GameObject? Location
+    {
+        get
+        {
+            var loc = Properties.ContainsKey("location") ? Properties["location"].AsString : null;
+            return loc != null ? DbProvider.Instance.FindById<GameObject>("gameobjects", loc) : null;
+        }
+        set => Properties["location"] = value?.Id != null ? new BsonValue(value.Id) : BsonValue.Null;
+    }
 
     /// <summary>
     /// Objects contained within this object (inventory, room contents, etc.)

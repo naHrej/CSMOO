@@ -409,16 +409,16 @@ public class EnhancedScriptGlobals : ScriptGlobals
     {
         get
         {
-            dynamic? location = null;
+            string? location = null;
             if (this is UnifiedScriptGlobals unifiedGlobals)
             {
-                location = ((Database.Player?)unifiedGlobals.Player)?.Location as GameObject;
+                location = ((Database.Player?)unifiedGlobals.Player)?.Location?.Id;
             }
             else
             {
-                location = Player?.Location as GameObject;
+                location = Player?.Location?.Id;
             }
-            return _objectFactory?.GetObjectById(location?.Id ?? "") as GameObject;
+            return _objectFactory?.GetObjectById(location ?? "");
         }
     }
 

@@ -99,7 +99,6 @@ public static class ObjectManager
     /// <summary>
     /// Moves an object to a new location
     /// </summary>
-    [Obsolete("Use MoveObject(GameObject gameObject, GameObject newLocation) instead")]
     public static bool MoveObject(string objectId, string? newLocationId)
         => InstanceManager.MoveObject(objectId, newLocationId);
 
