@@ -108,7 +108,7 @@ public static class VerbResolver
         allVerbs.AddRange(instanceVerbs);
 
         // Get the GameObject to access its class
-        var gameObject = DbProvider.Instance.FindById<GameObject>("gameobjects", objectId);
+        var gameObject = ObjectManager.GetObject(objectId);
         if (gameObject != null)
         {
             // Then get verbs from the inheritance chain (classes)
@@ -383,7 +383,7 @@ public static class VerbResolver
         var allVerbs = new List<(Verb verb, string source)>();
         
         // Get the GameObject to access its class
-        var gameObject = DbProvider.Instance.FindById<GameObject>("gameobjects", objectId);
+        var gameObject = ObjectManager.GetObject(objectId);
         if (gameObject != null)
         {
             // First, get verbs directly on the object instance

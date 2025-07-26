@@ -52,7 +52,7 @@ public class UnifiedScriptGlobals : EnhancedScriptGlobals
         get
         {
             if (string.IsNullOrEmpty(_playerId)) return null;
-            return DbProvider.Instance.FindById<Player>("gameobjects", _playerId);
+            return Database.ObjectManager.GetObject<Player>(_playerId);
         }
         set
         {

@@ -40,7 +40,7 @@ public class ScriptObject : DynamicObject
     public GameObject? GetGameObject()
     {
         // Use DbProvider for all DB access
-        return DbProvider.Instance.FindById<GameObject>("gameobjects", _objectId);
+        return ObjectManager.GetObject(_objectId);
     }
 
     /// <summary>
@@ -304,7 +304,7 @@ public class ScriptObjectFactory
     /// </summary>
     public dynamic? GetObjectById(string objectId)
     {
-        var obj = DbProvider.Instance.FindById<GameObject>("gameobjects", objectId);
+        var obj = ObjectManager.GetObject(objectId);
         if (obj == null) return null;
         return new ScriptObject(objectId, _currentPlayer, _commandProcessor, _helpers);
     }

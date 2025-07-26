@@ -106,7 +106,7 @@ public static class PlayerManager
     /// </summary>
     public static void ConnectPlayerToSession(string playerId, Guid sessionGuid)
     {
-        var player = DbProvider.Instance.FindById<Player>("players", playerId);
+        var player = ObjectManager.GetObject<Player>( playerId);
         if (player == null)
             throw new ArgumentException($"Player with ID {playerId} not found");
 
@@ -129,7 +129,7 @@ public static class PlayerManager
     /// </summary>
     public static void DisconnectPlayer(string playerId)
     {
-        var player = DbProvider.Instance.FindById<Player>("players", playerId);
+        var player = ObjectManager.GetObject<Player>(playerId);
         if (player == null)
             return;
 
@@ -174,7 +174,7 @@ public static class PlayerManager
     /// </summary>
     public static void ChangePassword(string playerId, string newPassword)
     {
-        var player = DbProvider.Instance.FindById<Player>("players", playerId);
+        var player = ObjectManager.GetObject<Player>(playerId);
         if (player == null)
             throw new ArgumentException($"Player with ID {playerId} not found");
   

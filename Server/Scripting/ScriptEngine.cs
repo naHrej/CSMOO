@@ -184,7 +184,7 @@ public class ScriptGlobals
     /// </summary>
     public object? GetProperty(string objectId, string propertyName)
     {
-        var obj = DbProvider.Instance.FindById<GameObject>("gameobjects", objectId);
+        var obj = Database.ObjectManager.GetObject(objectId);
         if (obj == null) return null;
         return Database.ObjectManager.GetProperty(obj, propertyName)?.RawValue;
     }
@@ -338,14 +338,14 @@ public class ScriptObjectManager
 {
     public object? GetProperty(string objectId, string propertyName)
     {
-        var obj = DbProvider.Instance.FindById<GameObject>("gameobjects", objectId);
+        var obj = ObjectManager.GetObject(objectId);
         if (obj == null) return null;
         return Database.ObjectManager.GetProperty(obj, propertyName)?.RawValue;
     }
 
     public void SetProperty(string objectId, string propertyName, object value)
     {
-        var obj = DbProvider.Instance.FindById<GameObject>("gameobjects", objectId);
+        var obj = ObjectManager.GetObject(objectId);
         if (obj != null)
         {
             Database.ObjectManager.SetProperty(obj, propertyName, new BsonValue(value));
@@ -378,9 +378,9 @@ public class ScriptWorldManager
         return [.. Database.WorldManager.GetAllRooms().Select(room => room.Id)];
     }
 
-    public void CreateExit(string fromRoomId, string toRoomId, string direction, string returnDirection)
+    public void CreateExit(GameObject fromRoom, GameObject toRoom, string direction, string returnDirection)
     {
-        Database.WorldManager.CreateExit(fromRoomId, toRoomId, direction, returnDirection);
+        Database.WorldManager.CreateExit(fromRoom, toRoom, direction, returnDirection);
     }
 
     public string CreateSimpleItem(string name, string shortDesc, string longDesc, string? locationId = null)

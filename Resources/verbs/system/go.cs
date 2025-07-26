@@ -65,7 +65,7 @@ return;
 if (Builtins.MoveObject(Player, destination))
 {
 notify(Player, $"<p class='success'>You go <span class='param'>{chosenDirection}</span>.</p>");
-Builtins.ShowRoom();
+    notify(Player, destination.longDescription);
 }
 else
 {

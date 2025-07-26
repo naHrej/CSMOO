@@ -112,7 +112,7 @@ public static class ObjectResolver
   /// </summary>
   private static GameObject? MatchId(string objectId)
   {
-    return DbProvider.Instance.FindById<GameObject>("gameobjects", objectId);
+    return ObjectManager.GetObject(objectId);
   }
 
   /// <summary>

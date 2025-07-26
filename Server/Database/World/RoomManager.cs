@@ -50,9 +50,11 @@ public static class RoomManager
             "A tranquil grove surrounded by ancient oak trees. Sunlight filters through " +
             "the canopy above, creating dancing patterns on the soft grass below. " +
             "A gentle breeze carries the scent of wildflowers.");
+        // Set the location of the second room
+        ObjectManager.SetProperty(secondRoom, "location", null!);
 
         // Create exits between the rooms
-        CreateExit(startingRoom.Id, secondRoom.Id, "north", "south");
+        CreateExit(startingRoom, secondRoom, "north", "south");
 
         // Create a simple item in the grove
         CreateSimpleItem("A Wooden Staff", "a wooden staff", 
@@ -65,7 +67,7 @@ public static class RoomManager
     /// <summary>
     /// Creates bidirectional exits between two rooms
     /// </summary>
-    public static void CreateExit(string fromRoomId, string toRoomId, string direction, string returnDirection)
+    public static void CreateExit(GameObject fromRoom, GameObject toRoom, string direction, string returnDirection)
     {
         var exitClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "Exit");
         if (exitClass == null)
@@ -75,22 +77,25 @@ public static class RoomManager
         }
 
         // Create the forward exit
-        var forwardExit = ObjectManager.CreateInstance(exitClass.Id, fromRoomId);
+        var forwardExit = ObjectManager.CreateInstance(exitClass.Id, fromRoom.Id);
         ObjectManager.SetProperty(forwardExit, "name", direction);
         ObjectManager.SetProperty(forwardExit, "shortDescription", direction);
         ObjectManager.SetProperty(forwardExit, "longDescription", $"An exit leading {direction}.");
         ObjectManager.SetProperty(forwardExit, "direction", direction);
-        ObjectManager.SetProperty(forwardExit, "destination", toRoomId);
+        ObjectManager.SetProperty(forwardExit, "destination", toRoom.Id);
 
         // Create the return exit
-        var returnExit = ObjectManager.CreateInstance(exitClass.Id, toRoomId);
+        var returnExit = ObjectManager.CreateInstance(exitClass.Id, toRoom.Id);
         ObjectManager.SetProperty(returnExit, "name", returnDirection);
         ObjectManager.SetProperty(returnExit, "shortDescription", returnDirection);
         ObjectManager.SetProperty(returnExit, "longDescription", $"An exit leading {returnDirection}.");
         ObjectManager.SetProperty(returnExit, "direction", returnDirection);
-        ObjectManager.SetProperty(returnExit, "destination", fromRoomId);
+        ObjectManager.SetProperty(returnExit, "destination", fromRoom.Id);
+        // Set location for both exits
+        ObjectManager.SetProperty(forwardExit, "location", fromRoom.Id);
+        ObjectManager.SetProperty(returnExit, "location", toRoom.Id);
 
-        Logger.Debug($"Created bidirectional exit: {direction} from #{fromRoomId} to #{toRoomId}");
+        Logger.Debug($"Created bidirectional exit: {direction} from #{fromRoom.Id} to #{toRoom.Id}");
     }
 
     /// <summary>
@@ -106,6 +111,7 @@ public static class RoomManager
         ObjectManager.SetProperty(item, "name", name);
         ObjectManager.SetProperty(item, "shortDescription", shortDesc);
         ObjectManager.SetProperty(item, "longDescription", longDesc);
+        ObjectManager.SetProperty(item, "location", locationId);
 
         Logger.Debug($"Created item '{name}' in location #{locationId}");
         return item;
