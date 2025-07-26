@@ -73,12 +73,8 @@ public class GameObject : DynamicObject
             var loc = Properties.ContainsKey("location") ? Properties["location"].AsString : null;
             return loc != null ? ObjectManager.GetObject(loc) : null;
         }
-        set
-        {
-            Logger.Debug($"Setting location of object {Id} to {value?.Id}");
-            Properties["location"] = value?.Id != null ? new BsonValue(value.Id) : BsonValue.Null;
+        set => Properties["location"] = value?.Id != null ? new BsonValue(value.Id) : BsonValue.Null;
 
-        }
     }
 
     /// <summary>
