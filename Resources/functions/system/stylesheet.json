@@ -1,0 +1,7 @@
+{
+  "name": "stylesheet",
+  "returnType": "string",
+  "parameters": [],
+  "parameterNames": [],
+  "description": "output CSS/LESS"
+}

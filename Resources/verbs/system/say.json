@@ -1,6 +1,6 @@
 {
   "name": "say",
-  "aliases": "",
+  "aliases": "\"",
   "pattern": "*",
   "description": "Speak to others in the room",
   "code": [
