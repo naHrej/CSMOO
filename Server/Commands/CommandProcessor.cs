@@ -398,6 +398,10 @@ public class CommandProcessor
     {
         try
         {
+            // send static Stylesheet.less as css to client
+            string css = Html.GetStylesheet();
+            SendToPlayer($"<style type='text/css'>{css}</style><hr/>");
+
             // Find the system object first
             var allObjects = DbProvider.Instance.FindAll<GameObject>("gameobjects").ToList();
             var systemObj = allObjects.FirstOrDefault(obj => 
@@ -426,7 +430,7 @@ public class CommandProcessor
                         {
                             var output = result.ToString();
                             if (!string.IsNullOrEmpty(output))
-                            {
+                            {                                
                                 SendToPlayer(output);
                                 return;
                             }

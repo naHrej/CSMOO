@@ -65,7 +65,7 @@ public static class Html
     {
         if (level < 1 || level > 6)
             throw new ArgumentException("Heading level must be between 1 and 6", nameof(level));
-        
+
         return Element($"h{level}", text);
     }
 
@@ -174,16 +174,16 @@ public static class Html
         public static string ProcessLess(string lessCSS, Dictionary<string, string>? variables = null)
         {
             variables ??= new Dictionary<string, string>();
-            
+
             // Replace variables (format: @variableName)
             foreach (var kvp in variables)
             {
                 lessCSS = lessCSS.Replace($"@{kvp.Key}", kvp.Value);
             }
-            
+
             // Process simple nesting (one level deep for MUD compatibility)
             lessCSS = ProcessSimpleNesting(lessCSS);
-            
+
             // Remove extra whitespace and normalize
             lessCSS = Regex.Replace(lessCSS, @"\s+", " ").Trim();
             
@@ -203,10 +203,10 @@ public static class Html
             // Simple nesting processor - handles basic cases like:
             // .container { color: red; .nested { background: blue; } }
             // Converts to: .container { color: red; } .container .nested { background: blue; }
-            
+
             var result = css;
             var nestedPattern = @"([^{}]+)\s*\{\s*([^{}]*?)\s*([^{}]+\s*\{[^{}]*\})\s*([^{}]*?)\s*\}";
-            
+
             while (Regex.IsMatch(result, nestedPattern))
             {
                 result = Regex.Replace(result, nestedPattern, match =>
@@ -215,26 +215,26 @@ public static class Html
                     var parentProps = match.Groups[2].Value.Trim();
                     var nestedRule = match.Groups[3].Value.Trim();
                     var remainingProps = match.Groups[4].Value.Trim();
-                    
+
                     // Extract nested selector and properties
                     var nestedMatch = Regex.Match(nestedRule, @"([^{]+)\s*\{\s*([^}]*)\s*\}");
                     if (nestedMatch.Success)
                     {
                         var nestedSelector = nestedMatch.Groups[1].Value.Trim();
                         var nestedProps = nestedMatch.Groups[2].Value.Trim();
-                        
-                        var parentRule = string.IsNullOrEmpty(parentProps + remainingProps) 
-                            ? "" 
+
+                        var parentRule = string.IsNullOrEmpty(parentProps + remainingProps)
+                            ? ""
                             : $"{parent} {{ {parentProps} {remainingProps} }}";
                         var expandedNested = $"{parent} {nestedSelector} {{ {nestedProps} }}";
-                        
+
                         return string.IsNullOrEmpty(parentRule) ? expandedNested : $"{parentRule} {expandedNested}";
                     }
-                    
+
                     return match.Value;
                 });
             }
-            
+
             return result;
         }
     }
@@ -348,5 +348,17 @@ public static class Html
             parent.AppendChild(child);
         }
         return parent;
+    }
+
+    public static string GetStylesheet()
+    {
+        // Path to the LESS stylesheet in the Resources folder
+        var lessPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Resources", "stylesheet.less");
+        if (!File.Exists(lessPath))
+            throw new FileNotFoundException($"LESS stylesheet not found: {lessPath}");
+
+        var lessContent = File.ReadAllText(lessPath);
+        var css = Style.ProcessLess(lessContent);
+        return css;
     }
 }

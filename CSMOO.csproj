@@ -13,6 +13,8 @@
     <EnablePreviewFeatures>true</EnablePreviewFeatures>
     <EnableHotReload>true</EnableHotReload>
     <HotReloadProfile>Development</HotReloadProfile>
+    <DebugType>portable</DebugType>
+    <DebugSymbols>true</DebugSymbols>
   </PropertyGroup>
 
   <ItemGroup>
