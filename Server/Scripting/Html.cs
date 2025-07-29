@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
 using HtmlAgilityPack;
+using dotless.Core;
 
 namespace CSMOO.Server.Scripting;
 
@@ -169,25 +171,39 @@ public static class Html
         public static string JustifyContent(string justify) => $"justify-content: {justify}";
 
         /// <summary>
-        /// Process LESS-like CSS with variables and basic nesting
+        /// Process LESS CSS with variables and nesting using the dotless library
         /// </summary>
         public static string ProcessLess(string lessCSS, Dictionary<string, string>? variables = null)
         {
-            variables ??= new Dictionary<string, string>();
-
-            // Replace variables (format: @variableName)
-            foreach (var kvp in variables)
+            try
             {
-                lessCSS = lessCSS.Replace($"@{kvp.Key}", kvp.Value);
+                // Replace variables if provided (format: @variableName)
+                if (variables != null)
+                {
+                    foreach (var kvp in variables)
+                    {
+                        lessCSS = lessCSS.Replace($"@{kvp.Key}", kvp.Value);
+                    }
+                }
+
+                // Use dotless to compile LESS to CSS
+                var engine = new EngineFactory().GetEngine();
+                var css = engine.TransformToCss(lessCSS, null);
+                
+                // Clean up whitespace for MUD client compatibility
+                css = Regex.Replace(css, @"\s+", " ").Trim();
+                css = Regex.Replace(css, @"\s*{\s*", " { ");
+                css = Regex.Replace(css, @"\s*}\s*", " } ");
+                css = Regex.Replace(css, @";\s*", "; ");
+                
+                return css;
             }
-
-            // Process simple nesting (one level deep for MUD compatibility)
-            lessCSS = ProcessSimpleNesting(lessCSS);
-
-            // Remove extra whitespace and normalize
-            lessCSS = Regex.Replace(lessCSS, @"\s+", " ").Trim();
-            
-            return lessCSS;
+            catch (Exception)
+            {
+                // Fallback: return the original LESS as-is if compilation fails
+                // This ensures the system doesn't break if there's invalid LESS
+                return lessCSS.Replace("\r\n", " ").Replace("\n", " ").Replace("\r", " ");
+            }
         }
 
         /// <summary>
@@ -198,45 +214,6 @@ public static class Html
             return new LessBuilder();
         }
 
-        private static string ProcessSimpleNesting(string css)
-        {
-            // Simple nesting processor - handles basic cases like:
-            // .container { color: red; .nested { background: blue; } }
-            // Converts to: .container { color: red; } .container .nested { background: blue; }
-
-            var result = css;
-            var nestedPattern = @"([^{}]+)\s*\{\s*([^{}]*?)\s*([^{}]+\s*\{[^{}]*\})\s*([^{}]*?)\s*\}";
-
-            while (Regex.IsMatch(result, nestedPattern))
-            {
-                result = Regex.Replace(result, nestedPattern, match =>
-                {
-                    var parent = match.Groups[1].Value.Trim();
-                    var parentProps = match.Groups[2].Value.Trim();
-                    var nestedRule = match.Groups[3].Value.Trim();
-                    var remainingProps = match.Groups[4].Value.Trim();
-
-                    // Extract nested selector and properties
-                    var nestedMatch = Regex.Match(nestedRule, @"([^{]+)\s*\{\s*([^}]*)\s*\}");
-                    if (nestedMatch.Success)
-                    {
-                        var nestedSelector = nestedMatch.Groups[1].Value.Trim();
-                        var nestedProps = nestedMatch.Groups[2].Value.Trim();
-
-                        var parentRule = string.IsNullOrEmpty(parentProps + remainingProps)
-                            ? ""
-                            : $"{parent} {{ {parentProps} {remainingProps} }}";
-                        var expandedNested = $"{parent} {nestedSelector} {{ {nestedProps} }}";
-
-                        return string.IsNullOrEmpty(parentRule) ? expandedNested : $"{parentRule} {expandedNested}";
-                    }
-
-                    return match.Value;
-                });
-            }
-
-            return result;
-        }
     }
 
     /// <summary>

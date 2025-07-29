@@ -400,7 +400,13 @@ public class CommandProcessor
         {
             // send static Stylesheet.less as css to client
             string css = Html.GetStylesheet();
+            if (string.IsNullOrEmpty(css))
+            {
+                css = "/* No CSS available */";
+            }
+            Logger.Debug($"Sending login banner CSS to player {_player?.Name}: {css}");
             SendToPlayer($"<style type='text/css'>{css}</style><hr/>");
+            Logger.Debug($"Login banner CSS sent to player {_player?.Name}\n<style type='text/css'>{css}</style><hr/>");
 
             // Find the system object first
             var allObjects = DbProvider.Instance.FindAll<GameObject>("gameobjects").ToList();
