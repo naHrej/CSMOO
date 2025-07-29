@@ -1,0 +1,8 @@
+{
+  "name": "Description",
+  "targetClass": "Object", 
+  "description": "Returns a formatted description of any object",
+  "returnType": "string",
+  "parameters": [],
+  "parameterNames": []
+}

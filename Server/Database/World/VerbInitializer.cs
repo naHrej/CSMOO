@@ -43,19 +43,28 @@ public static class VerbInitializer
 
     /// <summary>
     /// Hot reload all verb definitions (removes old, loads new)
+    /// Only removes verbs that were created from resources folder (CreatedBy == "system")
     /// </summary>
     public static void ReloadVerbs()
     {
         Logger.Info("Hot reloading verb definitions...");
 
-        // Clear existing verb definitions from database
-        // Use DbProvider to clear all verbs
+        // Only clear verb definitions that were loaded from resources
         var allVerbs = DbProvider.Instance.FindAll<Verb>("verbs").ToList();
+        var systemVerbs = allVerbs.Where(v => v.CreatedBy == "system").ToList();
+        var inGameVerbs = allVerbs.Where(v => v.CreatedBy != "system").ToList();
+        
         var countBefore = allVerbs.Count;
-        Logger.Debug($"Found {countBefore} verbs before deletion");
-        foreach (var v in allVerbs) DbProvider.Instance.Delete<Verb>("verbs", v.Id);
+        Logger.Debug($"Found {countBefore} total verbs before deletion ({systemVerbs.Count} system, {inGameVerbs.Count} in-game)");
+        
+        // Only delete system/resource verbs
+        foreach (var v in systemVerbs) 
+        {
+            DbProvider.Instance.Delete<Verb>("verbs", v.Id);
+        }
+        
         var countAfterDelete = DbProvider.Instance.FindAll<Verb>("verbs").Count();
-        Logger.Debug($"Cleared existing verb definitions - {countAfterDelete} verbs remaining");
+        Logger.Debug($"Cleared {systemVerbs.Count} system verb definitions - {countAfterDelete} verbs remaining (preserving {inGameVerbs.Count} in-game verbs)");
 
         // Reload all verbs from JSON files
         var classStats = LoadClassVerbs();
@@ -66,6 +75,33 @@ public static class VerbInitializer
         var countAfterReload = DbProvider.Instance.FindAll<Verb>("verbs").Count();
 
         Logger.Info($"Verb definitions reloaded successfully - Created: {totalLoaded}, Skipped: {totalSkipped}, Total in DB: {countAfterReload}");
+    }
+
+    /// <summary>
+    /// Force reload ALL verb definitions (removes all verbs, loads new)
+    /// Use with caution - this will delete in-game created verbs too!
+    /// </summary>
+    public static void ForceReloadAllVerbs()
+    {
+        Logger.Warning("FORCE reloading ALL verb definitions (including in-game verbs)...");
+
+        // Clear ALL verb definitions from database
+        var allVerbs = DbProvider.Instance.FindAll<Verb>("verbs").ToList();
+        var countBefore = allVerbs.Count;
+        Logger.Debug($"Found {countBefore} verbs before deletion");
+        foreach (var v in allVerbs) DbProvider.Instance.Delete<Verb>("verbs", v.Id);
+        var countAfterDelete = DbProvider.Instance.FindAll<Verb>("verbs").Count();
+        Logger.Debug($"Cleared ALL verb definitions - {countAfterDelete} verbs remaining");
+
+        // Reload all verbs from JSON files
+        var classStats = LoadClassVerbs();
+        var systemStats = LoadSystemVerbs();
+
+        var totalLoaded = classStats.Loaded + systemStats.Loaded;
+        var totalSkipped = classStats.Skipped + systemStats.Skipped;
+        var countAfterReload = DbProvider.Instance.FindAll<Verb>("verbs").Count();
+
+        Logger.Info($"ALL verb definitions force reloaded - Created: {totalLoaded}, Skipped: {totalSkipped}, Total in DB: {countAfterReload}");
     }
 
     /// <summary>

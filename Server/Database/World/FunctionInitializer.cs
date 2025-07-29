@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using System.IO;
 using System.Text.Json;
@@ -43,18 +44,28 @@ public static class FunctionInitializer
 
     /// <summary>
     /// Hot reload all function definitions (removes old, loads new)
+    /// Only removes functions that were created from resources folder (CreatedBy == "system")
     /// </summary>
     public static void ReloadFunctions()
     {
         Logger.Info("Hot reloading function definitions...");
 
-        // Clear existing function definitions from database
+        // Only clear function definitions that were loaded from resources
         var allFunctions = DbProvider.Instance.FindAll<Function>("functions").ToList();
+        var systemFunctions = allFunctions.Where(f => f.CreatedBy == "system").ToList();
+        var inGameFunctions = allFunctions.Where(f => f.CreatedBy != "system").ToList();
+        
         var countBefore = allFunctions.Count;
-        Logger.Debug($"Found {countBefore} functions before deletion");
-        foreach (var f in allFunctions) DbProvider.Instance.Delete<Function>("functions", f.Id);
+        Logger.Debug($"Found {countBefore} total functions before deletion ({systemFunctions.Count} system, {inGameFunctions.Count} in-game)");
+        
+        // Only delete system/resource functions
+        foreach (var f in systemFunctions) 
+        {
+            DbProvider.Instance.Delete<Function>("functions", f.Id);
+        }
+        
         var countAfterDelete = DbProvider.Instance.FindAll<Function>("functions").Count();
-        Logger.Debug($"Cleared existing function definitions - {countAfterDelete} functions remaining");
+        Logger.Debug($"Cleared {systemFunctions.Count} system function definitions - {countAfterDelete} functions remaining (preserving {inGameFunctions.Count} in-game functions)");
 
         // Reload all functions from JSON files
         var classStats = LoadClassFunctions();
@@ -65,6 +76,33 @@ public static class FunctionInitializer
         var countAfterReload = DbProvider.Instance.FindAll<Function>("functions").Count();
 
         Logger.Info($"Function definitions reloaded successfully - Created: {totalLoaded}, Skipped: {totalSkipped}, Total in DB: {countAfterReload}");
+    }
+
+    /// <summary>
+    /// Force reload ALL function definitions (removes all functions, loads new)
+    /// Use with caution - this will delete in-game created functions too!
+    /// </summary>
+    public static void ForceReloadAllFunctions()
+    {
+        Logger.Warning("FORCE reloading ALL function definitions (including in-game functions)...");
+
+        // Clear ALL function definitions from database
+        var allFunctions = DbProvider.Instance.FindAll<Function>("functions").ToList();
+        var countBefore = allFunctions.Count;
+        Logger.Debug($"Found {countBefore} functions before deletion");
+        foreach (var f in allFunctions) DbProvider.Instance.Delete<Function>("functions", f.Id);
+        var countAfterDelete = DbProvider.Instance.FindAll<Function>("functions").Count();
+        Logger.Debug($"Cleared ALL function definitions - {countAfterDelete} functions remaining");
+
+        // Reload all functions from JSON files
+        var classStats = LoadClassFunctions();
+        var systemStats = LoadSystemFunctions();
+
+        var totalLoaded = classStats.Loaded + systemStats.Loaded;
+        var totalSkipped = classStats.Skipped + systemStats.Skipped;
+        var countAfterReload = DbProvider.Instance.FindAll<Function>("functions").Count();
+
+        Logger.Info($"ALL function definitions force reloaded - Created: {totalLoaded}, Skipped: {totalSkipped}, Total in DB: {countAfterReload}");
     }
 
     /// <summary>
@@ -187,7 +225,7 @@ public static class FunctionInitializer
     {
         var stats = new FunctionLoadStats();
         
-        var targetClass = DbProvider.Instance.FindOne<GameObject>("objectclasses", c => c.Name == functionDef.TargetClass);
+        var targetClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == functionDef.TargetClass);
         if (targetClass == null)
         {
             Logger.Warning($"Target class '{functionDef.TargetClass}' not found for function '{functionDef.Name}'");
@@ -198,15 +236,22 @@ public static class FunctionInitializer
         // Only create if it doesn't already exist
         if (!existingFunctions.Any(f => f.ObjectId == targetClass.Id && f.Name == functionDef.Name))
         {
-            var function = Scripting.FunctionManager.CreateFunction(
-                targetClass, 
-                functionDef.Name, 
-                functionDef.Parameters,
-                functionDef.ParameterNames,
-                functionDef.ReturnType,
-                functionDef.GetCodeString(), 
-                "system"
-            );
+            // Create function directly since FunctionManager.CreateFunction expects GameObject
+            // but we have an ObjectClass. We'll create the Function object directly.
+            var function = new Function
+            {
+                ObjectId = targetClass.Id,
+                Name = functionDef.Name,
+                ParameterTypes = functionDef.Parameters,
+                ParameterNames = functionDef.ParameterNames,
+                ReturnType = functionDef.ReturnType,
+                Code = functionDef.GetCodeString(),
+                CreatedBy = "system",
+                CreatedAt = DateTime.UtcNow,
+                ModifiedAt = DateTime.UtcNow
+            };
+
+            DbProvider.Instance.Insert("functions", function);
             // Set description if provided
             if (!string.IsNullOrEmpty(functionDef.Description))
             {
