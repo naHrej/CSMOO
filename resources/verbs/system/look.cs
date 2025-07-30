@@ -14,18 +14,11 @@ else
     // 'look something'
     target = string.Join(" ", Args);
 }
-GameObject resolved = ObjectResolver.ResolveObject(target, Player);
+var resolved = (dynamic)(ObjectResolver.ResolveObject(target, Player));
 if (resolved == null)
 {
     notify(player, $"You don't see '{target}' here.");
     return false;
 }
-
-var name = resolved.Name;
-if(string.IsNullOrEmpty(name))
-{
-    name = resolved.Properties["name"];
-}
-var desc = resolved.Description();
-notify(player, desc);
+notify(player, resolved.Description() ?? $"<h3>{resolved.Name}</h3><p>You see nothing special about this {resolved.ClassId.Replace("obj_","")}.</p>");
 return true;

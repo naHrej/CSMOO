@@ -410,7 +410,7 @@ public class GameObject : DynamicObject
         }
         catch (Exception ex)
         {
-            throw new InvalidOperationException($"Error calling function '{methodName}' on object {Id}: {ex.Message}", ex);
+            throw new InvalidOperationException($"Error calling function '{methodName}' on object {Name}({Id}): {ex.Message}", ex);
         }
     }
 
