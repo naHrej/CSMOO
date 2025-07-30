@@ -1,0 +1,8 @@
+{
+  "name": "Description",
+  "targetClass": "Object", 
+  "description": "Returns a formatted description of any Room",
+  "returnType": "string",
+  "parameters": [],
+  "parameterNames": []
+}
