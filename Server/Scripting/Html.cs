@@ -330,8 +330,16 @@ public static class Html
     public static string GetStylesheet()
     {
         // Path to the LESS stylesheet in the Resources folder
-       
-        var lessPath = Path.Combine("resources", "stylesheet.less");
+        // Use the application's base directory to ensure cross-platform compatibility
+        var appDirectory = AppDomain.CurrentDomain.BaseDirectory;
+        var lessPath = Path.Combine(appDirectory, "resources", "stylesheet.less");
+        
+        // Also try relative path as fallback for development scenarios
+        if (!File.Exists(lessPath))
+        {
+            lessPath = Path.Combine("resources", "stylesheet.less");
+        }
+        
         if (!File.Exists(lessPath))
             throw new FileNotFoundException($"LESS stylesheet not found: {lessPath}");
 

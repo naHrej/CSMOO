@@ -21,9 +21,28 @@ public struct VerbLoadStats
 /// </summary>
 public static class VerbInitializer
 {
-    private static readonly string VerbsPath = Path.Combine("resources", "verbs");
+    private static readonly string VerbsPath = GetResourcePath("verbs");
     private static readonly string SystemVerbsPath = Path.Combine(VerbsPath, "system");
     private static readonly string ClassVerbsPath = Path.Combine(VerbsPath, "classes");
+
+    /// <summary>
+    /// Gets the absolute path to a resource directory, with fallback for development scenarios
+    /// </summary>
+    private static string GetResourcePath(string resourceName)
+    {
+        // Try application base directory first (for deployed/production scenarios)
+        var appDirectory = AppDomain.CurrentDomain.BaseDirectory;
+        var appBasedPath = Path.Combine(appDirectory, "resources", resourceName);
+        
+        if (Directory.Exists(appBasedPath))
+        {
+            return appBasedPath;
+        }
+        
+        // Fallback to relative path (for development scenarios)
+        var relativePath = Path.Combine("resources", resourceName);
+        return relativePath;
+    }
 
     /// <summary>
     /// Loads and creates all verbs from JSON definitions

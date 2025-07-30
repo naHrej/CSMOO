@@ -59,7 +59,7 @@ public static class HotReloadManager
 
             Logger.Info("Hot Reload Manager initialized successfully!");
             Logger.Info("The following will trigger hot reloads:");
-            Logger.Info("  - Changes to verb JSON files in Resources/verbs/");
+            Logger.Info("  - Changes to verb JSON files in resources/verbs/");
             Logger.Info("  - Changes to C# script files in Scripts/ (if present)");
         }
         catch (Exception ex)
@@ -73,7 +73,15 @@ public static class HotReloadManager
     /// </summary>
     private static void SetupVerbFileWatcher()
     {
-        var verbsPath = Path.Combine("Resources", "verbs");
+        // Try application base directory first, then relative path
+        var appDirectory = AppDomain.CurrentDomain.BaseDirectory;
+        var verbsPath = Path.Combine(appDirectory, "resources", "verbs");
+        
+        if (!Directory.Exists(verbsPath))
+        {
+            verbsPath = Path.Combine("resources", "verbs");
+        }
+        
         if (!Directory.Exists(verbsPath))
         {
             Logger.Warning($"Verbs directory not found: {verbsPath}");
