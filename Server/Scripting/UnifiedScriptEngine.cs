@@ -78,12 +78,21 @@ public class UnifiedScriptEngine
                 Player = player, // Always the Database.Player
                 This = thisObject ?? CreateNullGameObject(actualThisObjectId),
                 CommandProcessor = commandProcessor,
-                Helpers = new ScriptHelpers(player, commandProcessor),
                 Input = input,
                 Args = ParseArguments(input),
                 Verb = verb.Name,
                 Variables = variables ?? new Dictionary<string, string>()
             };
+
+            // If we have a previous context, inherit the Helpers to maintain consistency
+            if (previousContext != null)
+            {
+                globals.Helpers = previousContext.Helpers;
+            }
+            else
+            {
+                globals.Helpers = new ScriptHelpers(player, commandProcessor);
+            }
 
             // Set ThisObject to the same value as This (since it's an alias)
             globals.ThisObject = globals.This;
@@ -165,6 +174,16 @@ public class UnifiedScriptEngine
                 CallingObjectId = actualThisObjectId,
                 Parameters = parameters
             };
+
+            // If we have a previous context, inherit the Helpers to maintain consistency
+            if (previousContext != null)
+            {
+                globals.Helpers = previousContext.Helpers;
+            }
+            else if (commandProcessor != null)
+            {
+                globals.Helpers = new ScriptHelpers(player, commandProcessor);
+            }
 
             // Set ThisObject to the same value as This (since it's an alias)
             globals.ThisObject = globals.This;
