@@ -77,6 +77,7 @@ public class UnifiedScriptEngine
             {
                 Player = player, // Always the Database.Player
                 This = thisObject ?? CreateNullGameObject(actualThisObjectId),
+                Caller = previousContext?.This ?? playerObject, // The object that called this verb (or Player if no previous context)
                 CommandProcessor = commandProcessor,
                 Input = input,
                 Args = ParseArguments(input),
@@ -170,6 +171,7 @@ public class UnifiedScriptEngine
             {
                 Player = player, // Always the Database.Player
                 This = thisObject ?? CreateNullGameObject(actualThisObjectId),
+                Caller = previousContext?.This ?? playerObject, // The object that called this function (or Player if no previous context)
                 CommandProcessor = commandProcessor,
                 CallingObjectId = actualThisObjectId,
                 Parameters = parameters

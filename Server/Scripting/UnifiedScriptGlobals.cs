@@ -38,6 +38,12 @@ public class UnifiedScriptGlobals : EnhancedScriptGlobals
         get => This; 
         set => This = value; 
     }
+    
+    /// <summary>
+    /// The object that called this function (the previous object in the function chain)
+    /// </summary>
+    public dynamic? Caller { get; set; }
+    
     // Unique: string-based ThisObjectId for legacy verb scripts (keep for legacy support)
     public string ThisObjectId { get; set; } = string.Empty;
 
