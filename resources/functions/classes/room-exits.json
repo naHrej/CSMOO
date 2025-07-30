@@ -2,10 +2,7 @@
   "name": "Exits",
   "targetClass": "Room", 
   "description": "Returns a list of Exits from the room",
-  "returnType": "string",
+  "returnType": "List<dynamic>",
   "parameters": [],
-  "parameterNames": [],
-  "code": [   
-    "return Builtins.GetExitsFromRoom(This);"
-  ]
+  "parameterNames": []
 }

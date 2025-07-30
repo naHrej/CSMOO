@@ -454,7 +454,7 @@ public class ScriptHelpers
     /// <summary>
     /// Get all exits from a room
     /// </summary>
-    public List<GameObject> GetExitsFromRoom(string roomId)
+    public List<dynamic> GetExitsFromRoom(string roomId)
     {
         return WorldManager.GetExitsFromRoom(roomId);
     }

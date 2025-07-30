@@ -144,10 +144,15 @@ public class UnifiedScriptEngine
             var thisObject = Database.ObjectManager.GetObject(actualThisObjectId);
             var playerObject = Database.ObjectManager.GetObject(player.Id);
 
-            // Debug logging to identify null objects
+            // Debug logging to identify null objects and This assignment
+            Logger.Debug($"ExecuteFunction '{function.Name}': thisObjectId={thisObjectId}, function.ObjectId={function.ObjectId}, actualThisObjectId={actualThisObjectId}");
             if (thisObject == null)
             {
                 Logger.Warning($"ExecuteFunction: thisObject is null for ID '{actualThisObjectId}' (function: {function.Name})");
+            }
+            else
+            {
+                Logger.Debug($"ExecuteFunction '{function.Name}': This will be set to object '{thisObject.Name}' (ID: {thisObject.Id})");
             }
             if (playerObject == null)
             {

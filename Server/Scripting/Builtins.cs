@@ -948,7 +948,7 @@ public static class Builtins
     /// <summary>
     /// Get all exits from a room
     /// </summary>
-    public static List<GameObject> GetExitsFromRoom(GameObject room)
+    public static List<dynamic> GetExitsFromRoom(GameObject room)
     {
         return WorldManager.GetExitsFromRoom(room);
     }

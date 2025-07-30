@@ -28,12 +28,12 @@ public class UnifiedScriptGlobals : EnhancedScriptGlobals
     /// <summary>
     /// The object this script is running on (now directly GameObject with dynamic support)
     /// </summary>
-    public GameObject? This { get; set; }
+    public dynamic? This { get; set; }
     
     /// <summary>
     /// Alias for This - the object this script is running on (now directly GameObject with dynamic support)
     /// </summary>
-    public GameObject? ThisObject 
+    public dynamic? ThisObject 
     { 
         get => This; 
         set => This = value; 
@@ -75,6 +75,21 @@ public class UnifiedScriptGlobals : EnhancedScriptGlobals
     {
         return Player;
     }
+
+    /// <summary>
+    /// Get the player's location as a GameObject (for scripts that need the actual GameObject)
+    /// </summary>
+    public GameObject? GetPlayerLocation()
+    {
+        var playerObj = GetPlayerGameObject();
+        return playerObj?.Location;
+    }
+
+    /// <summary>
+    /// The player's current location as GameObject (alternative to 'here' ScriptObject)
+    /// Usage: var location = Location; // Returns GameObject instead of ScriptObject
+    /// </summary>
+    public GameObject? Location => GetPlayerLocation();
 
     /// <summary>
     /// The complete input string that triggered this verb (null for functions)
@@ -199,6 +214,60 @@ public class UnifiedScriptGlobals : EnhancedScriptGlobals
     /// Get the current player for use with notify() - returns dynamic GameObject
     /// </summary>
     public new dynamic? player => Player;
+
+    /// <summary>
+    /// The current location as GameObject - returns the actual GameObject, not ScriptObject
+    /// If script is running on a player: returns player's location
+    /// If script is running on a room: returns the room itself
+    /// </summary>
+    public new dynamic? here
+    {
+        get
+        {
+            return Player.Location as dynamic;
+        }
+    }
+
+    /// <summary>
+    /// Check if an object is a room using class inheritance and properties
+    /// </summary>
+    private bool IsRoom(GameObject obj)
+    {
+        // Check if it inherits from Room class
+        var roomClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "Room");
+        if (roomClass != null && (obj.ClassId == roomClass.Id || Database.ObjectManager.InheritsFrom(obj.ClassId, roomClass.Id)))
+        {
+            return true;
+        }
+
+        // Fallback: check for explicit room properties
+        var isRoomProperty = Database.ObjectManager.GetProperty(obj, "isRoom")?.AsBoolean == true;
+        if (isRoomProperty) return true;
+
+        // Additional fallback: check if it has room-like characteristics
+        return HasRoomCharacteristics(obj);
+    }
+
+    /// <summary>
+    /// Check if an object has room-like characteristics
+    /// </summary>
+    private bool HasRoomCharacteristics(GameObject obj)
+    {
+        // First check if it inherits from Room class
+        var roomClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "Room");
+        if (roomClass != null && (obj.ClassId == roomClass.Id || Database.ObjectManager.InheritsFrom(obj.ClassId, roomClass.Id)))
+        {
+            return true;
+        }
+
+        // Fallback: check if object has room-like properties
+        var hasExits = Database.ObjectManager.GetObjectsInLocation(obj.Id).Any(o => 
+            Database.ObjectManager.GetProperty(o, "isExit")?.AsBoolean == true);
+        var hasLongDesc = !string.IsNullOrEmpty(Database.ObjectManager.GetProperty(obj, "longDescription")?.AsString);
+        var isRoomProperty = Database.ObjectManager.GetProperty(obj, "isRoom")?.AsBoolean == true;
+        
+        return hasExits || hasLongDesc || isRoomProperty;
+    }
 
     /// <summary>
     /// Send a message to all players in the same room as the current player
@@ -331,7 +400,7 @@ public class UnifiedScriptGlobals : EnhancedScriptGlobals
         }
 
         var engine = new UnifiedScriptEngine();
-        return engine.ExecuteFunction(function, parameters, dbPlayer, CommandProcessor, CallingObjectId);
+        return engine.ExecuteFunction(function, parameters, dbPlayer, CommandProcessor, objectId);
     }
 
     /// <summary>
@@ -433,7 +502,10 @@ public class UnifiedScriptGlobals : EnhancedScriptGlobals
     /// </summary>
     public new object? Here(string verbName, params object[] args)
     {
-        return CallVerb("here", verbName, args);
+        // Use the here property to get the correct location
+        var hereObj = here;
+        if (hereObj == null) return null;
+        return CallVerb($"#{hereObj.DbRef}", verbName, args);
     }
 
     /// <summary>

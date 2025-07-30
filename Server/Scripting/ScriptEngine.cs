@@ -287,7 +287,7 @@ public class ScriptGlobals
         }
 
         var engine = new UnifiedScriptEngine();
-        return engine.ExecuteFunction(function, parameters, Player, CommandProcessor);
+        return engine.ExecuteFunction(function, parameters, Player, CommandProcessor, objectId);
     }
 
     /// <summary>

@@ -135,7 +135,9 @@ public static class FunctionManager
         var validTypes = new HashSet<string>
         {
             "string", "int", "bool", "float", "double", "decimal",
-            "object", "Player", "GameObject", "ObjectClass"
+            "object", "Player", "GameObject", "ObjectClass",
+            "List<dynamic>", "List<GameObject>", "List<Player>", "List<string>", "List<int>",
+            "IEnumerable<dynamic>", "IEnumerable<GameObject>", "IEnumerable<Player>"
         };
         
         return validTypes.Contains(type);
@@ -149,7 +151,9 @@ public static class FunctionManager
         var validTypes = new HashSet<string>
         {
             "void", "string", "int", "bool", "float", "double", "decimal",
-            "object", "Player", "GameObject", "ObjectClass"
+            "object", "Player", "GameObject", "ObjectClass",
+            "List<dynamic>", "List<GameObject>", "List<Player>", "List<string>", "List<int>",
+            "IEnumerable<dynamic>", "IEnumerable<GameObject>", "IEnumerable<Player>"
         };
         
         return validTypes.Contains(type);

@@ -1994,7 +1994,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
         // Validate return type
         if (!FunctionManager.IsValidReturnType(returnType))
         {
-            _commandProcessor.SendToPlayer($"Invalid return type '{returnType}'. Valid types: void, string, int, bool, float, double, decimal, object, Player, GameObject, ObjectClass");
+            _commandProcessor.SendToPlayer($"Invalid return type '{returnType}'. Valid types: void, string, int, bool, float, double, decimal, object, Player, GameObject, ObjectClass, List<dynamic>, List<GameObject>, List<Player>, List<string>, List<int>");
             return true;
         }
 
@@ -2020,7 +2020,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
                 // Validate parameter type
                 if (!FunctionManager.IsValidParameterType(paramType))
                 {
-                    _commandProcessor.SendToPlayer($"Invalid parameter type '{paramType}'. Valid types: string, int, bool, float, double, decimal, object, Player, GameObject, ObjectClass");
+                    _commandProcessor.SendToPlayer($"Invalid parameter type '{paramType}'. Valid types: string, int, bool, float, double, decimal, object, Player, GameObject, ObjectClass, List<dynamic>, List<GameObject>, List<Player>, List<string>, List<int>");
                     return true;
                 }
 
