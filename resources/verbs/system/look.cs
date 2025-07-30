@@ -1,4 +1,5 @@
 // Look command - shows room or looks at specific object.
+// This is a test
 string target = "";
 if (Args.Count == 0)
 {

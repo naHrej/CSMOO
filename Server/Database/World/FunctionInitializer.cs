@@ -5,6 +5,7 @@ using System.Text.Json;
 using LiteDB;
 using CSMOO.Server.Database.Models;
 using CSMOO.Server.Logging;
+using System.Runtime.InteropServices;
 
 namespace CSMOO.Server.Database.World;
 
@@ -31,34 +32,13 @@ public static class FunctionInitializer
     /// </summary>
     private static string GetResourcePath(string resourceName)
     {
+        
         var possiblePaths = new List<string>();
-        
-        // Strategy 1: Application base directory
-        var appDirectory = AppDomain.CurrentDomain.BaseDirectory;
-        possiblePaths.Add(Path.Combine(appDirectory, "resources", resourceName));
-        
-        // Strategy 2: Current working directory
         var workingDirectory = Directory.GetCurrentDirectory();
+
+        // Strategy 2: Current working directory with explicit path
         possiblePaths.Add(Path.Combine(workingDirectory, "resources", resourceName));
-        
-        // Strategy 3: Relative path from current directory
-        possiblePaths.Add(Path.Combine("resources", resourceName));
-        
-        // Strategy 4: Check if we're in a subdirectory and need to go up
-        var currentDir = Directory.GetCurrentDirectory();
-        var parentDir = Directory.GetParent(currentDir);
-        if (parentDir != null)
-        {
-            possiblePaths.Add(Path.Combine(parentDir.FullName, "resources", resourceName));
-        }
-        
-        foreach (var path in possiblePaths)
-        {
-            if (Directory.Exists(path))
-            {
-                return path;
-            }
-        }
+        Logger.Debug($"Trying resource path: {possiblePaths.Last()}");
         
         // If none exist, return the first option (app directory based) for error reporting
         return possiblePaths[0];
