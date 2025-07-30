@@ -136,11 +136,15 @@ public static class VerbInitializer
                 // If code is missing or empty, look for a .cs file with the same base name
                 if (verbDef.Code == null || verbDef.Code.Length == 0)
                 {
-                    var csFile = Path.ChangeExtension(file, ".cs");
-                    if (File.Exists(csFile))
+                    var csFile = TryFindCodeFile(file);
+                    if (!string.IsNullOrEmpty(csFile) && File.Exists(csFile))
                     {
                         verbDef.Code = new[] { File.ReadAllText(csFile) };
                         Logger.Debug($"Loaded code from {csFile} for verb {verbDef.Name}");
+                    }
+                    else
+                    {
+                        Logger.Debug($"No .cs file found for {file}");
                     }
                 }
 
@@ -196,11 +200,15 @@ public static class VerbInitializer
                 // If code is missing or empty, look for a .cs file with the same base name
                 if (verbDef.Code == null || verbDef.Code.Length == 0)
                 {
-                    var csFile = Path.ChangeExtension(file, ".cs");
-                    if (File.Exists(csFile))
+                    var csFile = TryFindCodeFile(file);
+                    if (!string.IsNullOrEmpty(csFile) && File.Exists(csFile))
                     {
                         verbDef.Code = new[] { File.ReadAllText(csFile) };
                         Logger.Debug($"Loaded code from {csFile} for verb {verbDef.Name}");
+                    }
+                    else
+                    {
+                        Logger.Debug($"No .cs file found for {file}");
                     }
                 }
 
@@ -342,5 +350,65 @@ public static class VerbInitializer
         
         Logger.Debug($"System object ID: {systemObj?.Id}");
         return systemObj?.Id;
+    }
+
+    /// <summary>
+    /// Try to find a code file (.cs) that corresponds to a JSON definition file
+    /// Handles case sensitivity issues on Linux by trying multiple variations
+    /// </summary>
+    private static string? TryFindCodeFile(string jsonFile)
+    {
+        var directory = Path.GetDirectoryName(jsonFile);
+        var fileNameWithoutExtension = Path.GetFileNameWithoutExtension(jsonFile);
+        
+        if (string.IsNullOrEmpty(directory) || string.IsNullOrEmpty(fileNameWithoutExtension))
+            return null;
+
+        // First try the exact case match (Path.ChangeExtension approach)
+        var exactMatch = Path.ChangeExtension(jsonFile, ".cs");
+        if (File.Exists(exactMatch))
+        {
+            Logger.Debug($"Found exact match: {exactMatch}");
+            return exactMatch;
+        }
+
+        // On case-sensitive file systems (Linux), try different case variations
+        var possibleFiles = new[]
+        {
+            Path.Combine(directory, fileNameWithoutExtension + ".cs"),
+            Path.Combine(directory, fileNameWithoutExtension + ".CS"),
+            Path.Combine(directory, fileNameWithoutExtension.ToLower() + ".cs"),
+            Path.Combine(directory, fileNameWithoutExtension.ToUpper() + ".cs")
+        };
+
+        foreach (var possibleFile in possibleFiles)
+        {
+            if (File.Exists(possibleFile))
+            {
+                Logger.Debug($"Found case variation: {possibleFile}");
+                return possibleFile;
+            }
+        }
+
+        // Last resort: scan the directory for any .cs file with matching base name (case-insensitive)
+        try
+        {
+            var csFiles = Directory.GetFiles(directory, "*.cs");
+            var matchingFile = csFiles.FirstOrDefault(f => 
+                string.Equals(Path.GetFileNameWithoutExtension(f), fileNameWithoutExtension, StringComparison.OrdinalIgnoreCase));
+            
+            if (matchingFile != null)
+            {
+                Logger.Debug($"Found by directory scan: {matchingFile}");
+                return matchingFile;
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.Warning($"Error scanning directory for .cs files: {ex.Message}");
+        }
+
+        Logger.Debug($"No .cs file found for {jsonFile}");
+        return null;
     }
 }
