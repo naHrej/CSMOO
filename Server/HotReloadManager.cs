@@ -73,18 +73,42 @@ public static class HotReloadManager
     /// </summary>
     private static void SetupVerbFileWatcher()
     {
-        // Try application base directory first, then relative path
-        var appDirectory = AppDomain.CurrentDomain.BaseDirectory;
-        var verbsPath = Path.Combine(appDirectory, "resources", "verbs");
+        // Try multiple path strategies to find the verbs directory
+        var possiblePaths = new List<string>();
         
-        if (!Directory.Exists(verbsPath))
+        // Strategy 1: Application base directory
+        var appDirectory = AppDomain.CurrentDomain.BaseDirectory;
+        possiblePaths.Add(Path.Combine(appDirectory, "resources", "verbs"));
+        
+        // Strategy 2: Current working directory
+        var workingDirectory = Directory.GetCurrentDirectory();
+        possiblePaths.Add(Path.Combine(workingDirectory, "resources", "verbs"));
+        
+        // Strategy 3: Relative path from current directory
+        possiblePaths.Add(Path.Combine("resources", "verbs"));
+        
+        // Strategy 4: Check if we're in a subdirectory and need to go up
+        var currentDir = Directory.GetCurrentDirectory();
+        var parentDir = Directory.GetParent(currentDir);
+        if (parentDir != null)
         {
-            verbsPath = Path.Combine("resources", "verbs");
+            possiblePaths.Add(Path.Combine(parentDir.FullName, "resources", "verbs"));
         }
         
-        if (!Directory.Exists(verbsPath))
+        string? verbsPath = null;
+        foreach (var path in possiblePaths)
         {
-            Logger.Warning($"Verbs directory not found: {verbsPath}");
+            if (Directory.Exists(path))
+            {
+                verbsPath = path;
+                break;
+            }
+        }
+        
+        if (verbsPath == null)
+        {
+            var searchedPaths = string.Join(", ", possiblePaths);
+            Logger.Warning($"Verbs directory not found. Searched: {searchedPaths}");
             return;
         }
 
