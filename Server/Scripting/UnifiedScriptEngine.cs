@@ -56,6 +56,7 @@ public class UnifiedScriptEngine
     public string ExecuteVerb(Verb verb, string input, Database.Player player, 
         CommandProcessor commandProcessor, string? thisObjectId = null, Dictionary<string, string>? variables = null)
     {
+        var previousContext = Builtins.UnifiedContext; // Store previous context
         try
         {
             var actualThisObjectId = thisObjectId ?? verb.ObjectId;
@@ -112,8 +113,8 @@ public class UnifiedScriptEngine
         }
         finally
         {
-            // Clear Builtins context to avoid memory leaks
-            Builtins.UnifiedContext = null;
+            // Restore previous Builtins context to support nested function calls
+            Builtins.UnifiedContext = previousContext;
         }
     }
 
@@ -123,6 +124,7 @@ public class UnifiedScriptEngine
     public object? ExecuteFunction(Function function, object?[] parameters, Database.Player player, 
         CommandProcessor? commandProcessor = null, string? thisObjectId = null)
     {
+        var previousContext = Builtins.UnifiedContext; // Store previous context
         try
         {
             // Validate parameter count
@@ -144,15 +146,10 @@ public class UnifiedScriptEngine
             var thisObject = Database.ObjectManager.GetObject(actualThisObjectId);
             var playerObject = Database.ObjectManager.GetObject(player.Id);
 
-            // Debug logging to identify null objects and This assignment
-            Logger.Debug($"ExecuteFunction '{function.Name}': thisObjectId={thisObjectId}, function.ObjectId={function.ObjectId}, actualThisObjectId={actualThisObjectId}");
+            // Debug logging to identify null objects
             if (thisObject == null)
             {
                 Logger.Warning($"ExecuteFunction: thisObject is null for ID '{actualThisObjectId}' (function: {function.Name})");
-            }
-            else
-            {
-                Logger.Debug($"ExecuteFunction '{function.Name}': This will be set to object '{thisObject.Name}' (ID: {thisObject.Id})");
             }
             if (playerObject == null)
             {
@@ -227,8 +224,8 @@ public class UnifiedScriptEngine
         }
         finally
         {
-            // Clear Builtins context to avoid memory leaks
-            Builtins.UnifiedContext = null;
+            // Restore previous Builtins context to support nested function calls
+            Builtins.UnifiedContext = previousContext;
         }
     }
 
