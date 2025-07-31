@@ -13,6 +13,7 @@ public class Config
     public ServerConfig Server { get; set; } = new();
     public DatabaseConfig Database { get; set; } = new();
     public LoggingConfig Logging { get; set; } = new();
+    public ScriptingConfig Scripting { get; set; } = new();
     
     private static Config? _instance;
     private static readonly object _lock = new object();
@@ -120,4 +121,13 @@ public class LoggingConfig
     public string DebugLogFile { get; set; } = "logs/debug.log";
     public string LogLevel { get; set; } = "Info";
     public int MaxLogFiles { get; set; } = 5;
+}
+
+/// <summary>
+/// Scripting engine configuration
+/// </summary>
+public class ScriptingConfig
+{
+    public int MaxCallDepth { get; set; } = 100;
+    public int MaxExecutionTimeMs { get; set; } = 5000; // 5 seconds default
 }

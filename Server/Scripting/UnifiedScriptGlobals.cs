@@ -44,6 +44,11 @@ public class UnifiedScriptGlobals : EnhancedScriptGlobals
     /// </summary>
     public dynamic? Caller { get; set; }
     
+    /// <summary>
+    /// The current call depth in the function chain
+    /// </summary>
+    public int CallDepth { get; set; } = 0;
+    
     // Unique: string-based ThisObjectId for legacy verb scripts (keep for legacy support)
     public string ThisObjectId { get; set; } = string.Empty;
 

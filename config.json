@@ -17,5 +17,9 @@
     "DebugLogFile": "logs/debug.log",
     "LogLevel": "Debug",
     "MaxLogFiles": 5
+  },
+  "Scripting": {
+    "MaxCallDepth": 100,
+    "MaxExecutionTimeMs": 5000
   }
 }
