@@ -1781,8 +1781,8 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
                 var status = HotReloadManager.IsEnabled ? "ENABLED" : "DISABLED";
                 _commandProcessor.SendToPlayer($"Hot Reload Status: {status}");
                 _commandProcessor.SendToPlayer("Monitored paths:");
-                _commandProcessor.SendToPlayer("  • Resources/verbs/ (*.json)");
-                _commandProcessor.SendToPlayer("  • Resources/functions/ (*.json)");
+                _commandProcessor.SendToPlayer("  • resources/verbs/ (*.json)");
+                _commandProcessor.SendToPlayer("  • resources/functions/ (*.json)");
                 _commandProcessor.SendToPlayer("  • Scripts/ (*.cs) [if present]");
                 break;
 
@@ -1844,7 +1844,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
                 if (enabled)
                 {
                     _commandProcessor.SendToPlayer("📁 Monitoring the following directories:");
-                    _commandProcessor.SendToPlayer("  • Resources/verbs/ (*.json) - Verb definitions");
+                    _commandProcessor.SendToPlayer("  • resources/verbs/ (*.json) - Verb definitions");
                     _commandProcessor.SendToPlayer("  • Scripts/ (*.cs) - C# script files [if present]");
                     _commandProcessor.SendToPlayer("🔄 Changes to these files will trigger automatic reloads");
                 }
@@ -1903,7 +1903,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
                 
                 _commandProcessor.SendToPlayer("");
                 _commandProcessor.SendToPlayer("ℹ️ Core hot reload vs Verb hot reload:");
-                _commandProcessor.SendToPlayer("• Verb hot reload: Changes to JSON files in Resources/verbs/");
+                _commandProcessor.SendToPlayer("• Verb hot reload: Changes to JSON files in resources/verbs/");
                 _commandProcessor.SendToPlayer("• Core hot reload: Changes to C# application code files");
                 break;
 

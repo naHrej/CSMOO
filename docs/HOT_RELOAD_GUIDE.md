@@ -6,7 +6,7 @@ The CSMOO server now supports comprehensive hot reloading of both application co
 
 ### 1. Verb Hot Reload (Always Available)
 - **What**: JSON verb definition files
-- **Path**: `Resources/verbs/**/*.json`
+- **Path**: `resources/verbs/**/*.json`
 - **Trigger**: Automatic file watching + manual commands
 - **Scope**: Verb definitions, patterns, and code
 
@@ -20,7 +20,7 @@ The CSMOO server now supports comprehensive hot reloading of both application co
 
 ### Automatic File Watching
 The hot reload system automatically monitors:
-- **Verb definitions**: `Resources/verbs/**/*.json` 
+- **Verb definitions**: `resources/verbs/**/*.json` 
 - **Core C# code**: `Server/**/*.cs` and other C# files (Development mode only)
 - **C# scripts**: `Scripts/**/*.cs` (if the Scripts directory exists)
 
@@ -47,7 +47,7 @@ Core application hot reload information and control:
 ## How It Works
 
 ### Verb Hot Reload
-When a `.json` file in the `Resources/verbs/` directory is modified:
+When a `.json` file in the `resources/verbs/` directory is modified:
 1. The file watcher detects the change
 2. After a 500ms debounce period, the reload is triggered
 3. All existing verbs are cleared from the database
@@ -167,7 +167,7 @@ dotnet run
 > @hotreload status
 ✅ Hot Reload Status: ENABLED
 📁 Monitoring the following directories:
-  • Resources/verbs/ (*.json) - Verb definitions
+  • resources/verbs/ (*.json) - Verb definitions
   • Scripts/ (*.cs) - C# script files [if present]
 🔄 Changes to these files will trigger automatic reloads
 
@@ -186,7 +186,7 @@ dotnet run
 5. Test your changes immediately in-game - **no restart needed!**
 
 ### With Verb Hot Reload
-1. Edit verb JSON files in `Resources/verbs/`
+1. Edit verb JSON files in `resources/verbs/`
 2. Save the file
 3. Watch the server console for reload confirmation
 4. Test your changes immediately in-game
