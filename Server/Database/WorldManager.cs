@@ -52,15 +52,15 @@ public static class WorldManager
     /// <summary>
     /// Gets all exits from a room
     /// </summary>
-    public static List<dynamic> GetExitsFromRoom(string roomId)
+    public static List<dynamic> GetExits(string roomId)
     {
-        return RoomManager.GetExitsFromRoom(roomId).Cast<dynamic>().ToList();
+        return RoomManager.GetExits(roomId).Cast<dynamic>().ToList();
     }
         /// <summary>
     /// Gets all exits from a room
     /// </summary>
-    public static List<dynamic> GetExitsFromRoom(GameObject room)
+    public static List<dynamic> GetExits(GameObject room)
     {
-        return RoomManager.GetExitsFromRoom(room).Cast<dynamic>().ToList();
+        return RoomManager.GetExits(room).Cast<dynamic>().ToList();
     }
 }

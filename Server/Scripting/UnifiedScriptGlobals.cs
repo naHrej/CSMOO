@@ -230,7 +230,7 @@ public class UnifiedScriptGlobals : EnhancedScriptGlobals
     {
         get
         {
-            return Player.Location as dynamic;
+            return Player!.Location as dynamic;
         }
     }
 

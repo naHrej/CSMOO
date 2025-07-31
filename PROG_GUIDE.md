@@ -259,7 +259,7 @@ bool MoveObject(string objectId, string newLocationId)
 bool MoveObject(GameObject gameObj, GameObject destination)
 
 // Get all exits from a room
-List<GameObject> GetExitsFromRoom(string roomId)
+List<GameObject> GetExits(dynamic room)
 ```
 
 ### Player Management
@@ -432,7 +432,7 @@ Helpers.UpdatePlayerLocation(player, newLocationId);
 Helpers.ShowRoom();
 
 // Get exits from a room
-var exits = Helpers.GetExitsFromRoom(roomId);
+var exits = room.Exits();
 
 // Look at an object
 Helpers.LookAtObject("objectName");

@@ -1,1 +1,1 @@
-return Builtins.GetExitsFromRoom((GameObject)This);
+return Builtins.GetExits((GameObject)This);

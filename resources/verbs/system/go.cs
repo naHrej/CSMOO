@@ -5,7 +5,7 @@ if (currentLocation is null)
     notify(Player, "<p class='error' style='color:red'>You are not in any location.</p>");
     return;
 }
-var exits = Builtins.GetExitsFromRoom(currentLocation);
+var exits = Builtins.GetExitsLocation);
 var exitNames = new List<string>();
 foreach (var exit in exits)
 {

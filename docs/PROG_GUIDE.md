@@ -209,7 +209,7 @@ Helpers.UpdatePlayerLocation(player, newLocationId);
 Helpers.ShowRoom();
 
 // Get exits from a room
-var exits = Helpers.GetExitsFromRoom(roomId);
+var exits = room.Exits();
 
 // Look at an object
 Helpers.LookAtObject("objectName");

@@ -394,7 +394,7 @@ public class ScriptHelpers
         notify(_player, longDesc);
 
         // Show exits
-        var exits = WorldManager.GetExitsFromRoom(_player.Location);
+        var exits = WorldManager.GetExits(_player.Location);
         if (exits.Any())
         {
             var exitNames = exits.Select(e => ObjectManager.GetProperty(e, "direction")?.AsString).Where(d => d != null);
@@ -454,9 +454,9 @@ public class ScriptHelpers
     /// <summary>
     /// Get all exits from a room
     /// </summary>
-    public List<dynamic> GetExitsFromRoom(string roomId)
+    public List<dynamic> GetExits(string roomId)
     {
-        return WorldManager.GetExitsFromRoom(roomId);
+        return WorldManager.GetExits(roomId);
     }
 
     /// <summary>

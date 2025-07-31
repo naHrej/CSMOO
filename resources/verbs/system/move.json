@@ -18,7 +18,7 @@
     "}",
     "",
     "// Get all exits from current room",
-    "var exits = Builtins.GetExitsFromRoom(currentLocation.ObjectId);",
+    "var exits = Builtins.GetExits(currentLocation.ObjectId);",
     "if (exits.Count == 0)",
     "{",
     "    return; // No exits, let other verbs handle this word",

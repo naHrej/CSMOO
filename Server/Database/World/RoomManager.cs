@@ -149,7 +149,7 @@ public static class RoomManager
     /// <summary>
     /// Gets all exits from a room
     /// </summary>
-    public static List<GameObject> GetExitsFromRoom(string roomId)
+    public static List<GameObject> GetExits(string roomId)
     {
         var exitClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "Exit");
         if (exitClass == null) return new List<GameObject>();
@@ -161,7 +161,7 @@ public static class RoomManager
     /// <summary>
     /// Gets all exits from a room
     /// </summary>
-    public static List<GameObject> GetExitsFromRoom(GameObject room)
+    public static List<GameObject> GetExits(GameObject room)
     {
         var exitClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "Exit");
         if (exitClass == null) return new List<GameObject>();
@@ -176,7 +176,7 @@ public static class RoomManager
     /// </summary>
     public static GameObject? FindExitInDirection(string roomId, string direction)
     {
-        var exits = GetExitsFromRoom(roomId);
+        var exits = GetExits(roomId);
         return exits.FirstOrDefault(exit =>
         {
             var exitDirection = ObjectManager.GetProperty(exit, "direction")?.AsString?.ToLower();
@@ -248,7 +248,7 @@ public static class RoomManager
             ["TotalRooms"] = allRooms.Count,
             ["RoomsWithItems"] = allRooms.Count(room => GetItemsInRoom(room.Id).Any()),
             ["RoomsWithPlayers"] = allRooms.Count(room => GetPlayersInRoom(room.Id).Any()),
-            ["TotalExits"] = allRooms.Sum(room => GetExitsFromRoom(room.Id).Count)
+            ["TotalExits"] = allRooms.Sum(room => GetExits(room.Id).Count)
         };
 
         return stats;

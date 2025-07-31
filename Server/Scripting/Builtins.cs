@@ -787,7 +787,7 @@ public static class Builtins
         // Show exits
         if (currentPlayer.Location != null)
         {
-            var exits = WorldManager.GetExitsFromRoom(currentPlayer.Location);
+            var exits = WorldManager.GetExits(currentPlayer.Location);
             if (exits.Any())
             {
                 var exitNames = ((IEnumerable<GameObject>)exits).Select(e => GetProperty(e, "direction")?.AsString).Where(d => d != null);
@@ -948,9 +948,9 @@ public static class Builtins
     /// <summary>
     /// Get all exits from a room
     /// </summary>
-    public static List<dynamic> GetExitsFromRoom(GameObject room)
+    public static List<dynamic> GetExits(GameObject room)
     {
-        return WorldManager.GetExitsFromRoom(room);
+        return WorldManager.GetExits(room);
     }
 
     /// <summary>
@@ -962,14 +962,14 @@ public static class Builtins
         if (currentPlayer == null) return;
 
         var playerGameObject = ObjectManager.GetObject(currentPlayer.Id);
-        if (playerGameObject?.Contents == null || !playerGameObject.Contents.Any())
+        if (playerGameObject?.Contents == null || !playerGameObject!.Contents.Any())
         {
             Notify(currentPlayer, "You are carrying nothing.");
             return;
         }
 
         Notify(currentPlayer, "You are carrying:");
-        foreach (var itemId in playerGameObject.Contents)
+        foreach (var itemId in playerGameObject!.Contents)
         {
             var item = ObjectManager.GetObject(itemId);
             if (item != null)

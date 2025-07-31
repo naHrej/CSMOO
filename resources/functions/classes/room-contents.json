@@ -1,0 +1,8 @@
+{
+  "name": "Contents",
+  "targetClass": "Room", 
+  "description": "Returns a list of Contents in the room",
+  "returnType": "List<dynamic>",
+  "parameters": [],
+  "parameterNames": []
+}
