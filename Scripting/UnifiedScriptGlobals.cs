@@ -1,20 +1,8 @@
-using System;
-using System.Collections.Generic;
-using System.Dynamic;
-using System.Linq;
-using System.Reflection;
-using System.Text;
-using Microsoft.CodeAnalysis.CSharp.Scripting;
-using Microsoft.CodeAnalysis.Scripting;
 using CSMOO.Database;
-using CSMOO.Database.Models;
-using CSMOO.Logging;
-using CSMOO.Commands;
-using CSMOO.Verbs;
 using CSMOO.Functions;
-using LiteDB;
-using Database = CSMOO.Database;
 using CSMOO.Object;
+using CSMOO.Verbs;
+using LiteDB;
 
 namespace CSMOO.Scripting;
 

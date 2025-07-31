@@ -1,9 +1,6 @@
-using System;
-using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using CSMOO.Database;
-using CSMOO.Logging;
 using LiteDB;
 
 namespace CSMOO.Object;

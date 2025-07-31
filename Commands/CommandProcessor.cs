@@ -1,11 +1,5 @@
-using System;
-using System.Collections.Generic;
 using System.Net.Sockets;
-using System.Text;
-using System.IO;
-using System.Linq;
 using CSMOO.Database;
-using CSMOO.Database.Models;
 using CSMOO.Sessions;
 using CSMOO.Scripting;
 using CSMOO.Logging;

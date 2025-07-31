@@ -1,6 +1,3 @@
-using System;
-using System.Threading.Tasks;
-
 namespace CSMOO.Sessions;
 /// <summary>
 /// Interface for different types of client connections (Telnet, WebSocket, etc.)

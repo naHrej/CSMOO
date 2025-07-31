@@ -1,5 +1,3 @@
-using System;
-
 namespace CSMOO.Verbs;
 
 /// <summary>

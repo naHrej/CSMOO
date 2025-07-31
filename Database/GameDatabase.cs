@@ -1,10 +1,8 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using LiteDB;
 using CSMOO.Configuration;
 using CSMOO.Object;
 using CSMOO.Verbs;
+using CSMOO.Functions;
 
 namespace CSMOO.Database;
 
@@ -38,7 +36,7 @@ public class GameDatabase : IDisposable
         verbs.EnsureIndex(x => x.ObjectId);
         verbs.EnsureIndex(x => x.Name);
         
-        var functions = _database.GetCollection<Database.Models.GameFunction>("functions");
+        var functions = _database.GetCollection<GameFunction>("functions");
         functions.EnsureIndex(x => x.Id);
         functions.EnsureIndex(x => x.Name);
     }

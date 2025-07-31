@@ -1,9 +1,6 @@
-using System;
-using System.Collections.Generic;
-using CSMOO.Functions;
 using LiteDB;
 
-namespace CSMOO.Database.Models;
+namespace CSMOO.Functions;
 
 /// <summary>
 /// Represents a user-defined function that can be called from scripts

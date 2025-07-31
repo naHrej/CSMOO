@@ -1,4 +1,3 @@
-using System;
 using CSMOO.Commands;
 using CSMOO.Object;
 
