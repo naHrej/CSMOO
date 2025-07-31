@@ -37,3 +37,4 @@
     "notify(Player, $\"You tell {targetPlayer.name}, \\\"{message}\\\"\");"
   ]
 }
+

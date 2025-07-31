@@ -16,3 +16,4 @@
     "notify(Player, $\"You examine {name}.\");"
   ]
 }
+

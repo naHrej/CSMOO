@@ -1,7 +1,7 @@
-﻿using CSMOO.Server;
-using CSMOO.Server.Configuration;
-using CSMOO.Server.Logging;
-using CSMOO.Server.WebSocket;
+﻿using CSMOO.Core;
+using CSMOO.Configuration;
+using CSMOO.Logging;
+using CSMOO.Network;
 using System.Threading.Tasks;
 
 namespace CSMOO;

@@ -1,6 +1,6 @@
 using System;
-using CSMOO.Server.Database;
-using CSMOO.Server.Logging;
+using CSMOO.Database;
+using CSMOO.Logging;
 
 namespace CSMOO.Examples;
 
@@ -67,3 +67,4 @@ public static class ObjectSystemExample
         Logger.Info("\n=== Example Complete ===");
     }
 }
+

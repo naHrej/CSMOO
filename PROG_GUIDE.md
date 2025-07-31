@@ -140,8 +140,8 @@ The following namespaces are automatically imported:
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using CSMOO.Server.Database;
-using CSMOO.Server.Commands;
+using CSMOO.Database;
+using CSMOO.Commands;
 ```
 
 ## Available Variables
@@ -765,7 +765,7 @@ catch (Exception ex)
     "",
     "try",
     "{",
-    "    CSMOO.Server.Database.World.VerbInitializer.ReloadVerbs();",
+    "    CSMOO.Database.World.VerbInitializer.ReloadVerbs();",
     "    notify(player, \"Verb definitions reloaded successfully!\");",
     "}",
     "catch (Exception ex)",
@@ -799,7 +799,7 @@ catch (Exception ex)
     "try",
     "{",
     "    // Use the script engine to execute the code with full globals access",
-    "    var scriptEngine = new CSMOO.Server.Scripting.ScriptEngine();",
+    "    var scriptEngine = new CSMOO.Scripting.ScriptEngine();",
     "    var result = scriptEngine.ExecuteScript(scriptCode, player, CommandProcessor);",
     "    ",
     "    if (!string.IsNullOrEmpty(result))",
@@ -820,3 +820,4 @@ catch (Exception ex)
 This guide covers the fundamental concepts and advanced patterns for programming in CSMOO. For more examples, check the `resources/verbs/` directory and the existing system verbs.
 
 Happy coding! 🚀
+

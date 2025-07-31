@@ -4,12 +4,12 @@
   "description": "One-time fix to update admin permissions to new flag system",
   "code": [
     "// One-time fix for admin permissions",
-    "var admin = CSMOO.Server.Database.PlayerManager.FindPlayerByName(\"admin\");",
+    "var admin = CSMOO.Database.PlayerManager.FindPlayerByName(\"admin\");",
     "if (admin != null)",
     "{",
     "    notify(player, \"Found admin player, updating permissions...\");",
-    "    CSMOO.Server.Database.PermissionManager.InitializeAdminPermissions(admin);",
-    "    var flags = CSMOO.Server.Database.PermissionManager.GetFlagsString(admin);",
+    "    CSMOO.Database.PermissionManager.InitializeAdminPermissions(admin);",
+    "    var flags = CSMOO.Database.PermissionManager.GetFlagsString(admin);",
     "    notify(player, $\"Admin permissions updated. Flags: {flags}\");",
     "}",
     "else",
@@ -18,3 +18,4 @@
     "}"
   ]
 }
+
