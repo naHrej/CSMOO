@@ -37,7 +37,7 @@ var subtitle = Html.Div("Multi-User Object Oriented Server")
 
 // Add version badge
 var version = Html.Div("Version 1.0.0 (Dynamic!)")
-    .WithLessStyle("font-size:1rem; color:@accent; margin-bottom:@spacing-xlarge; padding:@spacing-small @spacing-medium; border:@border-accent; border-radius:@border-radius-pill; display:inline-block;", theme);
+    .WithLessStyle("font-size:1rem; color:@accent; margin-bottom:@spacing-xlarge; padding:@spacing-small @spacing-medium; border:@border-accent; border-radius:@border-radius; display:inline-block;", theme);
 
 // Add welcome message
 var welcome = Html.Div("*** Welcome to CSMOO! ***")
