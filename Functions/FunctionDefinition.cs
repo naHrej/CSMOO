@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace CSMOO.Database;
+namespace CSMOO.Functions;
 
 /// <summary>
 /// Represents a function definition loaded from JSON

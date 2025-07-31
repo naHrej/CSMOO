@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
-using CSMOO.Database;
+using CSMOO.Object;
 using LiteDB;
 
 namespace CSMOO.Scripting;
@@ -14,7 +14,7 @@ public class ScriptObjectManager
     {
         var obj = ObjectManager.GetObject(objectId);
         if (obj == null) return null;
-        return Database.ObjectManager.GetProperty(obj, propertyName)?.RawValue;
+        return ObjectManager.GetProperty(obj, propertyName)?.RawValue;
     }
 
     public void SetProperty(string objectId, string propertyName, object value)
@@ -22,18 +22,18 @@ public class ScriptObjectManager
         var obj = ObjectManager.GetObject(objectId);
         if (obj != null)
         {
-            Database.ObjectManager.SetProperty(obj, propertyName, new BsonValue(value));
+            ObjectManager.SetProperty(obj, propertyName, new BsonValue(value));
         }
     }
 
     public void MoveObject(string objectId, string? newLocation)
     {
-        Database.ObjectManager.MoveObject(objectId, newLocation);
+        ObjectManager.MoveObject(objectId, newLocation);
     }
 
     public List<string> GetObjectsInLocation(string locationId)
     {
-        return [.. Database.ObjectManager.GetObjectsInLocation(locationId).Select(obj => obj.Id)];
+        return [.. ObjectManager.GetObjectsInLocation(locationId).Select(obj => obj.Id)];
     }
 }
 

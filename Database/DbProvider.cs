@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using CSMOO.Database.Models;
+using CSMOO.Functions;
+using CSMOO.Object;
+using CSMOO.Verbs;
 
 namespace CSMOO.Database;
 

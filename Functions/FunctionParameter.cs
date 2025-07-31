@@ -1,6 +1,6 @@
 using LiteDB;
 
-namespace CSMOO.Database.Models;
+namespace CSMOO.Functions;
 
 /// <summary>
 /// Represents a parameter for a user-defined function

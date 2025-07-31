@@ -8,8 +8,8 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Scripting;
 using Microsoft.CodeAnalysis.Scripting;
 using LiteDB;
-using CSMOO.Database;
 using CSMOO.Commands;
+using CSMOO.Object;
 
 namespace CSMOO.Scripting;
 
@@ -39,8 +39,8 @@ public class ScriptEngine
                 "System.Linq",
                 "System.Collections.Generic",
                 "System.Text",
-                "CSMOO.Database",
                 "CSMOO.Commands",
+                "CSMOO.Object",
                 "CSMOO.Scripting",
                 "HtmlAgilityPack"
             );
@@ -56,8 +56,8 @@ public class ScriptEngine
             // Create script globals that provide access to game systems
             var globals = new UnifiedScriptGlobals
             {
-                Player = player != null ? Database.ObjectManager.GetObject(player.Id) : null,
-                This = player != null ? Database.ObjectManager.GetObject(player.Id) : null, // For test scripts, 'this' refers to the player
+                Player = player != null ? ObjectManager.GetObject(player.Id) : null,
+                This = player != null ? ObjectManager.GetObject(player.Id) : null, // For test scripts, 'this' refers to the player
                 CommandProcessor = commandProcessor,
                 ObjectManager = new ScriptObjectManager(),
                 WorldManager = new ScriptWorldManager(),

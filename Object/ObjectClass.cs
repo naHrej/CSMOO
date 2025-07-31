@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Dynamic;
 using LiteDB;
 
-namespace CSMOO.Database;
+namespace CSMOO.Object;
 
 /// <summary>
 /// Base class definition that all game objects inherit from

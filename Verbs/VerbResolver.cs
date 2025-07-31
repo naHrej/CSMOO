@@ -5,9 +5,9 @@ using System.Text;
 using System.Text.RegularExpressions;
 using LiteDB;
 using CSMOO.Database;
-using CSMOO.Database.Models;
 using CSMOO.Scripting;
 using CSMOO.Logging;
+using CSMOO.Object;
 
 namespace CSMOO.Verbs;
 
@@ -429,7 +429,7 @@ public static class VerbResolver
     /// <summary>
     /// Attempts to resolve and execute a command through the verb system
     /// </summary>
-    public static bool TryExecuteVerb(string input, Database.Player player, Commands.CommandProcessor commandProcessor)
+    public static bool TryExecuteVerb(string input, Player player, Commands.CommandProcessor commandProcessor)
     {
         if (string.IsNullOrWhiteSpace(input) || player == null)
             return false;
@@ -544,7 +544,7 @@ public static class VerbResolver
     /// <summary>
     /// Executes a verb with the script engine
     /// </summary>
-    private static bool ExecuteVerb(Verb verb, string input, Database.Player player, Commands.CommandProcessor commandProcessor, string thisObjectId, Dictionary<string, string>? variables = null)
+    private static bool ExecuteVerb(Verb verb, string input, Player player, Commands.CommandProcessor commandProcessor, string thisObjectId, Dictionary<string, string>? variables = null)
     {
         try
         {
@@ -563,7 +563,7 @@ public static class VerbResolver
     /// <summary>
     /// Tries to execute a movement command by calling the 'go' verb with the direction
     /// </summary>
-    private static bool TryExecuteMovementCommand(string direction, Database.Player player, Commands.CommandProcessor commandProcessor)
+    private static bool TryExecuteMovementCommand(string direction, Player player, Commands.CommandProcessor commandProcessor)
     {
         // Get current room
         if (string.IsNullOrEmpty(player.Location?.Id))
@@ -635,14 +635,14 @@ public static class VerbResolver
     /// <summary>
     /// Gets or creates the system object for global verbs
     /// </summary>
-    private static Database.GameObject GetOrCreateSystemObject()
+    private static GameObject GetOrCreateSystemObject()
     {
         var allObjects = DbProvider.Instance.FindAll<GameObject>("gameobjects").ToList();
         var systemObject = allObjects.FirstOrDefault(obj => obj.Properties.ContainsKey("isSystemObject") && obj.Properties["isSystemObject"].AsBoolean == true);
         if (systemObject == null)
         {
             // Create system object
-            systemObject = new Database.GameObject
+            systemObject = new GameObject
             {
                 Id = Guid.NewGuid().ToString(),
                 ClassId = "Object", // Base object class

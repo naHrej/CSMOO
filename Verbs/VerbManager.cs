@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using LiteDB;
 using CSMOO.Database;
-using CSMOO.Database.Models;
 using CSMOO.Logging;
 
 namespace CSMOO.Verbs;

@@ -3,12 +3,12 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using CSMOO.Database;
-using CSMOO.Database.Models;
 using CSMOO.Scripting;
 using CSMOO.Logging;
 using CSMOO.Verbs;
 using CSMOO.Functions;
 using CSMOO.Core;
+using CSMOO.Object;
 
 namespace CSMOO.Commands;
 

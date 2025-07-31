@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace CSMOO.Database;
+namespace CSMOO.Verbs;
 
 /// <summary>
 /// Represents a verb definition loaded from JSON

@@ -1,6 +1,7 @@
 using System;
 using LiteDB;
 using CSMOO.Logging;
+using CSMOO.Object;
 
 namespace CSMOO.Database;
 

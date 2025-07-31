@@ -1,5 +1,6 @@
 using CSMOO.Database;
 using CSMOO.Commands;
+using CSMOO.Object;
 
 namespace CSMOO.Scripting;
 
@@ -17,25 +18,25 @@ public class EnhancedScriptGlobals : ScriptGlobals
     {
         // Check for Helpers in base, derived class, or UnifiedScriptGlobals
         ScriptHelpers? helpers = null;
-        Database.Player? dbPlayer = null;
+        Player? dbPlayer = null;
         
         if (this is UnifiedScriptGlobals unifiedGlobals)
         {
             helpers = unifiedGlobals.Helpers;
             // Convert GameObject back to Database.Player if needed
-            dbPlayer = (Database.Player?)unifiedGlobals.Player ?? 
-                      DbProvider.Instance.FindById<Database.Player>("players", ((Database.Player?)unifiedGlobals.Player)?.Id ?? "");
+            dbPlayer = (Player?)unifiedGlobals.Player ?? 
+                      DbProvider.Instance.FindById<Player>("players", ((Player?)unifiedGlobals.Player)?.Id ?? "");
         }
         // VerbScriptGlobals merged: handle legacy ThisObjectId
         else if (this is UnifiedScriptGlobals legacyVerbGlobals && !string.IsNullOrEmpty(legacyVerbGlobals.ThisObjectId))
         {
             helpers = legacyVerbGlobals.Helpers;
-            dbPlayer = (Database.Player?)legacyVerbGlobals.Player;
+            dbPlayer = (Player?)legacyVerbGlobals.Player;
         }
         else
         {
             helpers = Helpers;
-            dbPlayer = Player as Database.Player;
+            dbPlayer = Player as Player;
         }
         
         if (dbPlayer != null && CommandProcessor != null && helpers != null)

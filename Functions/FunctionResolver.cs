@@ -2,8 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using CSMOO.Database;
-using CSMOO.Database.Models;
 using CSMOO.Logging;
+using CSMOO.Object;
 
 namespace CSMOO.Functions;
 

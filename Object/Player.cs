@@ -3,8 +3,9 @@ using System.Collections.Generic;
 using System.Dynamic;
 using LiteDB;
 using System.ComponentModel;
+using CSMOO.Database;
 
-namespace CSMOO.Database;/// <summary>
+namespace CSMOO.Object;/// <summary>
 /// Player-specific data that extends GameObject
 /// </summary>
 public class Player : GameObject

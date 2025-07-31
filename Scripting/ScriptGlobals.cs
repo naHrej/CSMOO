@@ -8,10 +8,10 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Scripting;
 using Microsoft.CodeAnalysis.Scripting;
 using LiteDB;
-using CSMOO.Database;
 using CSMOO.Commands;
 using CSMOO.Verbs;
 using CSMOO.Functions;
+using CSMOO.Object;
 
 namespace CSMOO.Scripting;
 
@@ -110,7 +110,7 @@ public class ScriptGlobals
 
         return candidates.Where(objId =>
         {
-            var obj = Database.ObjectManager.GetObject(objId);
+            var obj = Object.ObjectManager.GetObject(objId);
             return obj != null && (
                 obj.Name?.Contains(name, StringComparison.OrdinalIgnoreCase) == true ||
                 (obj.Properties.ContainsKey("aliases") &&
@@ -134,7 +134,7 @@ public class ScriptGlobals
         }
 
         var engine = new UnifiedScriptEngine();
-        return engine.ExecuteVerb(verb, $"{verbName} {string.Join(" ", args)}", Player as Database.Player ?? throw new InvalidOperationException("Invalid player type"), CommandProcessor!, objectId);
+        return engine.ExecuteVerb(verb, $"{verbName} {string.Join(" ", args)}", Player as Player ?? throw new InvalidOperationException("Invalid player type"), CommandProcessor!, objectId);
     }
 
     /// <summary>
@@ -172,7 +172,7 @@ public class ScriptGlobals
         }
 
         var engine = new UnifiedScriptEngine();
-        return engine.ExecuteFunction(function, parameters, Player as Database.Player ?? throw new InvalidOperationException("Invalid player type"), CommandProcessor!, objectId);
+        return engine.ExecuteFunction(function, parameters, Player as Player ?? throw new InvalidOperationException("Invalid player type"), CommandProcessor!, objectId);
     }
 
     /// <summary>

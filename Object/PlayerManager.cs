@@ -2,10 +2,11 @@ using System;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
+using CSMOO.Database;
 using CSMOO.Logging;
 using LiteDB;
 
-namespace CSMOO.Database;
+namespace CSMOO.Object;
 
 /// <summary>
 /// Manages player accounts and their connection to sessions

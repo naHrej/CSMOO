@@ -2,12 +2,11 @@ using System.Linq;
 using System.IO;
 using System.Text.Json;
 using LiteDB;
-using CSMOO.Database;
-using CSMOO.Database.Models;
-using CSMOO.Verbs;
 using CSMOO.Logging;
+using CSMOO.Object;
+using CSMOO.Database;
 
-namespace CSMOO.Database;
+namespace CSMOO.Verbs;
 
 /// <summary>
 /// Statistics for verb loading operations

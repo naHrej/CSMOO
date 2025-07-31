@@ -14,6 +14,7 @@ using CSMOO.Verbs;
 using CSMOO.Functions;
 using LiteDB;
 using Database = CSMOO.Database;
+using CSMOO.Object;
 
 namespace CSMOO.Scripting;
 
@@ -65,7 +66,7 @@ public class UnifiedScriptGlobals : EnhancedScriptGlobals
         get
         {
             if (string.IsNullOrEmpty(_playerId)) return null;
-            return Database.ObjectManager.GetObject<Player>(_playerId);
+            return CSMOO.Object.ObjectManager.GetObject<Player>(_playerId);
         }
         set
         {
@@ -159,7 +160,7 @@ public class UnifiedScriptGlobals : EnhancedScriptGlobals
     {
         var thisGameObject = GetThisGameObject();
         if (thisGameObject == null) return null;
-        return Database.ObjectManager.GetProperty(thisGameObject, propertyName)?.RawValue;
+        return CSMOO.Object.ObjectManager.GetProperty(thisGameObject, propertyName)?.RawValue;
     }
 
     /// <summary>
@@ -184,8 +185,8 @@ public class UnifiedScriptGlobals : EnhancedScriptGlobals
             BsonValue bv => bv,
             _ => new BsonValue(value.ToString() ?? "")
         };
-        
-        Database.ObjectManager.SetProperty(thisGameObject, propertyName, bsonValue);
+
+        CSMOO.Object.ObjectManager.SetProperty(thisGameObject, propertyName, bsonValue);
     }
 
     /// <summary>
@@ -193,8 +194,8 @@ public class UnifiedScriptGlobals : EnhancedScriptGlobals
     /// </summary>
     public void notify(GameObject targetPlayer, string message)
     {
-        var dbPlayer = targetPlayer as Database.Player ?? 
-                      DbProvider.Instance.FindById<Database.Player>("players", targetPlayer.Id);
+        var dbPlayer = targetPlayer as Player ?? 
+                      DbProvider.Instance.FindById<Player>("players", targetPlayer.Id);
         
         if (dbPlayer != null)
         {
@@ -208,14 +209,14 @@ public class UnifiedScriptGlobals : EnhancedScriptGlobals
     public GameObject? GetPlayer(string nameOrId)
     {
         // Try by name first
-        var player = DbProvider.Instance.FindOne<Database.Player>("players", p => 
+        var player = DbProvider.Instance.FindOne<Player>("players", p => 
             p.Name.Equals(nameOrId, StringComparison.OrdinalIgnoreCase));
         
-        if (player != null) return Database.ObjectManager.GetObject(player.Id);
+        if (player != null) return CSMOO.Object.ObjectManager.GetObject(player.Id);
         
         // Try by ID
-        var playerById = DbProvider.Instance.FindById<Database.Player>("players", nameOrId);
-        return playerById != null ? Database.ObjectManager.GetObject(playerById.Id) : null;
+        var playerById = DbProvider.Instance.FindById<Player>("players", nameOrId);
+        return playerById != null ? CSMOO.Object.ObjectManager.GetObject(playerById.Id) : null;
     }
 
     /// <summary>
@@ -248,13 +249,13 @@ public class UnifiedScriptGlobals : EnhancedScriptGlobals
     {
         // Check if it inherits from Room class
         var roomClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "Room");
-        if (roomClass != null && (obj.ClassId == roomClass.Id || Database.ObjectManager.InheritsFrom(obj.ClassId, roomClass.Id)))
+        if (roomClass != null && (obj.ClassId == roomClass.Id || CSMOO.Object.ObjectManager.InheritsFrom(obj.ClassId, roomClass.Id)))
         {
             return true;
         }
 
         // Fallback: check for explicit room properties
-        var isRoomProperty = Database.ObjectManager.GetProperty(obj, "isRoom")?.AsBoolean == true;
+        var isRoomProperty = CSMOO.Object.ObjectManager.GetProperty(obj, "isRoom")?.AsBoolean == true;
         if (isRoomProperty) return true;
 
         // Additional fallback: check if it has room-like characteristics
@@ -268,16 +269,16 @@ public class UnifiedScriptGlobals : EnhancedScriptGlobals
     {
         // First check if it inherits from Room class
         var roomClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "Room");
-        if (roomClass != null && (obj.ClassId == roomClass.Id || Database.ObjectManager.InheritsFrom(obj.ClassId, roomClass.Id)))
+        if (roomClass != null && (obj.ClassId == roomClass.Id || CSMOO.Object.ObjectManager.InheritsFrom(obj.ClassId, roomClass.Id)))
         {
             return true;
         }
 
         // Fallback: check if object has room-like properties
-        var hasExits = Database.ObjectManager.GetObjectsInLocation(obj.Id).Any(o => 
-            Database.ObjectManager.GetProperty(o, "isExit")?.AsBoolean == true);
-        var hasLongDesc = !string.IsNullOrEmpty(Database.ObjectManager.GetProperty(obj, "longDescription")?.AsString);
-        var isRoomProperty = Database.ObjectManager.GetProperty(obj, "isRoom")?.AsBoolean == true;
+        var hasExits = CSMOO.Object.ObjectManager.GetObjectsInLocation(obj.Id).Any(o =>
+            CSMOO.Object.ObjectManager.GetProperty(o, "isExit")?.AsBoolean == true);
+        var hasLongDesc = !string.IsNullOrEmpty(CSMOO.Object.ObjectManager.GetProperty(obj, "longDescription")?.AsString);
+        var isRoomProperty = CSMOO.Object.ObjectManager.GetProperty(obj, "isRoom")?.AsBoolean == true;
         
         return hasExits || hasLongDesc || isRoomProperty;
     }
@@ -290,7 +291,7 @@ public class UnifiedScriptGlobals : EnhancedScriptGlobals
         var playerGameObject = GetPlayerGameObject();
         if (playerGameObject?.Location == null) return;
 
-        var playersInRoom = Database.PlayerManager.GetOnlinePlayers()
+        var playersInRoom = CSMOO.Object.PlayerManager.GetOnlinePlayers()
             .Where(p => p.Location == playerGameObject.Location)
             .ToList();
 
@@ -311,11 +312,11 @@ public class UnifiedScriptGlobals : EnhancedScriptGlobals
         var playerGameObject = GetPlayerGameObject();
         if (playerGameObject?.Location == null) return null;
 
-        var objects = Database.ObjectManager.GetObjectsInLocation(playerGameObject.Location);
+        var objects = CSMOO.Object.ObjectManager.GetObjectsInLocation(playerGameObject.Location);
         var targetObject = objects.FirstOrDefault(obj =>
         {
-            var objName = Database.ObjectManager.GetProperty(obj, "name")?.AsString?.ToLower();
-            var shortDesc = Database.ObjectManager.GetProperty(obj, "shortDescription")?.AsString?.ToLower();
+            var objName = CSMOO.Object.ObjectManager.GetProperty(obj, "name")?.AsString?.ToLower();
+            var shortDesc = CSMOO.Object.ObjectManager.GetProperty(obj, "shortDescription")?.AsString?.ToLower();
             name = name.ToLower();
             return objName?.Contains(name) == true || shortDesc?.Contains(name) == true;
         });
@@ -362,8 +363,8 @@ public class UnifiedScriptGlobals : EnhancedScriptGlobals
             
             // Get Database.Player from GameObject
             var playerGameObject = GetPlayerGameObject();
-            var dbPlayer = playerGameObject as Database.Player ?? 
-                          DbProvider.Instance.FindById<Database.Player>("players", playerGameObject?.Id ?? "");
+            var dbPlayer = playerGameObject as Player ?? 
+                          DbProvider.Instance.FindById<Player>("players", playerGameObject?.Id ?? "");
             
             if (dbPlayer == null || CommandProcessor == null)
             {
@@ -395,7 +396,7 @@ public class UnifiedScriptGlobals : EnhancedScriptGlobals
         // Get Database.Player from GameObject
         var playerGameObject = GetPlayerGameObject();
         var dbPlayer =
-                      DbProvider.Instance.FindById<Database.Player>("players", playerGameObject?.Id ?? "");
+                      DbProvider.Instance.FindById<Player>("players", playerGameObject?.Id ?? "");
         
         if (dbPlayer == null)
             throw new InvalidOperationException("No player context available.");
@@ -470,7 +471,7 @@ public class UnifiedScriptGlobals : EnhancedScriptGlobals
         var match = DbProvider.Instance.FindAll<GameObject>("gameobjects")
             .FirstOrDefault(obj =>
             {
-                var objName = (Database.ObjectManager.GetProperty(obj, "name") as BsonValue)?.AsString;
+                var objName = (CSMOO.Object.ObjectManager.GetProperty(obj, "name") as BsonValue)?.AsString;
                 return objName?.Equals(objectRef, StringComparison.OrdinalIgnoreCase) == true;
             });
         if (match != null) return match.Id;

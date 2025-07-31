@@ -1,6 +1,7 @@
 using System;
 using CSMOO.Database;
 using CSMOO.Logging;
+using CSMOO.Object;
 
 namespace CSMOO.Core;
 

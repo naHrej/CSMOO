@@ -12,6 +12,7 @@ using CSMOO.Logging;
 using CSMOO.Verbs;
 using CSMOO.Functions;
 using LiteDB;
+using CSMOO.Object;
 
 namespace CSMOO.Commands;
 
@@ -428,7 +429,7 @@ public class CommandProcessor
                         var functionEngine = new Scripting.UnifiedScriptEngine();
                         
                         // Create a minimal system player context for login banner
-                        var systemPlayer = new Database.Player
+                        var systemPlayer = new Player
                         {
                             Id = systemObj.Id,
                             Name = "System"

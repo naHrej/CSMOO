@@ -5,7 +5,6 @@ using System.Text;
 using System.Text.RegularExpressions;
 using LiteDB;
 using CSMOO.Database;
-using CSMOO.Database.Models;
 using CSMOO.Logging;
 
 namespace CSMOO.Verbs;

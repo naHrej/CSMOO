@@ -5,8 +5,9 @@ using System.Dynamic;
 using LiteDB;
 using CSMOO.Logging;
 using CSMOO.Functions;
+using CSMOO.Database;
 
-namespace CSMOO.Database;
+namespace CSMOO.Object;
 
 /// <summary>
 /// An actual instance of an ObjectClass - this is what exists in the game world

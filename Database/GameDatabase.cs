@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using LiteDB;
 using CSMOO.Configuration;
+using CSMOO.Object;
+using CSMOO.Verbs;
 
 namespace CSMOO.Database;
 
@@ -31,7 +33,7 @@ public class GameDatabase : IDisposable
         players.EnsureIndex(x => x.Name);
         players.EnsureIndex(x => x.SessionGuid);
         
-        var verbs = _database.GetCollection<Database.Models.Verb>("verbs");
+        var verbs = _database.GetCollection<Verb>("verbs");
         verbs.EnsureIndex(x => x.Id);
         verbs.EnsureIndex(x => x.ObjectId);
         verbs.EnsureIndex(x => x.Name);

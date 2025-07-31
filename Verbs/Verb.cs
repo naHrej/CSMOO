@@ -1,7 +1,7 @@
 using System;
 using LiteDB;
 
-namespace CSMOO.Database.Models;
+namespace CSMOO.Verbs;
 
 /// <summary>
 /// Represents a verb (command) that can be executed on an object

@@ -3,6 +3,7 @@ using System.Linq;
 using CSMOO.Database;
 using System.Collections.Generic;
 using Microsoft.CodeAnalysis;
+using CSMOO.Object;
 
 namespace CSMOO.Core;
 

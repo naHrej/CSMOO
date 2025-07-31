@@ -3,13 +3,12 @@ using System.Linq;
 using System.IO;
 using System.Text.Json;
 using LiteDB;
-using CSMOO.Database;
-using CSMOO.Database.Models;
-using CSMOO.Functions;
 using CSMOO.Logging;
 using System.Runtime.InteropServices;
+using CSMOO.Object;
+using CSMOO.Database;
 
-namespace CSMOO.Database;
+namespace CSMOO.Functions;
 
 /// <summary>
 /// Statistics for function loading operations

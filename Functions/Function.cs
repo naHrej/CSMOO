@@ -1,7 +1,7 @@
 using System;
 using LiteDB;
 
-namespace CSMOO.Database.Models;
+namespace CSMOO.Functions;
 
 /// <summary>
 /// Represents a function (method) that can be called on an object with strict type checking

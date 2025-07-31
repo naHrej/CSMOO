@@ -1,9 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using CSMOO.Database;
 using CSMOO.Logging;
 
-namespace CSMOO.Database;
+namespace CSMOO.Object;
 
 /// <summary>
 /// Manages player permissions and flags in a PennMUSH-style system

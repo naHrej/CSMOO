@@ -1,5 +1,7 @@
-using CSMOO.Database;
+using CSMOO.Functions;
 using CSMOO.Logging;
+using CSMOO.Object;
+using CSMOO.Verbs;
 
 namespace CSMOO.Database;
 

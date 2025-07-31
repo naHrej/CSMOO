@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using CSMOO.Database;
+using CSMOO.Object;
 
 namespace CSMOO.Scripting;
 

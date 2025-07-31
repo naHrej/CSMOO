@@ -9,6 +9,7 @@ using CSMOO.Sessions;
 using CSMOO.Logging;
 using CSMOO.Verbs;
 using LiteDB;
+using CSMOO.Object;
 
 namespace CSMOO.Scripting;
 

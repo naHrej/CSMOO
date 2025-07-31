@@ -2,12 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using CSMOO.Database;
-using CSMOO.Database.Models;
 using CSMOO.Scripting;
 using CSMOO.Logging;
 using CSMOO.Verbs;
 using CSMOO.Functions;
 using LiteDB;
+using CSMOO.Object;
 
 namespace CSMOO.Scripting;
 
@@ -718,10 +718,10 @@ public static class Builtins
     public static dynamic? GetCurrentPlayer()
     {
         // Check unified context first, then fall back to old context
-        if (((Database.Player?)UnifiedContext?.Player) != null)
+        if (((Player?)UnifiedContext?.Player) != null)
         {
             // Convert GameObject to Database.Player
-            var unifiedPlayer = (Database.Player?)UnifiedContext.Player;
+            var unifiedPlayer = (Player?)UnifiedContext.Player;
             if (unifiedPlayer != null)
                 return unifiedPlayer;
             var id = unifiedPlayer?.Id;
@@ -729,7 +729,7 @@ public static class Builtins
                 return ObjectManager.GetObject<Player>(id);
             return null;
         }
-        return (Database.Player?)CurrentContext?.Player;
+        return (Player?)CurrentContext?.Player;
     }
 
     /// <summary>
@@ -1171,7 +1171,7 @@ public static class Builtins
     /// <summary>
     /// Execute C# script code with the same environment as verb/function execution
     /// </summary>
-    public static string ExecuteScript(string scriptCode, Database.Player player, Commands.CommandProcessor commandProcessor, string? thisObjectId = null, string? input = null)
+    public static string ExecuteScript(string scriptCode, Player player, Commands.CommandProcessor commandProcessor, string? thisObjectId = null, string? input = null)
     {
         try
         {
@@ -1197,7 +1197,7 @@ public static class Builtins
     /// <summary>
     /// Execute C# script code with the same environment as verb/function execution (overload with variables)
     /// </summary>
-    public static string ExecuteScript(string scriptCode, Database.Player player, Commands.CommandProcessor commandProcessor, string? thisObjectId = null, string? input = null, Dictionary<string, string>? variables = null)
+    public static string ExecuteScript(string scriptCode, Player player, Commands.CommandProcessor commandProcessor, string? thisObjectId = null, string? input = null, Dictionary<string, string>? variables = null)
     {
         try
         {

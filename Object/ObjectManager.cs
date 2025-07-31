@@ -1,10 +1,10 @@
 using System;
 using System.Collections.Generic;
 using LiteDB;
-using CSMOO.Database;
 using CSMOO.Logging;
+using CSMOO.Database;
 
-namespace CSMOO.Database;
+namespace CSMOO.Object;
 /// <summary>
 /// Main facade for object management, delegating to specialized managers
 /// </summary>

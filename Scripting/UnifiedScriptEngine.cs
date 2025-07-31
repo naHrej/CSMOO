@@ -7,13 +7,14 @@ using System.Text;
 using System.Threading;
 using Microsoft.CodeAnalysis.CSharp.Scripting;
 using Microsoft.CodeAnalysis.Scripting;
-using CSMOO.Database;
-using CSMOO.Database.Models;
 using CSMOO.Logging;
 using CSMOO.Commands;
 using CSMOO.Configuration;
 using LiteDB;
 using Database = CSMOO.Database;
+using CSMOO.Object;
+using CSMOO.Functions;
+using CSMOO.Verbs;
 
 namespace CSMOO.Scripting;
 
@@ -46,6 +47,7 @@ public class UnifiedScriptEngine
                 "System.Threading.Tasks",
                 "CSMOO.Database",
                 "CSMOO.Commands",
+                "CSMOO.Object",
                 "CSMOO.Scripting",
                 "CSMOO.Core",
                 "HtmlAgilityPack"
@@ -55,15 +57,15 @@ public class UnifiedScriptEngine
     /// <summary>
     /// Execute a verb with unified script globals
     /// </summary>
-    public string ExecuteVerb(Verb verb, string input, Database.Player player, 
+    public string ExecuteVerb(Verb verb, string input, Player player, 
         CommandProcessor commandProcessor, string? thisObjectId = null, Dictionary<string, string>? variables = null)
     {
         var previousContext = Builtins.UnifiedContext; // Store previous context
         try
         {
             var actualThisObjectId = thisObjectId ?? verb.ObjectId;
-            var thisObject = Database.ObjectManager.GetObject(actualThisObjectId);
-            var playerObject = Database.ObjectManager.GetObject(player.Id);
+            var thisObject = ObjectManager.GetObject(actualThisObjectId);
+            var playerObject = ObjectManager.GetObject(player.Id);
 
             // Debug logging to identify null objects
             if (thisObject == null)
@@ -154,7 +156,7 @@ public class UnifiedScriptEngine
     /// <summary>
     /// Execute a function with unified script globals and type checking
     /// </summary>
-    public object? ExecuteFunction(Function function, object?[] parameters, Database.Player player, 
+    public object? ExecuteFunction(Function function, object?[] parameters, Player player, 
         CommandProcessor? commandProcessor = null, string? thisObjectId = null)
     {
         var previousContext = Builtins.UnifiedContext; // Store previous context
@@ -176,8 +178,8 @@ public class UnifiedScriptEngine
             }
 
             var actualThisObjectId = thisObjectId ?? function.ObjectId;
-            var thisObject = Database.ObjectManager.GetObject(actualThisObjectId);
-            var playerObject = Database.ObjectManager.GetObject(player.Id);
+            var thisObject = ObjectManager.GetObject(actualThisObjectId);
+            var playerObject = ObjectManager.GetObject(player.Id);
 
             // Debug logging to identify null objects
             if (thisObject == null)
@@ -386,7 +388,7 @@ public class UnifiedScriptEngine
             "float" => actualType == typeof(float),
             "double" => actualType == typeof(double),
             "decimal" => actualType == typeof(decimal),
-            "player" => actualType == typeof(Database.Player),
+            "player" => actualType == typeof(Player),
             "gameobject" => actualType == typeof(GameObject),
             "objectclass" => actualType == typeof(ObjectClass),
             _ => true // For unknown types, allow anything
@@ -416,7 +418,7 @@ public class UnifiedScriptEngine
             "float" => actualType == typeof(float),
             "double" => actualType == typeof(double),
             "decimal" => actualType == typeof(decimal),
-            "player" => actualType == typeof(Database.Player),
+            "player" => actualType == typeof(Player),
             "gameobject" => actualType == typeof(GameObject),
             "objectclass" => actualType == typeof(ObjectClass),
             _ => true // For unknown types, allow anything
