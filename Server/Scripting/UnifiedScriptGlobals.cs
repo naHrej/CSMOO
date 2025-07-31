@@ -224,7 +224,7 @@ public class UnifiedScriptGlobals : EnhancedScriptGlobals
     /// <summary>
     /// Get the current player for use with notify() - returns dynamic GameObject
     /// </summary>
-    public new dynamic? player => Player;
+    public dynamic? player => Player;
 
     /// <summary>
     /// The current location as GameObject - returns the actual GameObject, not ScriptObject
@@ -503,7 +503,7 @@ public class UnifiedScriptGlobals : EnhancedScriptGlobals
     /// <summary>
     /// Call a verb on the player object (me)
     /// </summary>
-    public new object? Me(string verbName, params object[] args)
+    public object? Me(string verbName, params object[] args)
     {
         return CallVerb("me", verbName, args);
     }
@@ -511,7 +511,7 @@ public class UnifiedScriptGlobals : EnhancedScriptGlobals
     /// <summary>
     /// Call a verb on the current room (here)
     /// </summary>
-    public new object? Here(string verbName, params object[] args)
+    public object? Here(string verbName, params object[] args)
     {
         // Use the here property to get the correct location
         var hereObj = here;
@@ -522,7 +522,7 @@ public class UnifiedScriptGlobals : EnhancedScriptGlobals
     /// <summary>
     /// Call a verb on the system object
     /// </summary>
-    public new object? System(string verbName, params object[] args)
+    public object? System(string verbName, params object[] args)
     {
         return CallVerb("system", verbName, args);
     }
@@ -530,7 +530,7 @@ public class UnifiedScriptGlobals : EnhancedScriptGlobals
     /// <summary>
     /// Call a verb on an object by DBREF
     /// </summary>
-    public new object? Object(int dbref, string verbName, params object[] args)
+    public object? Object(int dbref, string verbName, params object[] args)
     {
         return CallVerb($"#{dbref}", verbName, args);
     }
@@ -538,7 +538,7 @@ public class UnifiedScriptGlobals : EnhancedScriptGlobals
     /// <summary>
     /// Call a verb on a class
     /// </summary>
-    public new object? Class(string className, string verbName, params object[] args)
+    public object? Class(string className, string verbName, params object[] args)
     {
         return CallVerb($"class:{className}", verbName, args);
     }

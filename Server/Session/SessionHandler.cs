@@ -92,7 +92,5 @@ namespace CSMOO.Server.Session;
             PlayerManager.ConnectPlayerToSession(player.Id, sessionGuid);
             return true;
         }
-
-        public record SessionInfo(Guid ClientGuid, IClientConnection Connection);
     }
 
