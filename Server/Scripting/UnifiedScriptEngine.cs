@@ -4,12 +4,14 @@ using System.Dynamic;
 using System.Linq;
 using System.Reflection;
 using System.Text;
+using System.Threading;
 using Microsoft.CodeAnalysis.CSharp.Scripting;
 using Microsoft.CodeAnalysis.Scripting;
 using CSMOO.Server.Database;
 using CSMOO.Server.Database.Models;
 using CSMOO.Server.Logging;
 using CSMOO.Server.Commands;
+using CSMOO.Server.Configuration;
 using LiteDB;
 using Database = CSMOO.Server.Database;
 
@@ -78,12 +80,19 @@ public class UnifiedScriptEngine
                 Player = player, // Always the Database.Player
                 This = thisObject ?? CreateNullGameObject(actualThisObjectId),
                 Caller = previousContext?.This ?? playerObject, // The object that called this verb (or Player if no previous context)
+                CallDepth = (previousContext?.CallDepth ?? 0) + 1, // Track call depth
                 CommandProcessor = commandProcessor,
                 Input = input,
                 Args = ParseArguments(input),
                 Verb = verb.Name,
                 Variables = variables ?? new Dictionary<string, string>()
             };
+
+            // Check for maximum call depth
+            if (globals.CallDepth > Config.Instance.Scripting.MaxCallDepth)
+            {
+                throw new InvalidOperationException($"Maximum script call depth exceeded: {globals.CallDepth} > {Config.Instance.Scripting.MaxCallDepth}");
+            }
 
             // If we have a previous context, inherit the Helpers to maintain consistency
             if (previousContext != null)
@@ -107,10 +116,24 @@ public class UnifiedScriptEngine
             // Set Builtins context for script execution
             Builtins.UnifiedContext = globals;
             
+            // Create script with timeout protection
             var script = CSharpScript.Create(completeScript, _scriptOptions, typeof(UnifiedScriptGlobals));
-            var result = script.RunAsync(globals).Result;
             
-            return result.ReturnValue?.ToString() ?? "";
+            // Execute with timeout
+            using var cts = new CancellationTokenSource(Config.Instance.Scripting.MaxExecutionTimeMs);
+            try
+            {
+                var result = script.RunAsync(globals, cts.Token).Result;
+                return result.ReturnValue?.ToString() ?? "";
+            }
+            catch (AggregateException ex) when (ex.InnerException is OperationCanceledException)
+            {
+                throw new TimeoutException($"Script execution timed out after {Config.Instance.Scripting.MaxExecutionTimeMs}ms");
+            }
+            catch (OperationCanceledException)
+            {
+                throw new TimeoutException($"Script execution timed out after {Config.Instance.Scripting.MaxExecutionTimeMs}ms");
+            }
         }
         catch (Exception ex)
         {
@@ -172,10 +195,17 @@ public class UnifiedScriptEngine
                 Player = player, // Always the Database.Player
                 This = thisObject ?? CreateNullGameObject(actualThisObjectId),
                 Caller = previousContext?.This ?? playerObject, // The object that called this function (or Player if no previous context)
+                CallDepth = (previousContext?.CallDepth ?? 0) + 1, // Track call depth
                 CommandProcessor = commandProcessor,
                 CallingObjectId = actualThisObjectId,
                 Parameters = parameters
             };
+
+            // Check for maximum call depth
+            if (globals.CallDepth > Config.Instance.Scripting.MaxCallDepth)
+            {
+                throw new InvalidOperationException($"Maximum script call depth exceeded: {globals.CallDepth} > {Config.Instance.Scripting.MaxCallDepth}");
+            }
 
             // If we have a previous context, inherit the Helpers to maintain consistency
             if (previousContext != null)
@@ -225,9 +255,24 @@ public class UnifiedScriptEngine
             // Set Builtins context for script execution
             Builtins.UnifiedContext = globals;
 
-            // Create and execute script
+            // Create and execute script with timeout protection
             var script = CSharpScript.Create(finalCode, _scriptOptions, typeof(UnifiedScriptGlobals));
-            var result = script.RunAsync(globals).Result;
+            
+            // Execute with timeout
+            using var cts = new CancellationTokenSource(Config.Instance.Scripting.MaxExecutionTimeMs);
+            ScriptState<object> result;
+            try
+            {
+                result = script.RunAsync(globals, cts.Token).Result;
+            }
+            catch (AggregateException ex) when (ex.InnerException is OperationCanceledException)
+            {
+                throw new TimeoutException($"Function '{function.Name}' execution timed out after {Config.Instance.Scripting.MaxExecutionTimeMs}ms");
+            }
+            catch (OperationCanceledException)
+            {
+                throw new TimeoutException($"Function '{function.Name}' execution timed out after {Config.Instance.Scripting.MaxExecutionTimeMs}ms");
+            }
 
             // Validate return type
             var returnValue = result.ReturnValue;
