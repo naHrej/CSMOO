@@ -54,6 +54,16 @@ public class UnifiedScriptEngine
     public string ExecuteVerb(Verb verb, string input, Player player, 
         CommandProcessor commandProcessor, string? thisObjectId = null, Dictionary<string, string>? variables = null)
     {
+        var result = ExecuteVerbWithResult(verb, input, player, commandProcessor, thisObjectId, variables);
+        return result.result;
+    }
+
+    /// <summary>
+    /// Execute a verb with unified script globals and return both success status and result
+    /// </summary>
+    public (bool success, string result) ExecuteVerbWithResult(Verb verb, string input, Player player, 
+        CommandProcessor commandProcessor, string? thisObjectId = null, Dictionary<string, string>? variables = null)
+    {
         var previousContext = Builtins.UnifiedContext; // Store previous context
         try
         {
@@ -119,8 +129,18 @@ public class UnifiedScriptEngine
             using var cts = new CancellationTokenSource(Config.Instance.Scripting.MaxExecutionTimeMs);
             try
             {
-                var result = script.RunAsync(globals, cts.Token).Result;
-                return result.ReturnValue?.ToString() ?? "";
+                var scriptResult = script.RunAsync(globals, cts.Token).Result;
+                var returnValue = scriptResult.ReturnValue;
+                
+                // Check if the verb returns a boolean to indicate success/failure
+                if (returnValue is bool boolResult)
+                {
+                    return (boolResult, "");
+                }
+                
+                // If not a boolean, assume success and return the string representation
+                var stringResult = returnValue?.ToString() ?? "";
+                return (true, stringResult);
             }
             catch (AggregateException ex) when (ex.InnerException is OperationCanceledException)
             {

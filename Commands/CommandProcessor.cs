@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Net.Sockets;
 using CSMOO.Database;
 using CSMOO.Sessions;
@@ -224,6 +227,12 @@ public class CommandProcessor
                 return;
             }
 
+            // Try to execute as a "go" command for movement
+            if (TryExecuteGoCommand(input))
+            {
+                return;
+            }
+
             // Fall back to essential built-in commands only
             var parts = input.Split(' ', StringSplitOptions.RemoveEmptyEntries);
             if (parts.Length == 0) return;
@@ -258,6 +267,28 @@ public class CommandProcessor
             SendToPlayer($"Error processing command \"{input.ToUpperInvariant()}\": {ex.Message}");
             Logger.Error($"Error in command processing: {ex.Message}");
             Logger.Error($"Stack trace: {ex.StackTrace}");
+        }
+    }
+
+    /// <summary>
+    /// Tries to execute the input as a "go" command for movement
+    /// </summary>
+    private bool TryExecuteGoCommand(string input)
+    {
+        if (_player == null) return false;
+
+        try
+        {
+            // Try to execute the input with "go" prepended to see if it matches a movement direction
+            var goCommand = $"go {input}";
+            
+            // Use the existing TryExecuteVerb method but specifically for the go command
+            return VerbResolver.TryExecuteVerb(goCommand, _player, this);
+        }
+        catch (Exception ex)
+        {
+            Logger.Debug($"Error in TryExecuteGoCommand: {ex.Message}");
+            return false;
         }
     }
 
