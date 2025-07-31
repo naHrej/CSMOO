@@ -57,10 +57,14 @@ public static class HotReloadManager
             // Watch C# script files if they exist
             SetupScriptFileWatcher();
 
+            // Watch all resource files (functions, classes, etc.)
+            SetupResourceFileWatcher();
+
             Logger.Info("Hot Reload Manager initialized successfully!");
             Logger.Info("The following will trigger hot reloads:");
             Logger.Info("  - Changes to verb JSON files in resources/verbs/");
             Logger.Info("  - Changes to C# script files in Scripts/ (if present)");
+            Logger.Info("  - Changes to other resource files in resources/");
         }
         catch (Exception ex)
         {
@@ -160,6 +164,68 @@ public static class HotReloadManager
     }
 
     /// <summary>
+    /// Setup file watcher for all resource files (functions, classes, etc.)
+    /// </summary>
+    private static void SetupResourceFileWatcher()
+    {
+        // Try multiple path strategies to find the resources directory
+        var possiblePaths = new List<string>();
+
+        // Strategy 1: Application base directory
+        var appDirectory = AppDomain.CurrentDomain.BaseDirectory;
+        possiblePaths.Add(Path.Combine(appDirectory, "resources"));
+
+        // Strategy 2: Current working directory
+        var workingDirectory = Directory.GetCurrentDirectory();
+        possiblePaths.Add(Path.Combine(workingDirectory, "resources"));
+
+        // Strategy 3: Relative path from current directory
+        possiblePaths.Add(Path.Combine("resources"));
+
+        // Strategy 4: Parent directory
+        var currentDir = Directory.GetCurrentDirectory();
+        var parentDir = Directory.GetParent(currentDir);
+        if (parentDir != null)
+        {
+            possiblePaths.Add(Path.Combine(parentDir.FullName, "resources"));
+        }
+
+        string? resourcesPath = null;
+        foreach (var path in possiblePaths)
+        {
+            if (Directory.Exists(path))
+            {
+                resourcesPath = path;
+                break;
+            }
+        }
+
+        if (resourcesPath == null)
+        {
+            var searchedPaths = string.Join(", ", possiblePaths);
+            Logger.Warning($"Resources directory not found. Searched: {searchedPaths}");
+            return;
+        }
+
+        var resourceWatcher = new FileSystemWatcher(resourcesPath)
+        {
+            Filter = "*.*",
+            IncludeSubdirectories = true,
+            NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName | NotifyFilters.DirectoryName
+        };
+
+        resourceWatcher.Changed += OnResourceFileChanged;
+        resourceWatcher.Created += OnResourceFileChanged;
+        resourceWatcher.Deleted += OnResourceFileChanged;
+        resourceWatcher.Renamed += OnResourceFileRenamed;
+
+        resourceWatcher.EnableRaisingEvents = true;
+        _watchers.Add(resourceWatcher);
+
+        Logger.Debug($"Watching for resource changes in: {Path.GetFullPath(resourcesPath)}");
+    }
+
+    /// <summary>
     /// Handle verb file changes
     /// </summary>
     private static void OnVerbFileChanged(object sender, FileSystemEventArgs e)
@@ -208,6 +274,42 @@ public static class HotReloadManager
         {
             Logger.Info($"Hot reloading scripts due to change in: {fileName}");
             ReloadScripts();
+        });
+    }
+
+    /// <summary>
+    /// Handle resource file changes
+    /// </summary>
+    private static void OnResourceFileChanged(object sender, FileSystemEventArgs e)
+    {
+        if (!_isEnabled) return;
+
+        var fileName = Path.GetFileName(e.FullPath);
+        Logger.Debug($"Resource file changed: {fileName} ({e.ChangeType})");
+
+        // You can customize this to reload functions, classes, etc.
+        ScheduleReload("functions", () =>
+        {
+            Logger.Info($"Hot reloading functions due to change in: {fileName}");
+            ReloadFunctions();
+        });
+    }
+
+    /// <summary>
+    /// Handle resource file renames
+    /// </summary>
+    private static void OnResourceFileRenamed(object sender, RenamedEventArgs e)
+    {
+        if (!_isEnabled) return;
+
+        var oldName = Path.GetFileName(e.OldFullPath);
+        var newName = Path.GetFileName(e.FullPath);
+        Logger.Debug($"Resource file renamed: {oldName} -> {newName}");
+
+        ScheduleReload("functions", () =>
+        {
+            Logger.Info($"Hot reloading functions due to file rename: {oldName} -> {newName}");
+            ReloadFunctions();
         });
     }
 
@@ -360,7 +462,6 @@ public static class HotReloadManager
                 {
                     // Send notification to player (you'd need to implement this based on your session system)
                     Logger.Debug($"Notifying player {player.Name} of hot reload");
-                    // SessionManager.SendToPlayer(player.SessionGuid, $"[SYSTEM] {message}");
                 }
             }
             
