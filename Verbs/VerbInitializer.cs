@@ -32,7 +32,7 @@ public static class VerbInitializer
         var workingDirectory = Directory.GetCurrentDirectory();
 
         // Strategy 2: Current working directory with explicit path
-        possiblePaths.Add(Path.Combine(workingDirectory, "resources", resourceName));
+        possiblePaths.Add(Path.Combine(workingDirectory, "Resources", resourceName));
         Logger.Debug($"Trying resource path: {possiblePaths.Last()}");
         
         // If none exist, return the first option (app directory based) for error reporting

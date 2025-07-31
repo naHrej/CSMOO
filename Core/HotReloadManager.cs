@@ -78,21 +78,21 @@ public static class HotReloadManager
         
         // Strategy 1: Application base directory
         var appDirectory = AppDomain.CurrentDomain.BaseDirectory;
-        possiblePaths.Add(Path.Combine(appDirectory, "resources", "verbs"));
+        possiblePaths.Add(Path.Combine(appDirectory, "Resources", "verbs"));
         
         // Strategy 2: Current working directory
         var workingDirectory = Directory.GetCurrentDirectory();
-        possiblePaths.Add(Path.Combine(workingDirectory, "resources", "verbs"));
+        possiblePaths.Add(Path.Combine(workingDirectory, "Resources", "verbs"));
         
         // Strategy 3: Relative path from current directory
-        possiblePaths.Add(Path.Combine("resources", "verbs"));
+        possiblePaths.Add(Path.Combine("Resources", "verbs"));
         
         // Strategy 4: Check if we're in a subdirectory and need to go up
         var currentDir = Directory.GetCurrentDirectory();
         var parentDir = Directory.GetParent(currentDir);
         if (parentDir != null)
         {
-            possiblePaths.Add(Path.Combine(parentDir.FullName, "resources", "verbs"));
+            possiblePaths.Add(Path.Combine(parentDir.FullName, "Resources", "verbs"));
         }
         
         string? verbsPath = null;
@@ -169,21 +169,21 @@ public static class HotReloadManager
 
         // Strategy 1: Application base directory
         var appDirectory = AppDomain.CurrentDomain.BaseDirectory;
-        possiblePaths.Add(Path.Combine(appDirectory, "resources"));
+        possiblePaths.Add(Path.Combine(appDirectory, "Resources"));
 
         // Strategy 2: Current working directory
         var workingDirectory = Directory.GetCurrentDirectory();
-        possiblePaths.Add(Path.Combine(workingDirectory, "resources"));
+        possiblePaths.Add(Path.Combine(workingDirectory, "Resources"));
 
         // Strategy 3: Relative path from current directory
-        possiblePaths.Add(Path.Combine("resources"));
+        possiblePaths.Add(Path.Combine("Resources"));
 
         // Strategy 4: Parent directory
         var currentDir = Directory.GetCurrentDirectory();
         var parentDir = Directory.GetParent(currentDir);
         if (parentDir != null)
         {
-            possiblePaths.Add(Path.Combine(parentDir.FullName, "resources"));
+            possiblePaths.Add(Path.Combine(parentDir.FullName, "Resources"));
         }
 
         string? resourcesPath = null;

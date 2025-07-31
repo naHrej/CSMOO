@@ -1,4 +1,4 @@
-// Smart go command - move in any available direction
+// Smart go command - move in any available direction.
 var currentLocation = Player.Location;
 if (currentLocation is null)
 {

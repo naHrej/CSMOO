@@ -331,21 +331,21 @@ public static class Html
         
         // Strategy 1: Application base directory
         var appDirectory = AppDomain.CurrentDomain.BaseDirectory;
-        possiblePaths.Add(Path.Combine(appDirectory, "resources", "stylesheet.less"));
+        possiblePaths.Add(Path.Combine(appDirectory, "Resources", "stylesheet.less"));
         
         // Strategy 2: Current working directory
         var workingDirectory = Directory.GetCurrentDirectory();
-        possiblePaths.Add(Path.Combine(workingDirectory, "resources", "stylesheet.less"));
+        possiblePaths.Add(Path.Combine(workingDirectory, "Resources", "stylesheet.less"));
         
         // Strategy 3: Relative path from current directory
-        possiblePaths.Add(Path.Combine("resources", "stylesheet.less"));
+        possiblePaths.Add(Path.Combine("Resources", "stylesheet.less"));
         
         // Strategy 4: Check if we're in a subdirectory and need to go up
         var currentDir = Directory.GetCurrentDirectory();
         var parentDir = Directory.GetParent(currentDir);
         if (parentDir != null)
         {
-            possiblePaths.Add(Path.Combine(parentDir.FullName, "resources", "stylesheet.less"));
+            possiblePaths.Add(Path.Combine(parentDir.FullName, "Resources", "stylesheet.less"));
         }
         
         string? lessPath = null;

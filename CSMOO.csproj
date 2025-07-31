@@ -29,11 +29,11 @@
     <PackageReference Include="Microsoft.Extensions.DependencyModel" Version="8.0.2" />
   </ItemGroup>
     <ItemGroup>
-    <Compile Remove="resources/**/*.cs" />
+    <Compile Remove="Resources/**/*.cs" />
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="resources\**\*">
+    <Content Include="Resources\**\*">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
