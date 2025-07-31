@@ -355,7 +355,7 @@ public static class Logger
         var originalColor = Console.ForegroundColor;
         try
         {
-            var bannerPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Resources", "banner.txt");
+            var bannerPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "resources", "banner.txt");
             
             string bannerContent;
             if (File.Exists(bannerPath))

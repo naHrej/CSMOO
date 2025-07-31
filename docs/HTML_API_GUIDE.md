@@ -144,4 +144,4 @@ Html.Style.Build(
 
 ## Example: Complete Login Banner
 
-See `Resources/verbs/system/display_login.json` for a complete example of building a complex, styled login screen using this API.
+See `resources/verbs/system/display_login.json` for a complete example of building a complex, styled login screen using this API.
