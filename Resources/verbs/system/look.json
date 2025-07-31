@@ -1,0 +1,7 @@
+{
+  "name": "look",
+  "aliases": "l",
+  "pattern": "*",
+  "description": "Look around the room or at a specific object"
+}
+

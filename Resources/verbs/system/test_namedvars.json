@@ -1,0 +1,34 @@
+{
+  "name": "test",
+  "aliases": "",
+  "pattern": "{varname} is a {varname2}",
+  "description": "Test verb for named variables",
+  "permissions": "public",
+  "code": [
+    "// Test named variables - variables should be automatically available!",
+    "notify(Player, \"🧪 Named Variables Test\");",
+    "notify(Player, \"═══════════════════════\");",
+    "notify(Player, $\"📝 Your input: '{Input}'\");",
+    "notify(Player, \"\");",
+    "",
+    "// Variables should now be automatically available as 'varname' and 'varname2'",
+    "try",
+    "{",
+    "    notify(Player, \"✅ Automatic variables:\");",
+    "    notify(Player, $\"   varname = '{varname}'\");",
+    "    notify(Player, $\"   varname2 = '{varname2}'\");",
+    "    notify(Player, \"\");",
+    "    notify(Player, $\"🎯 Result: {varname} is indeed a {varname2}!\");",
+    "}",
+    "catch (Exception ex)",
+    "{",
+    "    notify(Player, $\"❌ Error accessing variables: {ex.Message}\");",
+    "}",
+    "",
+    "notify(Player, \"\");",
+    "notify(Player, \"💡 Try: test apple is a fruit\");"
+  ],
+  "createdBy": "system",
+  "createdAt": "2025-07-18T00:00:00Z"
+}
+

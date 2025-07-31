@@ -1,0 +1,25 @@
+{
+  "targetClass": "Player",
+  "name": "inventory", 
+  "aliases": "i inv",
+  "pattern": "",
+  "description": "Show what you are carrying",
+  "code": [
+    "// Show player's inventory",
+    "var items = Builtins.GetObjectsInLocation(player.Id);",
+    "if (items.Count == 0)",
+    "{",
+    "    Builtins.Notify(player, \"You are not carrying anything.\");",
+    "}",
+    "else",
+    "{",
+    "    Builtins.Notify(player, \"You are carrying:\");",
+    "    foreach (var item in items)",
+    "    {",
+    "        var name = Builtins.GetObjectName(item.Id);",
+    "        Builtins.Notify(player, $\"  {name}\");",
+    "    }",
+    "}"
+  ]
+}
+

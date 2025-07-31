@@ -1,0 +1,25 @@
+{
+  "name": "say",
+  "aliases": "\"",
+  "pattern": "*",
+  "description": "Speak to others in the room",
+  "code": [
+    "// Say command - speak to others in the room",
+    "if (Args.Count == 0)",
+    "{",
+    "    notify(Player, \"Say what?\");",
+    "    return;",
+    "}",
+    "",
+    "var message = string.Join(\" \", Args);",
+    "notify(Player, $\"You say, \\\"{message}\\\"\");",
+    "",
+    "// Send to other players in the room",
+    "var players = Builtins.GetPlayersInRoom(Player.Location);",
+    "foreach(var plr in players)",
+    "{",
+    "    if(plr.Id != Player.Id)",
+    "        notify(plr, $\"{Player.Name} says, \\\"{message}\\\"\");",
+    "}"
+  ]
+}

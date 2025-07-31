@@ -1,0 +1,11 @@
+{
+  "name": "inventory",
+  "aliases": "i inv",
+  "pattern": "",
+  "description": "Show what you are carrying",
+  "code": [
+    "// Inventory command - show what the player is carrying",
+    "Builtins.ShowInventory();"
+  ]
+}
+

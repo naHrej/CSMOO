@@ -1,0 +1,35 @@
+{
+  "name": "give",
+  "aliases": "hand",
+  "pattern": "give {item} to {person}",
+  "description": "Give an item to someone",
+  "permissions": "public",
+  "code": [
+    "// Give command with automatic named variables",
+    "notify(Player, \"🎁 Give Command\");",
+    "notify(Player, \"══════════════\");",
+    "notify(Player, $\"📝 Your input: '{Input}'\");",
+    "notify(Player, \"\");",
+    "",
+    "// Variables 'item' and 'person' should be automatically available",
+    "try",
+    "{",
+    "    notify(Player, \"✅ Automatic variables:\");",
+    "    notify(Player, $\"   item = '{item}'\");",
+    "    notify(Player, $\"   person = '{person}'\");",
+    "    notify(Player, \"\");",
+    "    ",
+    "    notify(Player, $\"🤝 You give the {item} to {person}.\");",
+    "    SayToRoom($\"{Player.name} gives a {item} to {person}.\");",
+    "}",
+    "catch (Exception ex)",
+    "{",
+    "    notify(Player, $\"❌ Error: {ex.Message}\");",
+    "    notify(Player, \"Usage: give <item> to <person>\");",
+    "    notify(Player, \"Example: give apple to Alice\");",
+    "}"
+  ],
+  "createdBy": "system",
+  "createdAt": "2025-07-18T00:00:00Z"
+}
+

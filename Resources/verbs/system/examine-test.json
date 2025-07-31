@@ -1,0 +1,19 @@
+{
+  "name": "examine-test",
+  "aliases": "et",
+  "pattern": "*",
+  "description": "Test examine verb",
+  "code": [
+    "var targetName = Args.FirstOrDefault() ?? \"here\";",
+    "var targetId = Player.Location;",
+    "var targetObject = Builtins.FindObject(targetId);",
+    "if (targetObject == null)",
+    "{",
+    "    notify(Player, \"Object not found.\");",
+    "    return;",
+    "}",
+    "var name = Builtins.GetProperty(targetObject.Id, \"name\") ?? \"something\";",
+    "notify(Player, $\"You examine {name}.\");"
+  ]
+}
+
