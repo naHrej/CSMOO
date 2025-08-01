@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
+using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
 using CSMOO.Configuration;
@@ -72,28 +74,36 @@ public class HttpServer
         using (var writer = new StreamWriter(context.Response.OutputStream))
         {
             var allObjects = ObjectManager.GetAllObjects();
-            dynamic systemObject = allObjects.FirstOrDefault(obj =>
-                obj.Properties.ContainsKey("isSystemObject"))!;
-
+            var systemObject = allObjects.FirstOrDefault(obj =>
+                obj.Properties.ContainsKey("isSystemObject"));
 
             if (systemObject != null)
             {
-                var less = systemObject.Less ?? "No less information available.";
-                if(typeof(string) == systemObject.Less.GetType())
+                string less = "No less information available.";
+                
+                // Check if the 'less' property exists
+                if (systemObject.Properties.ContainsKey("less"))
                 {
-                    less = systemObject.Less;
+                    var lessProperty = systemObject.Properties["less"];
+                    
+                    if (lessProperty.IsString)
+                    {
+                        less = lessProperty.AsString;
+                    }
+                    else if (lessProperty.IsArray)
+                    {
+                        // Convert BsonArray to List<string>
+                        var lessLines = lessProperty.AsArray.Select(bv => bv.AsString).ToList();
+                        less = string.Join("\n", lessLines);
+                    }
                 }
-                else if (systemObject.Less is IEnumerable<string> lessList)
-                {
-                    less = string.Join("\n", lessList);
-                }
-                await writer.WriteLineAsync($"{less}");
+                
+                await writer.WriteLineAsync(less);
             }
             else
             {
                 await writer.WriteLineAsync("No system object found.");
             }
-           
         }
     }
 }

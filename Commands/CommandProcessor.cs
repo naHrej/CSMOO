@@ -23,6 +23,11 @@ public class CommandProcessor
     private Player? _player;
     private ProgrammingCommands? _programmingCommands;
 
+    // Multiline property editor state
+    private string? _editTargetObjectId;
+    private string? _editTargetPropName;
+    private List<string>? _editBuffer;
+
     public CommandProcessor(Guid sessionGuid, TcpClient client)
     {
         _sessionGuid = sessionGuid;
@@ -52,6 +57,13 @@ public class CommandProcessor
     /// </summary>
     public void ProcessCommand(string input)
     {
+        // If in multiline property edit mode, handle input directly
+        if (IsInMultilinePropertyEditMode())
+        {
+            HandleMultilinePropertyInput(input);
+            return;
+        }
+
         if (string.IsNullOrWhiteSpace(input))
             return;
 
@@ -518,6 +530,58 @@ public class CommandProcessor
                 // Connection lost
             }
         }
+    }
+
+    /// <summary>
+    /// Starts multiline property editing mode for @edit <object>.<property>
+    /// </summary>
+    public void StartMultilinePropertyEdit(string objectId, string propName)
+    {
+        _editTargetObjectId = objectId;
+        _editTargetPropName = propName;
+        _editBuffer = new List<string>();
+        SendToPlayer($"Editing property '{propName}' on object '{objectId}'. Enter lines, '.' alone to finish, or '.abort' to cancel.");
+    }
+
+    // Returns true if currently in multiline property edit mode
+    public bool IsInMultilinePropertyEditMode()
+    {
+        return _editBuffer != null;
+    }
+
+    // Make multiline property input handler public
+    public bool HandleMultilinePropertyInput(string input)
+    {
+        if (_editBuffer == null) return false;
+        if (input.Trim() == ".abort")
+        {
+            SendToPlayer("Edit cancelled. No changes saved.");
+            _editTargetObjectId = null;
+            _editTargetPropName = null;
+            _editBuffer = null;
+            return true;
+        }
+        if (input.Trim() == ".")
+        {
+            var obj = ObjectManager.GetObject(_editTargetObjectId!);
+            if (obj != null && _editTargetPropName != null)
+            {
+                obj.Properties[_editTargetPropName] = new BsonArray(_editBuffer.Select(line => new BsonValue(line)));
+                DbProvider.Instance.Update("gameobjects", obj);
+                SendToPlayer($"Property '{_editTargetPropName}' updated with {_editBuffer.Count} lines.");
+            }
+            else
+            {
+                SendToPlayer("Error: Object or property not found.");
+            }
+            _editTargetObjectId = null;
+            _editTargetPropName = null;
+            _editBuffer = null;
+            return true;
+        }
+        _editBuffer.Add(input);
+        SendToPlayer($"[{_editBuffer.Count}] ");
+        return true;
     }
 }
 

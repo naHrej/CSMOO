@@ -791,8 +791,32 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
             return true;
         }
 
-        // Just redirect to @program for now
-        return HandleProgramCommand(new[] { "@program", parts.Length > 1 ? parts[1] : "" });
+        // Multiline property editor for @edit <object>.<property>
+        if (parts.Length != 2 || !parts[1].Contains('.'))
+        {
+            _commandProcessor.SendToPlayer("Usage: @edit <object>.<property>");
+            return true;
+        }
+
+        var split = parts[1].Split('.', 2);
+        var objectName = split[0];
+        var propName = split[1];
+        var objectId = ResolveObject(objectName);
+        if (objectId == null)
+        {
+            _commandProcessor.SendToPlayer($"Object '{objectName}' not found.");
+            return true;
+        }
+        var obj = ObjectManager.GetObject(objectId);
+        if (obj == null)
+        {
+            _commandProcessor.SendToPlayer($"Object '{objectName}' not found.");
+            return true;
+        }
+
+        // Start multiline property edit mode
+        _commandProcessor.StartMultilinePropertyEdit(objectId, propName);
+        return true;
     }
 
     /// <summary>
@@ -1406,34 +1430,35 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
         foreach (var group in verbGroups)
         {
             var verbs = group.ToList();
+            if (verbs.Count <= 1) continue;
+
             var verbsWithCode = verbs.Where(v => !string.IsNullOrEmpty(v.Code) && v.Code.Length > 0).ToList();
             var emptyVerbs = verbs.Where(v => string.IsNullOrEmpty(v.Code) || v.Code.Length == 0).ToList();
 
-            _commandProcessor.SendToPlayer($"Found {verbs.Count} verbs named '{group.Key}': {verbsWithCode.Count} with code, {emptyVerbs.Count} empty");
-
-            // If we have verbs with code, remove the empty ones
-            if (verbsWithCode.Count > 0 && emptyVerbs.Count > 0)
+            // Remove all empty verbs if there's at least one with code
+            if (verbsWithCode.Count > 0)
             {
                 foreach (var emptyVerb in emptyVerbs)
                 {
-                    _commandProcessor.SendToPlayer($"  Removing empty verb: ID={emptyVerb.Id}");
+                    _commandProcessor.SendToPlayer($"  Removing empty verb: {emptyVerb.Id}");
                     verbCollection.Delete(emptyVerb.Id);
                     removedCount++;
                 }
             }
-            // If all verbs are empty, keep only the first one
-            else if (verbsWithCode.Count == 0 && emptyVerbs.Count > 1)
+            // If all are empty, keep only the newest one
+            else if (emptyVerbs.Count > 1)
             {
-                for (int i = 1; i < emptyVerbs.Count; i++)
+                var verbsToRemove = emptyVerbs.OrderBy(v => v.Id).Take(emptyVerbs.Count - 1);
+                foreach (var verb in verbsToRemove)
                 {
-                    _commandProcessor.SendToPlayer($"  Removing duplicate empty verb: ID={emptyVerbs[i].Id}");
-                    verbCollection.Delete(emptyVerbs[i].Id);
+                    _commandProcessor.SendToPlayer($"  Removing duplicate empty verb: {verb.Id}");
+                    verbCollection.Delete(verb.Id);
                     removedCount++;
                 }
             }
         }
 
-        _commandProcessor.SendToPlayer($"Cleanup complete. Removed {removedCount} duplicate verbs.");
+        _commandProcessor.SendToPlayer($"Removed {removedCount} duplicate verbs.");
         return true;
     }
 
@@ -2113,6 +2138,54 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
         }
 
         return true;
+    }
+
+    /// <summary>
+    /// Handle input for commands and programming
+    /// </summary>
+    public bool HandleInput(string input)
+    {
+        // If in multiline property edit mode, let CommandProcessor handle it
+        if (_commandProcessor.IsInMultilinePropertyEditMode())
+        {
+            return _commandProcessor.HandleMultilinePropertyInput(input);
+        }
+        // If in programming mode, handle code input
+        if (_isInProgrammingMode)
+        {
+            return HandleProgrammingInput(input);
+        }
+
+        var parts = input.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length == 0) return false;
+        var command = parts[0].ToLower();
+        return command switch
+        {
+            "@program" => HandleProgramCommand(parts),
+            "@script" => HandleScriptCommand(parts),
+            "@verb" => HandleVerbCommand(parts),
+            "@list" => HandleListCommand(parts),
+            "@edit" => HandleEditCommand(parts),
+            "@verbs" => HandleVerbsCommand(parts),
+            "@funcs" => HandleFuncsCommand(parts),
+            "@rmverb" => HandleRemoveVerbCommand(parts),
+            "@flag" => HandleFlagCommand(parts),
+            "@flags" => HandleFlagsCommand(parts),
+            "@update-permissions" => HandleUpdatePermissionsCommand(parts),
+            "@debug" when parts.Length > 1 && parts[1] == "verbs" => HandleDebugVerbsCommand(parts),
+            "@fix" when parts.Length > 1 && parts[1] == "verbs" => HandleFixVerbsCommand(parts),
+            "@remove" when parts.Length > 1 && parts[1] == "verb" => HandleRemoveVerbByIdCommand(parts),
+            "@cleanup" when parts.Length > 1 && parts[1] == "player" => HandleCleanupPlayerCommand(parts),
+            "@cleanup" => HandleCleanupCommand(parts),
+            "@func" => HandleFuncCommand(parts),
+            "@function" => HandleFunctionCommand(parts),
+            "@functions" => HandleFunctionsCommand(parts),
+            "@funcreload" => HandleFuncReloadCommand(parts),
+            "@reload" => HandleReloadCommand(parts),
+            "@hotreload" => HandleHotReloadCommand(parts),
+            "@corehot" => HandleCoreHotReloadCommand(parts),
+            _ => false
+        };
     }
 }
 
