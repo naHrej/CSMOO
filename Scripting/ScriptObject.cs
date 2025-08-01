@@ -176,7 +176,7 @@ public class ScriptObject : DynamicObject
         }
 
         // Execute the verb using the unified script engine
-        var scriptEngine = new UnifiedScriptEngine();
+        var scriptEngine = new ScriptEngine();
         return scriptEngine.ExecuteVerb(verb, input, _currentPlayer, _commandProcessor, _objectId);
     }
 
@@ -193,7 +193,7 @@ public class ScriptObject : DynamicObject
         }
 
         // Execute the function using the unified script engine
-        var functionEngine = new UnifiedScriptEngine();
+        var functionEngine = new ScriptEngine();
         return functionEngine.ExecuteFunction(function, args ?? new object[0], _currentPlayer, _commandProcessor, _objectId);
     }
 

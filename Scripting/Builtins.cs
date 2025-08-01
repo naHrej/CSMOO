@@ -1171,7 +1171,7 @@ public static class Builtins
     {
         try
         {
-            var engine = new UnifiedScriptEngine();
+            var engine = new ScriptEngine();
             
             // Create a temporary verb structure for execution
             var tempVerb = new Verb
@@ -1197,7 +1197,7 @@ public static class Builtins
     {
         try
         {
-            var engine = new UnifiedScriptEngine();
+            var engine = new ScriptEngine();
             
             // Create a temporary verb structure for execution
             var tempVerb = new Verb

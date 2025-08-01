@@ -401,7 +401,7 @@ public class GameObject : DynamicObject
             }
 
             // Execute the function using the UnifiedScriptEngine
-            var engine = new Scripting.UnifiedScriptEngine();
+            var engine = new Scripting.ScriptEngine();
             result = engine.ExecuteFunction(function, args ?? new object[0],
                 currentPlayer, commandProcessor, Id);
             return true;

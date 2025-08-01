@@ -125,7 +125,7 @@ public class ScriptGlobals
             throw new ArgumentException($"Verb '{verbName}' not found on object '{objectId}'.");
         }
 
-        var engine = new UnifiedScriptEngine();
+        var engine = new ScriptEngine();
         return engine.ExecuteVerb(verb, $"{verbName} {string.Join(" ", args)}", Player as Player ?? throw new InvalidOperationException("Invalid player type"), CommandProcessor!, objectId);
     }
 
@@ -163,7 +163,7 @@ public class ScriptGlobals
             throw new ArgumentException($"Function '{functionName}' not found on object '{objectId}'.");
         }
 
-        var engine = new UnifiedScriptEngine();
+        var engine = new ScriptEngine();
         return engine.ExecuteFunction(function, parameters, Player as Player ?? throw new InvalidOperationException("Invalid player type"), CommandProcessor!, objectId);
     }
 

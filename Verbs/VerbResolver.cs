@@ -544,7 +544,7 @@ public static class VerbResolver
     {
         try
         {
-            var scriptEngine = new UnifiedScriptEngine();
+            var scriptEngine = new ScriptEngine();
             var result = scriptEngine.ExecuteVerbWithResult(verb, input, player, commandProcessor, thisObjectId, variables);
             return result.success;
         }

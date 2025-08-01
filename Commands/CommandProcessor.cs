@@ -304,8 +304,10 @@ public class CommandProcessor
 
         try
         {
-            var scriptEngine = new ScriptEngine();
-            var result = scriptEngine.ExecuteScript(scriptCode, _player, this);
+            var scriptEngine = new Scripting.ScriptEngine();
+            var result = scriptEngine.ExecuteVerb(
+                new Verb { Name = "script", Code = scriptCode, ObjectId = _player?.Id ?? "system" },
+                scriptCode, _player, this);
             if (!string.IsNullOrEmpty(result))
             {
                 SendToPlayer($"Script result: {result}");
@@ -451,7 +453,7 @@ public class CommandProcessor
                 {
                     try
                     {
-                        var functionEngine = new Scripting.UnifiedScriptEngine();
+                        var functionEngine = new Scripting.ScriptEngine();
                         
                         // Create a minimal system player context for login banner
                         var systemPlayer = new Player

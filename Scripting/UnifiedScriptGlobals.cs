@@ -343,7 +343,7 @@ public class UnifiedScriptGlobals : EnhancedScriptGlobals
             }
 
             // Execute the verb with the provided arguments
-            var scriptEngine = new UnifiedScriptEngine();
+            var scriptEngine = new ScriptEngine();
             
             // Build input string from arguments
             var inputArgs = args.Select(a => a?.ToString() ?? "").ToArray();
@@ -401,7 +401,7 @@ public class UnifiedScriptGlobals : EnhancedScriptGlobals
             throw new ArgumentException($"Function '{functionName}' not found on object '{objectRef}'.");
         }
 
-        var engine = new UnifiedScriptEngine();
+        var engine = new ScriptEngine();
         return engine.ExecuteFunction(function, parameters, dbPlayer, CommandProcessor, objectId);
     }
 
