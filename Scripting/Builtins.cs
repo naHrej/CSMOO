@@ -150,7 +150,7 @@ public static class Builtins
     /// <summary>
     /// Find a player by name
     /// </summary>
-    public static Player? FindPlayer(string playerName)
+    public static dynamic? FindPlayer(string playerName)
     {
         if (string.IsNullOrEmpty(playerName)) return null;
         return DbProvider.Instance.FindOne<Player>("players", p =>
@@ -160,7 +160,7 @@ public static class Builtins
     /// <summary>
     /// Find a player by partial name match
     /// </summary>
-    public static Player? FindPlayerByPartialName(string partialName)
+    public static dynamic? FindPlayerByPartialName(string partialName)
     {
         return DbProvider.Instance.FindOne<Player>("players", p => 
             p.Name.StartsWith(partialName, StringComparison.OrdinalIgnoreCase));
@@ -169,7 +169,7 @@ public static class Builtins
     /// <summary>
     /// Find a player by ID
     /// </summary>
-    public static Player? FindPlayerById(string playerId)
+    public static dynamic? FindPlayerById(string playerId)
     {
         return ObjectManager.GetObject<Player>(playerId);
     }
@@ -177,33 +177,33 @@ public static class Builtins
     /// <summary>
     /// Get all online players
     /// </summary>
-    public static List<Player> GetOnlinePlayers()
+    public static List<dynamic> GetOnlinePlayers()
     {
-        return PlayerManager.GetOnlinePlayers();
+        return PlayerManager.GetOnlinePlayers().AsEnumerable().Cast<dynamic>().ToList();
     }
     
     /// <summary>
     /// Get all players (online and offline) - useful for lambda filtering
     /// </summary>
-    public static List<Player> GetAllPlayers()
+    public static List<dynamic> GetAllPlayers()
     {
-        return DbProvider.Instance.FindAll<Player>("players").ToList();
+        return DbProvider.Instance.FindAll<Player>("players").ToList<dynamic>();
     }
     
     /// <summary>
     /// Get all game objects - useful for lambda filtering and searching
     /// </summary>
-    public static List<GameObject> GetAllObjects()
+    public static List<dynamic> GetAllObjects()
     {
-        return DbProvider.Instance.FindAll<GameObject>("gameobjects").ToList();
+        return DbProvider.Instance.FindAll<GameObject>("gameobjects").ToList<dynamic>();
     }
     
     /// <summary>
     /// Get all object classes - useful for lambda filtering
     /// </summary>
-    public static List<ObjectClass> GetAllObjectClasses()
+    public static List<dynamic> GetAllObjectClasses()
     {
-        return DbProvider.Instance.FindAll<ObjectClass>("objectclasses").ToList();
+        return DbProvider.Instance.FindAll<ObjectClass>("objectclasses").ToList<dynamic>();
     }
     
     /// <summary>
@@ -596,7 +596,7 @@ public static class Builtins
     /// <summary>
     /// Check if an object represents a player and return the player (GameObject overload)
     /// </summary>
-    public static Player? GetPlayerFromObject(GameObject obj)
+    public static dynamic? GetPlayerFromObject(GameObject obj)
     {
         var playerIdProperty = GetProperty(obj, "playerId");
         if (!string.IsNullOrEmpty(playerIdProperty))
@@ -1024,7 +1024,7 @@ public static class Builtins
     /// Execute an action for each player matching a condition
     /// Usage: ForEachPlayer(p => p.IsOnline, p => notify(p, "Hello!"));
     /// </summary>
-    public static void ForEachPlayer(Func<Player, bool> predicate, Action<Player> action)
+    public static void ForEachPlayer(Func<dynamic, bool> predicate, Action<dynamic> action)
     {
         var players = GetAllPlayers().Where(predicate);
         foreach (var player in players)
@@ -1044,7 +1044,7 @@ public static class Builtins
     /// Execute an action for each object matching a condition
     /// Usage: ForEachObject(obj => GetProperty(obj.Id, "type") == "weapon", obj => SetProperty(obj.Id, "sharpened", "true"));
     /// </summary>
-    public static void ForEachObject(Func<GameObject, bool> predicate, Action<GameObject> action)
+    public static void ForEachObject(Func<dynamic, bool> predicate, Action<dynamic> action)
     {
         var objects = GetAllObjects().Where(predicate);
         foreach (var obj in objects)
@@ -1064,7 +1064,7 @@ public static class Builtins
     /// Find players matching a condition - returns a list for further processing
     /// Usage: var admins = FindPlayers(p => IsAdmin(p));
     /// </summary>
-    public static List<Player> FindPlayers(Func<Player, bool> predicate)
+    public static List<dynamic> FindPlayers(Func<dynamic, bool> predicate)
     {
         return GetAllPlayers().Where(predicate).ToList();
     }
@@ -1073,7 +1073,7 @@ public static class Builtins
     /// Find objects matching a condition - returns a list for further processing
     /// Usage: var weapons = FindObjects(obj => GetProperty(obj.Id, "type") == "weapon");
     /// </summary>
-    public static List<GameObject> FindObjects(Func<GameObject, bool> predicate)
+    public static List<dynamic> FindObjects(Func<dynamic, bool> predicate)
     {
         return GetAllObjects().Where(predicate).ToList();
     }
@@ -1091,35 +1091,35 @@ public static class Builtins
     /// Find objects in a location matching a condition (strongly-typed for GameObject)
     /// Usage: var redItems = FindObjectsInLocationTyped(roomId, obj => obj.color == "red");
     /// </summary>
-    public static List<GameObject> FindObjectsInLocationTyped(string locationId, Func<GameObject, bool> predicate)
+    public static List<dynamic> FindObjectsInLocationTyped(string locationId, Func<GameObject, bool> predicate)
     {
         var objects = GetObjectsInLocation(locationId);
-        return objects.Cast<GameObject>().Where(predicate).ToList();
+        return objects.Cast<GameObject>().Where(predicate).Cast<dynamic>().ToList();
     }
 
     /// <summary>
     /// Filter dynamic objects with strongly-typed predicate
     /// Usage: var filtered = FilterObjects(GetObjectsInLocation(roomId), obj => obj.visible == true);
     /// </summary>
-    public static List<GameObject> FilterObjects(IEnumerable<dynamic> objects, Func<GameObject, bool> predicate)
+    public static List<dynamic> FilterObjects(IEnumerable<dynamic> objects, Func<GameObject, bool> predicate)
     {
-        return objects.Cast<GameObject>().Where(predicate).ToList();
+        return objects.Cast<GameObject>().Where(predicate).Cast<dynamic>().ToList();
     }
 
     /// <summary>
     /// Transform dynamic objects to another type
     /// Usage: var names = SelectFromObjects(GetObjectsInLocation(roomId), obj => obj.name);
     /// </summary>
-    public static List<T> SelectFromObjects<T>(IEnumerable<dynamic> objects, Func<GameObject, T> selector)
+    public static List<dynamic> SelectFromObjects<T>(IEnumerable<dynamic> objects, Func<GameObject, T> selector)
     {
-        return objects.Cast<GameObject>().Select(selector).ToList();
+        return objects.Cast<GameObject>().Select(selector).Cast<dynamic>().ToList();
     }
 
     /// <summary>
     /// Count players matching a condition
     /// Usage: var onlineCount = CountPlayers(p => p.IsOnline);
     /// </summary>
-    public static int CountPlayers(Func<Player, bool> predicate)
+    public static int CountPlayers(Func<dynamic, bool> predicate)
     {
         return GetAllPlayers().Count(predicate);
     }
@@ -1128,7 +1128,7 @@ public static class Builtins
     /// Count objects matching a condition
     /// Usage: var weaponCount = CountObjects(obj => GetProperty(obj.Id, "type") == "weapon");
     /// </summary>
-    public static int CountObjects(Func<GameObject, bool> predicate)
+    public static int CountObjects(Func<dynamic, bool> predicate)
     {
         return GetAllObjects().Count(predicate);
     }
@@ -1137,7 +1137,7 @@ public static class Builtins
     /// Check if any player matches a condition
     /// Usage: var hasAdmin = AnyPlayer(p => IsAdmin(p));
     /// </summary>
-    public static bool AnyPlayer(Func<Player, bool> predicate)
+    public static bool AnyPlayer(Func<dynamic, bool> predicate)
     {
         return GetAllPlayers().Any(predicate);
     }
@@ -1146,7 +1146,7 @@ public static class Builtins
     /// Check if any object matches a condition
     /// Usage: var hasWeapon = AnyObject(obj => GetProperty(obj.Id, "type") == "weapon");
     /// </summary>
-    public static bool AnyObject(Func<GameObject, bool> predicate)
+    public static bool AnyObject(Func<dynamic, bool> predicate)
     {
         return GetAllObjects().Any(predicate);
     }
