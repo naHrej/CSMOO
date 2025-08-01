@@ -156,19 +156,7 @@ public static class RoomManager
             .Where(obj => obj.ClassId == exitClass.Id)
             .ToList();
     }
-    /// <summary>
-    /// Gets all exits from a room
-    /// </summary>
-    public static List<GameObject> GetExits(GameObject room)
-    {
-        var exitClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "Exit");
-        if (exitClass == null) return new List<GameObject>();
 
-        return ObjectManager.GetObjectsInLocation(room)
-            .Where(obj => obj.ClassId == exitClass.Id)
-            .ToList();
-    }
-    
     /// <summary>
     /// Finds an exit in a specific direction from a room
     /// </summary>
@@ -206,31 +194,40 @@ public static class RoomManager
     }
 
     /// <summary>
+    /// Gets all exits from a room
+    /// </summary>
+    public static List<dynamic> GetExits(GameObject room)
+    {
+        var roomContents = ObjectManager.GetObjectsInLocation(room).Cast<dynamic>().ToList();;
+        var exitClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "Exit");
+        if (exitClass == null) return [];
+        return roomContents
+            .Where(obj => obj.ClassId == exitClass.Id)
+            .ToList();
+    }
+    
+    /// <summary>
     /// Gets all items in a room (excludes exits and players)
     /// </summary>
-    public static List<GameObject> GetItemsInRoom(string roomId)
+    public static List<dynamic> GetItems(GameObject room)
     {
-        var roomContents = ObjectManager.GetObjectsInLocation(roomId);
-        var exitClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "Exit");
-        var playerClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "Player");
-
-        return roomContents.Where(obj => 
-            (exitClass == null || obj.ClassId != exitClass.Id) &&
-            (playerClass == null || !ObjectManager.InheritsFrom(obj.ClassId, playerClass.Id))
-        ).ToList();
+        var roomContents = ObjectManager.GetObjectsInLocation(room).Cast<dynamic>().ToList();;
+        var itemClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "Item");      
+        if (itemClass == null) return [];
+        return roomContents
+            .Where(obj => obj.ClassId == itemClass.Id)
+            .ToList();
     }
-
+    
     /// <summary>
     /// Gets all players in a room
     /// </summary>
-    public static List<GameObject> GetPlayersInRoom(string roomId)
+    public static List<dynamic> GetPlayers(GameObject room)
     {
-        var roomContents = ObjectManager.GetObjectsInLocation(roomId);
+        var roomContents = ObjectManager.GetObjectsInLocation(room).Cast<dynamic>().ToList();
         var playerClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "Player");
-        
-        if (playerClass == null) return new List<GameObject>();
-
-        return roomContents.Where(obj => 
+        if (playerClass == null) return [];
+        return roomContents.Where(obj =>
             ObjectManager.InheritsFrom(obj.ClassId, playerClass.Id)
         ).ToList();
     }
@@ -244,8 +241,8 @@ public static class RoomManager
         var stats = new Dictionary<string, object>
         {
             ["TotalRooms"] = allRooms.Count,
-            ["RoomsWithItems"] = allRooms.Count(room => GetItemsInRoom(room.Id).Any()),
-            ["RoomsWithPlayers"] = allRooms.Count(room => GetPlayersInRoom(room.Id).Any()),
+            ["RoomsWithItems"] = allRooms.Count(room => GetItems(room).Any()),
+            ["RoomsWithPlayers"] = allRooms.Count(room => GetPlayers(room).Any()),
             ["TotalExits"] = allRooms.Sum(room => GetExits(room.Id).Count)
         };
 

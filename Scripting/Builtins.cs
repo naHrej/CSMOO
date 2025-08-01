@@ -951,6 +951,12 @@ public static class Builtins
         return WorldManager.GetExits(room);
     }
 
+    public static List<dynamic> GetContents(GameObject room)
+    {
+        return RoomManager.GetItems(room);
+    }
+
+
     /// <summary>
     /// Show the player's inventory
     /// </summary>

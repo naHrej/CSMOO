@@ -1,0 +1,8 @@
+{
+  "name": "Players",
+  "targetClass": "Room", 
+  "description": "Returns a list of PLayers in the room",
+  "returnType": "List<dynamic>",
+  "parameters": [],
+  "parameterNames": []
+}
