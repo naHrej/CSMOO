@@ -307,7 +307,7 @@ public class CommandProcessor
             var scriptEngine = new Scripting.ScriptEngine();
             var result = scriptEngine.ExecuteVerb(
                 new Verb { Name = "script", Code = scriptCode, ObjectId = _player?.Id ?? "system" },
-                scriptCode, _player, this);
+                scriptCode, _player!, this);
             if (!string.IsNullOrEmpty(result))
             {
                 SendToPlayer($"Script result: {result}");

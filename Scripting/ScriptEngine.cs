@@ -33,7 +33,7 @@ public class ScriptEngine
                 Assembly.GetExecutingAssembly()             // Current assembly
             )
             .WithImports(
-
+                "System",
                 "System.Dynamic",
                 "System.Linq",
                 "System.Collections.Generic",
@@ -82,7 +82,7 @@ public class ScriptEngine
                 Logger.Warning($"ExecuteVerb: playerObject is null for ID '{player.Id}' (verb: {verb.Name})");
             }
 
-            var globals = new UnifiedScriptGlobals
+            var globals = new ScriptGlobals
             {
                 Player = player, // Always the Database.Player
                 This = thisObject ?? CreateNullGameObject(actualThisObjectId),
@@ -124,7 +124,7 @@ public class ScriptEngine
             Builtins.UnifiedContext = globals;
             
             // Create script with timeout protection
-            var script = CSharpScript.Create(completeScript, _scriptOptions, typeof(UnifiedScriptGlobals));
+            var script = CSharpScript.Create(completeScript, _scriptOptions, typeof(ScriptGlobals));
             
             // Execute with timeout
             using var cts = new CancellationTokenSource(Config.Instance.Scripting.MaxExecutionTimeMs);
@@ -207,7 +207,7 @@ public class ScriptEngine
             }
 
             // Create globals for function execution
-            var globals = new UnifiedScriptGlobals
+            var globals = new ScriptGlobals
             {
                 Player = player, // Always the Database.Player
                 This = thisObject ?? CreateNullGameObject(actualThisObjectId),
@@ -273,7 +273,7 @@ public class ScriptEngine
             Builtins.UnifiedContext = globals;
 
             // Create and execute script with timeout protection
-            var script = CSharpScript.Create(finalCode, _scriptOptions, typeof(UnifiedScriptGlobals));
+            var script = CSharpScript.Create(finalCode, _scriptOptions, typeof(ScriptGlobals));
             
             // Execute with timeout
             using var cts = new CancellationTokenSource(Config.Instance.Scripting.MaxExecutionTimeMs);

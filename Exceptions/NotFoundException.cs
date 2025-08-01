@@ -1,3 +1,4 @@
+
 namespace CSMOO.Exceptions;
 
 /// <summary>

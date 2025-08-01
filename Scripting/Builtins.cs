@@ -15,12 +15,12 @@ public static class Builtins
     /// <summary>
     /// Current script context - set by the script engine before execution (legacy, now UnifiedScriptGlobals)
     /// </summary>
-    public static UnifiedScriptGlobals? CurrentContext { get; set; }
+    public static ScriptGlobals? CurrentContext { get; set; }
     
     /// <summary>
     /// Unified script context - set by the UnifiedScriptEngine before execution
     /// </summary>
-    public static UnifiedScriptGlobals? UnifiedContext { get; set; }
+    public static ScriptGlobals? UnifiedContext { get; set; }
 
     #region Object Management
 
