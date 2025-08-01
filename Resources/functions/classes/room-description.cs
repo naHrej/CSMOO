@@ -15,7 +15,7 @@ try
         desc.Append("<ul style='margin:0'>");
         foreach (var exit in Room.Exits())
         {
-            desc.Append($"<li>{exit.Name}</li>");
+            desc.Append($"<li style='color:yellow'>{exit.Name}</li>");
         }
         desc.Append("</ul>");
     }
@@ -25,7 +25,7 @@ try
         desc.Append("<ul style='margin:0'>");
         foreach (var plyr in Room.Players())
         {
-            desc.Append($"<li>{plyr.Name}</li>");
+            desc.Append($"<li style='color:yellow'>{plyr.Name}</li>");
         }
         desc.Append("</ul>");
     }
@@ -35,7 +35,7 @@ try
         desc.Append("<ul style='margin:0'>");
         foreach (var item in Room.Contents())
         {
-            desc.Append($"<li>{item.Name}</li>");
+            desc.Append($"<li style='color:yellow'>{item.Name}</li>");
         }
         desc.Append("</ul>");
     }
