@@ -1734,7 +1734,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
     }
 
     /// <summary>
-    /// @reload [verbs|functions|scripts] - Manually trigger hot reload
+    /// @reload [verbs|functions|scripts|properties] - Manually trigger hot reload
     /// </summary>
     private bool HandleReloadCommand(string[] parts)
     {
@@ -1747,11 +1747,12 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
 
         if (parts.Length < 2)
         {
-            _commandProcessor.SendToPlayer("Usage: @reload [verbs|functions|scripts|status]");
-            _commandProcessor.SendToPlayer("  @reload verbs     - Reload all verb definitions");
-            _commandProcessor.SendToPlayer("  @reload functions - Reload all function definitions");
-            _commandProcessor.SendToPlayer("  @reload scripts   - Reload script engine");
-            _commandProcessor.SendToPlayer("  @reload status    - Show hot reload status");
+            _commandProcessor.SendToPlayer("Usage: @reload [verbs|functions|scripts|properties|status]");
+            _commandProcessor.SendToPlayer("  @reload verbs      - Reload all verb definitions");
+            _commandProcessor.SendToPlayer("  @reload functions  - Reload all function definitions");
+            _commandProcessor.SendToPlayer("  @reload scripts    - Reload script engine");
+            _commandProcessor.SendToPlayer("  @reload properties - Reload all property definitions");
+            _commandProcessor.SendToPlayer("  @reload status     - Show hot reload status");
             return true;
         }
 
@@ -1801,18 +1802,34 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
                 }
                 break;
 
+            case "properties":
+            case "props":
+                _commandProcessor.SendToPlayer("🔄 Initiating manual property reload...");
+                try
+                {
+                    PropertyInitializer.ReloadProperties();
+                    _commandProcessor.SendToPlayer("✅ Property reload completed successfully!");
+                }
+                catch (Exception ex)
+                {
+                    _commandProcessor.SendToPlayer($"❌ Property reload failed: {ex.Message}");
+                    Logger.Error("Manual property reload failed", ex);
+                }
+                break;
+
             case "status":
                 var status = HotReloadManager.IsEnabled ? "ENABLED" : "DISABLED";
                 _commandProcessor.SendToPlayer($"Hot Reload Status: {status}");
                 _commandProcessor.SendToPlayer("Monitored paths:");
                 _commandProcessor.SendToPlayer("  • resources/verbs/ (*.json)");
                 _commandProcessor.SendToPlayer("  • resources/functions/ (*.json)");
+                _commandProcessor.SendToPlayer("  • resources/properties/ (*.json)");
                 _commandProcessor.SendToPlayer("  • Scripts/ (*.cs) [if present]");
                 break;
 
             default:
                 _commandProcessor.SendToPlayer($"Unknown reload target: {target}");
-                _commandProcessor.SendToPlayer("Valid targets: verbs, functions, scripts, status");
+                _commandProcessor.SendToPlayer("Valid targets: verbs, functions, scripts, properties, status");
                 break;
         }
 
@@ -2184,8 +2201,108 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
             "@reload" => HandleReloadCommand(parts),
             "@hotreload" => HandleHotReloadCommand(parts),
             "@corehot" => HandleCoreHotReloadCommand(parts),
+            "@props" => HandlePropsCommand(parts),
+            "@propload" => HandlePropLoadCommand(parts),
             _ => false
         };
+    }
+
+    /// <summary>
+    /// @props <object> - Show all properties on an object
+    /// </summary>
+    private bool HandlePropsCommand(string[] parts)
+    {
+        var objectName = parts.Length > 1 ? parts[1] : "here";
+        var objectId = ResolveObject(objectName);
+        
+        if (objectId == null)
+        {
+            _commandProcessor.SendToPlayer($"Object '{objectName}' not found.");
+            return true;
+        }
+
+        var obj = ObjectManager.GetObject(objectId);
+        if (obj == null)
+        {
+            _commandProcessor.SendToPlayer($"Object '{objectName}' not found.");
+            return true;
+        }
+
+        _commandProcessor.SendToPlayer($"=== Properties on {GetObjectName(objectId)} ===");
+        
+        if (obj.Properties.Any())
+        {
+            foreach (var prop in obj.Properties.OrderBy(kvp => kvp.Key))
+            {
+                var value = prop.Value;
+                string displayValue;
+                
+                if (value.IsString)
+                {
+                    displayValue = $"\"{value.AsString}\"";
+                }
+                else if (value.IsArray)
+                {
+                    var lines = value.AsArray.Select(bv => bv.AsString).ToArray();
+                    if (lines.Length <= 3)
+                    {
+                        displayValue = $"[{string.Join(", ", lines.Select(l => $"\"{l}\""))}]";
+                    }
+                    else
+                    {
+                        displayValue = $"[{lines.Length} lines: \"{lines[0]}\", \"{lines[1]}\", ...]";
+                    }
+                }
+                else if (value.IsBoolean)
+                {
+                    displayValue = value.AsBoolean.ToString().ToLower();
+                }
+                else if (value.IsNumber)
+                {
+                    displayValue = value.ToString();
+                }
+                else
+                {
+                    displayValue = value.ToString();
+                }
+                
+                _commandProcessor.SendToPlayer($"  {prop.Key}: {displayValue}");
+            }
+        }
+        else
+        {
+            _commandProcessor.SendToPlayer("No properties defined.");
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// @propload - Hot reload all property definitions from JSON files
+    /// </summary>
+    private bool HandlePropLoadCommand(string[] parts)
+    {
+        // Check if player has admin privileges
+        if (!PermissionManager.HasFlag(_player, PermissionManager.Flag.Admin))
+        {
+            _commandProcessor.SendToPlayer("You need the Admin flag to use this command.");
+            return true;
+        }
+
+        _commandProcessor.SendToPlayer("Reloading property definitions...");
+
+        try
+        {
+            PropertyInitializer.ReloadProperties();
+            _commandProcessor.SendToPlayer("Property definitions reloaded successfully!");
+        }
+        catch (Exception ex)
+        {
+            _commandProcessor.SendToPlayer($"Error reloading properties: {ex.Message}");
+            Logger.Error("Property reload failed", ex);
+        }
+
+        return true;
     }
 }
 

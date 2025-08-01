@@ -1,0 +1,9 @@
+[
+  {
+    "name": "less",
+    "type": "array",
+    "filename": "stylesheet.less",
+    "description": "CSS stylesheet for the web interface",
+    "overwrite": true
+  }
+]
