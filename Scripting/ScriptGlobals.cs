@@ -99,6 +99,24 @@ public class ScriptGlobals
     }
 
     /// <summary>
+    /// Get an object by its DBref number (for #4.property syntax support)
+    /// </summary>
+    public dynamic? GetObjectByDbRef(int dbRef)
+    {
+        var obj = CSMOO.Object.ObjectManager.FindByDbRef(dbRef);
+        return obj;
+    }
+
+    /// <summary>
+    /// Get an object by its ID (for $objectId.property syntax support)
+    /// </summary>
+    public dynamic? GetObjectById(string objectId)
+    {
+        var obj = CSMOO.Object.ObjectManager.GetObject(objectId);
+        return obj;
+    }
+
+    /// <summary>
     /// The player's current location as GameObject (alternative to 'here' ScriptObject)
     /// Usage: var location = Location; // Returns GameObject instead of ScriptObject
     /// </summary>

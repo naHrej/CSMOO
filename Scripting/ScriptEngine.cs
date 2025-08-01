@@ -117,8 +117,9 @@ public class ScriptEngine
             // Initialize the object factory for enhanced script support
             globals.InitializeObjectFactory();
 
-            // Build the complete script with automatic variable declarations
-            var completeScript = BuildScriptWithVariables(verb.Code, variables);
+            // Build the complete script with automatic variable declarations and DBref/ID preprocessing
+            var preprocessedCode = PreprocessObjectReferenceSyntax(verb.Code);
+            var completeScript = BuildScriptWithVariables(preprocessedCode, variables);
 
             // Set Builtins context for script execution
             Builtins.UnifiedContext = globals;
@@ -264,8 +265,9 @@ public class ScriptEngine
                 }
             }
             
-            // Add the actual function code
-            scriptCode.AppendLine(function.Code);
+            // Add the actual function code with DBref/ID preprocessing
+            var preprocessedFunctionCode = PreprocessObjectReferenceSyntax(function.Code);
+            scriptCode.AppendLine(preprocessedFunctionCode);
             
             var finalCode = scriptCode.ToString();
 
@@ -341,6 +343,84 @@ public class ScriptEngine
         nullGameObject.Properties["name"] = $"<missing object {objectId}>";
         
         return nullGameObject;
+    }
+
+    /// <summary>
+    /// Preprocesses script code to transform DBref syntax (#4.property, #4.function(), etc.) and ID syntax ($objectId.property) into valid C# code
+    /// </summary>
+    private string PreprocessObjectReferenceSyntax(string originalCode)
+    {
+        if (string.IsNullOrEmpty(originalCode))
+            return originalCode;
+
+        var result = originalCode;
+
+        // Handle DBref patterns: #<number>.<identifier> or #<number>.<identifier>(...)
+        var dbrefPattern = @"#(\d+)\.(\w+)(\(.*?\))?";
+        result = System.Text.RegularExpressions.Regex.Replace(result, dbrefPattern, match =>
+        {
+            var dbref = match.Groups[1].Value;
+            var member = match.Groups[2].Value;
+            var methodCall = match.Groups[3].Value; // Will be empty for properties, contains (...) for methods
+            
+            if (!string.IsNullOrEmpty(methodCall))
+            {
+                // This is a method call: #4.methodName(args) -> GetObjectByDbRef(4).methodName(args)
+                return $"GetObjectByDbRef({dbref}).{member}{methodCall}";
+            }
+            else
+            {
+                // This is a property access: #4.propertyName -> GetObjectByDbRef(4).propertyName
+                return $"GetObjectByDbRef({dbref}).{member}";
+            }
+        });
+
+        // Handle DBref assignment patterns: #4.property = value
+        var dbrefAssignmentPattern = @"#(\d+)\.(\w+)\s*=";
+        result = System.Text.RegularExpressions.Regex.Replace(result, dbrefAssignmentPattern, match =>
+        {
+            var dbref = match.Groups[1].Value;
+            var member = match.Groups[2].Value;
+            
+            return $"GetObjectByDbRef({dbref}).{member} =";
+        });
+
+        // Handle ID patterns: $<identifier>.<identifier> or $<identifier>.<identifier>(...)
+        var idPattern = @"\$([a-zA-Z0-9\-_]+)\.(\w+)(\(.*?\))?";
+        result = System.Text.RegularExpressions.Regex.Replace(result, idPattern, match =>
+        {
+            var objectId = match.Groups[1].Value;
+            var member = match.Groups[2].Value;
+            var methodCall = match.Groups[3].Value; // Will be empty for properties, contains (...) for methods
+            
+            if (!string.IsNullOrEmpty(methodCall))
+            {
+                // This is a method call: $objectId.methodName(args) -> GetObjectById("objectId").methodName(args)
+                return $"GetObjectById(\"{objectId}\").{member}{methodCall}";
+            }
+            else
+            {
+                // This is a property access: $objectId.propertyName -> GetObjectById("objectId").propertyName
+                return $"GetObjectById(\"{objectId}\").{member}";
+            }
+        });
+
+        // Handle ID assignment patterns: $objectId.property = value
+        var idAssignmentPattern = @"\$([a-zA-Z0-9\-_]+)\.(\w+)\s*=";
+        result = System.Text.RegularExpressions.Regex.Replace(result, idAssignmentPattern, match =>
+        {
+            var objectId = match.Groups[1].Value;
+            var member = match.Groups[2].Value;
+            
+            return $"GetObjectById(\"{objectId}\").{member} =";
+        });
+
+        if (result != originalCode)
+        {
+            Logger.Debug($"DBref/ID preprocessing transformed:\n{originalCode}\ninto:\n{result}");
+        }
+
+        return result;
     }
 
     /// <summary>
