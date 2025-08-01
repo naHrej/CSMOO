@@ -32,20 +32,36 @@ public static class InstanceManager
         }
 
         mergedProperties["classid"] = classId; // Ensure class ID is set    
-        var gameObject = new GameObject
-        {
-            Id = Guid.NewGuid().ToString(),
-            
-            Properties = mergedProperties,
-            Location = DbProvider.Instance.FindOne<GameObject>("gameobjects", o => o.Properties.ContainsKey("isStartingRoom")) ?? null,
-        };
+        GameObject gameObject;
+        var newId = Guid.NewGuid().ToString();
+        var name = mergedProperties.ContainsKey("name") ? mergedProperties["name"].AsString : objectClass.Name;
+        var description = mergedProperties.ContainsKey("description") ? mergedProperties["description"].AsString : "";
 
-        // Assign a DbRef
+        switch (objectClass.Name.ToLowerInvariant())
+        {
+            case "room":
+                gameObject = new Room(newId, name, description);
+                break;
+            case "exit":
+                gameObject = new Exit(newId, name);
+                break;
+            case "item":
+                gameObject = new Item(newId, name);
+                break;
+            case "player":
+                gameObject = new Player { Id = newId, Name = name };
+                break;
+            default:
+                gameObject = new GameObject { Id = newId, Name = name };
+                break;
+        }
+
+        gameObject.Properties = mergedProperties;
+        gameObject.Location = DbProvider.Instance.FindOne<GameObject>("gameobjects", o => o.Properties.ContainsKey("isStartingRoom")) ?? null;
         gameObject.DbRef = GetNextDbRef();
-        
+
         DbProvider.Instance.Insert("gameobjects", gameObject);
         Logger.Debug($"Created instance of {objectClass.Name} with ID {gameObject.Id} (#{gameObject.DbRef})");
-        
         return gameObject;
     }
 
