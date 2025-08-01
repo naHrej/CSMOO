@@ -34,14 +34,17 @@ internal class Program
             ServerInitializer.Initialize();
             
             // Start both servers
-            var telnetServer = new ServerTelnet(config.Server.Port);
-            var webSocketServer = new WebSocketServer(config.Server.Port + 1); // Use next port for WebSocket
+            var telnetServer = new TelnetServer(config.Server.Port);
+            var webSocketServer = new WebSocketServer(config.Server.WsPort); // Use next port for WebSocket
+            var httpServer = new HttpServer(); // Initialize HTTP server
             
             try
             {
                 // Start WebSocket server asynchronously
                 _ = Task.Run(async () => await webSocketServer.StartAsync());
-                
+                _ = Task.Run(async () => await httpServer.StartAsync());
+
+
                 // Start Telnet server (blocking call)
                 telnetServer.Start();
             }

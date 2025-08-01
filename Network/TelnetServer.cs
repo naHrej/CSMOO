@@ -6,12 +6,12 @@ using CSMOO.Logging;
 
 namespace CSMOO.Network;
 
-internal class ServerTelnet
+internal class TelnetServer
 {
     private TcpListener _listener;
     private bool _isRunning;
     
-    public ServerTelnet(int port)
+    public TelnetServer(int port)
     {
         _listener = new TcpListener(System.Net.IPAddress.Any, port);
         _isRunning = false;

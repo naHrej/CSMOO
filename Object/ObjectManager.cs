@@ -188,6 +188,14 @@ public static class ObjectManager
     public static BsonValue? GetProperty(GameObject gameObject, string propertyName)
         => PropertyManager.GetProperty(gameObject, propertyName);
 
+    // <summary>
+    /// Get all objects in the cache
+    /// </summary>
+    public static List<GameObject> GetAllObjects()
+    {
+        return _objectCache.Values.ToList();
+    }
+
   
 
     /// <summary>
