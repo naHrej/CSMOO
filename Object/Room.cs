@@ -1,6 +1,6 @@
 namespace CSMOO.Object;
 
-class Room : GameObject
+public class Room : GameObject
 {
     public Room(string id, string name, string description)
     {

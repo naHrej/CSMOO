@@ -1,6 +1,6 @@
 namespace CSMOO.Object;
 
-class Exit : GameObject
+public class Exit : GameObject
 {
     public Exit(string id, string name)
     {
