@@ -228,11 +228,16 @@ if (Builtins.IsAdmin(Player) || Builtins.IsModerator(Player))
     }
     else
     {
-        var verbs = Builtins.GetVerbsOnObject(targetId);
-        if (verbs.Any())
+        // Get all verbs with source information
+        var allVerbsWithSource = VerbResolver.GetAllVerbsOnObject(targetId);
+        var instanceVerbs = allVerbsWithSource.Where(v => v.source == "instance").ToList();
+        var inheritedVerbs = allVerbsWithSource.Where(v => v.source != "instance").ToList();
+        
+        // Show instance-specific verbs
+        if (instanceVerbs.Any())
         {
-            output.AppendLine("Verbs:");
-            foreach (var verb in verbs.OrderBy(v => v.Name))
+            output.AppendLine("Instance Verbs:");
+            foreach (var (verb, source) in instanceVerbs.OrderBy(v => v.verb.Name))
             {
                 var verbInfo = $"  {verb.Name}";
                 if (!string.IsNullOrEmpty(verb.Aliases))
@@ -248,7 +253,31 @@ if (Builtins.IsAdmin(Player) || Builtins.IsModerator(Player))
         }
         else
         {
-            output.AppendLine("Verbs: none");
+            output.AppendLine("Instance Verbs: none");
+        }
+        
+        // Show inherited verbs
+        if (inheritedVerbs.Any())
+        {
+            output.AppendLine("Inherited Verbs:");
+            foreach (var (verb, source) in inheritedVerbs.OrderBy(v => v.verb.Name))
+            {
+                var verbInfo = $"  {verb.Name}";
+                if (!string.IsNullOrEmpty(verb.Aliases))
+                {
+                    verbInfo += $" ({verb.Aliases})";
+                }
+                if (!string.IsNullOrEmpty(verb.Pattern))
+                {
+                    verbInfo += $" [{verb.Pattern}]";
+                }
+                verbInfo += $" (from {source})";
+                output.AppendLine(verbInfo);
+            }
+        }
+        else
+        {
+            output.AppendLine("Inherited Verbs: none");
         }
     }
 
@@ -277,11 +306,16 @@ if (Builtins.IsAdmin(Player) || Builtins.IsModerator(Player))
     }
     else
     {
-        var functions = Builtins.GetFunctionsOnObject(targetId);
-        if (functions.Any())
+        // Get all functions with source information
+        var allFunctionsWithSource = FunctionResolver.GetAllFunctionsOnObject(targetId);
+        var instanceFunctions = allFunctionsWithSource.Where(f => f.source == "instance").ToList();
+        var inheritedFunctions = allFunctionsWithSource.Where(f => f.source != "instance").ToList();
+        
+        // Show instance-specific functions
+        if (instanceFunctions.Any())
         {
-            output.AppendLine("Functions:");
-            foreach (var func in functions.OrderBy(f => f.Name))
+            output.AppendLine("Instance Functions:");
+            foreach (var (func, source) in instanceFunctions.OrderBy(f => f.function.Name))
             {
                 var paramString = string.Join(", ", func.ParameterTypes.Zip(func.ParameterNames, (type, name) => $"{type} {name}"));
                 var funcInfo = $"  {func.ReturnType} {func.Name}({paramString})";
@@ -294,24 +328,75 @@ if (Builtins.IsAdmin(Player) || Builtins.IsModerator(Player))
         }
         else
         {
-            output.AppendLine("Functions: none");
+            output.AppendLine("Instance Functions: none");
+        }
+        
+        // Show inherited functions
+        if (inheritedFunctions.Any())
+        {
+            output.AppendLine("Inherited Functions:");
+            foreach (var (func, source) in inheritedFunctions.OrderBy(f => f.function.Name))
+            {
+                var paramString = string.Join(", ", func.ParameterTypes.Zip(func.ParameterNames, (type, name) => $"{type} {name}"));
+                var funcInfo = $"  {func.ReturnType} {func.Name}({paramString})";
+                if (!string.IsNullOrEmpty(func.Description))
+                {
+                    funcInfo += $" - {func.Description}";
+                }
+                funcInfo += $" (from {source})";
+                output.AppendLine(funcInfo);
+            }
+        }
+        else
+        {
+            output.AppendLine("Inherited Functions: none");
         }
     }
 
     // Show properties (only for object instances, classes already show default properties above)
     if (!isExaminingClass)
     {
+        // For properties, we need to separate instance vs inherited differently
+        // Instance properties are those directly in target.Properties
+        // Inherited properties come from the class hierarchy
+        
+        var instanceProperties = new List<KeyValuePair<string, object>>();
+        var inheritedProperties = new List<KeyValuePair<string, object>>();
+        
         if (target.Properties?.Any() == true)
         {
-            output.AppendLine("Instance Properties:");
-            // Convert to list to avoid dynamic lambda dispatch issue
-            var propertiesList = new List<KeyValuePair<string, object>>();
+            // Convert instance properties to list
             foreach (var prop in target.Properties)
             {
-                propertiesList.Add(new KeyValuePair<string, object>(prop.Key, prop.Value));
+                instanceProperties.Add(new KeyValuePair<string, object>(prop.Key, prop.Value));
             }
-            // Now we can safely use OrderBy on the concrete list
-            foreach (var prop in propertiesList.OrderBy(p => p.Key))
+        }
+        
+        // Get properties from class hierarchy (excluding those overridden in instance)
+        if (objectClass != null)
+        {
+            var inheritanceChain = CSMOO.Object.ObjectManager.GetInheritanceChain(objectClass.Id);
+            foreach (var classInChain in inheritanceChain)
+            {
+                if (classInChain.Properties?.Any() == true)
+                {
+                    foreach (var classProp in classInChain.Properties)
+                    {
+                        // Only add if not already in instance properties
+                        if (!instanceProperties.Any(ip => ip.Key == classProp.Key))
+                        {
+                            inheritedProperties.Add(new KeyValuePair<string, object>(classProp.Key, classProp.Value));
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Show instance properties
+        if (instanceProperties.Any())
+        {
+            output.AppendLine("Instance Properties:");
+            foreach (var prop in instanceProperties.OrderBy(p => p.Key))
             {
                 var value = prop.Value?.ToString() ?? "null";
                 if (value.Length > 50)
@@ -324,6 +409,25 @@ if (Builtins.IsAdmin(Player) || Builtins.IsModerator(Player))
         else
         {
             output.AppendLine("Instance Properties: none");
+        }
+        
+        // Show inherited properties
+        if (inheritedProperties.Any())
+        {
+            output.AppendLine("Inherited Properties:");
+            foreach (var prop in inheritedProperties.OrderBy(p => p.Key))
+            {
+                var value = prop.Value?.ToString() ?? "null";
+                if (value.Length > 50)
+                {
+                    value = value.Substring(0, 47) + "...";
+                }
+                output.AppendLine($"  {prop.Key}: {value} (from class)");
+            }
+        }
+        else
+        {
+            output.AppendLine("Inherited Properties: none");
         }
     }
 }

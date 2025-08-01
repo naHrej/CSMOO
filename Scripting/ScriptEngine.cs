@@ -45,6 +45,8 @@ public class ScriptEngine
                 "CSMOO.Object",
                 "CSMOO.Scripting",
                 "CSMOO.Core",
+                "CSMOO.Verbs",
+                "CSMOO.Functions",
                 "HtmlAgilityPack"
             );
     }
