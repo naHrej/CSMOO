@@ -51,6 +51,9 @@ public static class InstanceManager
             case "player":
                 gameObject = new Player { Id = newId, Name = name };
                 break;
+            case "container":
+                gameObject = new Container(newId, name);
+                break;
             default:
                 gameObject = new GameObject { Id = newId, Name = name };
                 break;
