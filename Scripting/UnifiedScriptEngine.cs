@@ -33,12 +33,13 @@ public class UnifiedScriptEngine
                 Assembly.GetExecutingAssembly()             // Current assembly
             )
             .WithImports(
-                "System",
+
                 "System.Dynamic",
                 "System.Linq",
                 "System.Collections.Generic",
                 "System.Text",
                 "System.Threading.Tasks",
+                "CSMOO.Exceptions",
                 "CSMOO.Database",
                 "CSMOO.Commands",
                 "CSMOO.Object",
