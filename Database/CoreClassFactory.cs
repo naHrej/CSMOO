@@ -15,7 +15,7 @@ public static class CoreClassFactory
     public static void CreateCoreClasses()
     {
         // Check if core classes already exist
-        if (DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "Object") != null)
+        if (DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "GameObject") != null)
         {
             Logger.Debug("Core classes already exist, skipping creation");
             return;
@@ -38,10 +38,18 @@ public static class CoreClassFactory
     /// </summary>
     private static ObjectClass CreateBaseObjectClass()
     {
+        // Check if GameObject class already exists
+        var existingGameObjectClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "GameObject");
+        if (existingGameObjectClass != null)
+        {
+            Logger.Debug("GameObject class already exists, skipping creation");
+            return existingGameObjectClass;
+        }
+
         var baseObjectClass = new ObjectClass
         {
-            Id = "obj_base_object",
-            Name = "Object",
+            Id = "GameObject",
+            Name = "GameObject",
             Description = "The fundamental base class for all objects in the game",
             Properties = new BsonDocument
             {
@@ -66,11 +74,19 @@ public static class CoreClassFactory
     /// </summary>
     private static ObjectClass CreateRoomClass()
     {
-        var baseObjectClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "Object");
+        // Check if Room class already exists
+        var existingRoomClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "Room");
+        if (existingRoomClass != null)
+        {
+            Logger.Debug("Room class already exists, skipping creation");
+            return existingRoomClass;
+        }
+
+        var baseObjectClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "GameObject");
         
         var roomClass = new ObjectClass
         {
-            Id = "obj_room",
+            Id = "Room",
             Name = "Room",
             ParentClassId = baseObjectClass?.Id,
             Description = "A location that can contain objects and players",
@@ -95,11 +111,19 @@ public static class CoreClassFactory
     /// </summary>
     private static ObjectClass CreateExitClass()
     {
-        var baseObjectClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "Object");
+        // Check if Exit class already exists
+        var existingExitClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "Exit");
+        if (existingExitClass != null)
+        {
+            Logger.Debug("Exit class already exists, skipping creation");
+            return existingExitClass;
+        }
+
+        var baseObjectClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "GameObject");
         
         var exitClass = new ObjectClass
         {
-            Id = "obj_exit",
+            Id = "Exit",
             Name = "Exit",
             ParentClassId = baseObjectClass?.Id,
             Description = "A connection between rooms",
@@ -127,11 +151,19 @@ public static class CoreClassFactory
     /// </summary>
     private static ObjectClass CreateContainerClass()
     {
-        var baseObjectClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "Object");
+        // Check if Container class already exists
+        var existingContainerClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "Container");
+        if (existingContainerClass != null)
+        {
+            Logger.Debug("Container class already exists, skipping creation");
+            return existingContainerClass;
+        }
+
+        var baseObjectClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "GameObject");
         
         var containerClass = new ObjectClass
         {
-            Id = "obj_container",
+            Id = "Container",
             Name = "Container",
             ParentClassId = baseObjectClass?.Id,
             Description = "An object that can hold other objects",
@@ -158,11 +190,19 @@ public static class CoreClassFactory
     /// </summary>
     private static ObjectClass CreateItemClass()
     {
-        var baseObjectClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "Object");
+        // Check if Item class already exists
+        var existingItemClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "Item");
+        if (existingItemClass != null)
+        {
+            Logger.Debug("Item class already exists, skipping creation");
+            return existingItemClass;
+        }
+
+        var baseObjectClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "GameObject");
         
         var itemClass = new ObjectClass
         {
-            Id = "obj_item",
+            Id = "Item",
             Name = "Item",
             ParentClassId = baseObjectClass?.Id,
             Description = "A basic item that can be picked up",
@@ -195,11 +235,11 @@ public static class CoreClassFactory
             return existingPlayerClass;
         }
 
-        var baseObjectClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "Object");
+        var baseObjectClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "GameObject");
         
         var playerClass = new ObjectClass
         {
-            Id = "obj_player",
+            Id = "Player",
             Name = "Player",
             ParentClassId = baseObjectClass?.Id,
             Description = "A player character",
@@ -230,7 +270,7 @@ public static class CoreClassFactory
     /// </summary>
     public static ObjectClass? GetBaseObjectClass()
     {
-        return DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "Object");
+        return DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "GameObject");
     }
 
     /// <summary>

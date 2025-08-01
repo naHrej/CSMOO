@@ -329,7 +329,6 @@ public class ScriptEngine
         {
             Id = objectId,
             DbRef = 0,
-            ClassId = "",
             Properties = new LiteDB.BsonDocument(),
             Location = null,
             Contents = new List<string>(),

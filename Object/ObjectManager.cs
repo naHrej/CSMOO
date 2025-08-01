@@ -10,6 +10,9 @@ public static class ObjectManager
 {
     // Singleton cache for loaded GameObject instances
     private static readonly Dictionary<string, GameObject> _objectCache = new();
+    
+    // Singleton cache for loaded ObjectClass instances
+    private static readonly Dictionary<string, ObjectClass> _objectClassCache = new();
 
     /// <summary>
     /// Loads all GameObjects from the database into the singleton cache at startup.
@@ -24,6 +27,18 @@ public static class ObjectManager
     }
 
     /// <summary>
+    /// Loads all ObjectClasses from the database into the singleton cache at startup.
+    /// </summary>
+    public static void LoadAllObjectClassesToCache()
+    {
+        var allClasses = DbProvider.Instance.FindAll<ObjectClass>("objectclasses");
+        foreach (var objClass in allClasses)
+        {
+            _objectClassCache[objClass.Id] = objClass;
+        }
+    }
+
+    /// <summary>
     /// Adds a GameObject to the singleton cache, or returns the cached instance if already present.
     /// </summary>
     public static GameObject? CacheGameObject(GameObject obj)
@@ -33,6 +48,18 @@ public static class ObjectManager
             return cached;
         _objectCache[obj.Id] = obj;
         return obj;
+    }
+
+    /// <summary>
+    /// Adds an ObjectClass to the singleton cache, or returns the cached instance if already present.
+    /// </summary>
+    public static ObjectClass? CacheObjectClass(ObjectClass objClass)
+    {
+        if (objClass == null) return null;
+        if (_objectClassCache.TryGetValue(objClass.Id, out var cached))
+            return cached;
+        _objectClassCache[objClass.Id] = objClass;
+        return objClass;
     }
     #region Class Management (delegated to ClassManager)
     
@@ -157,7 +184,7 @@ public static class ObjectManager
     /// <summary>
     /// Gets a typed object by ID
     /// </summary>
-    public static T? GetObject<T>(string objectId) where T : GameObject 
+    public static T? GetObject<T>(string objectId) where T : GameObject
     {
         if (string.IsNullOrEmpty(objectId)) return default;
         if (_objectCache.TryGetValue(objectId, out var cachedObj) && cachedObj is T cached)
@@ -178,13 +205,36 @@ public static class ObjectManager
         return obj;
     }
 
+    public static ObjectClass? GetClass(string classId)
+    {
+        if (string.IsNullOrEmpty(classId)) return null;
+        if (_objectClassCache.TryGetValue(classId, out var cached))
+            return cached;
+        var objClass = DbProvider.Instance.FindById<ObjectClass>("objectclasses", classId);
+        if (objClass != null)
+        {
+            _objectClassCache[objClass.Id] = objClass;
+        }
+        return objClass;
+    }
+    
+    public static ObjectClass? GetClassByName(string className)
+    {
+        if (string.IsNullOrEmpty(className)) return null;
+        var objClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name.Equals(className, StringComparison.OrdinalIgnoreCase));
+        if (objClass != null)
+        {
+            _objectClassCache[objClass.Id] = objClass;
+        }
+        return objClass;
+    }
     #endregion
 
-    #region Property Management (delegated to PropertyManager)
+        #region Property Management (delegated to PropertyManager)
 
-    /// <summary>
-    /// Gets a property value from an object, checking inheritance chain if not found on instance
-    /// </summary>
+        /// <summary>
+        /// Gets a property value from an object, checking inheritance chain if not found on instance
+        /// </summary>
     public static BsonValue? GetProperty(GameObject gameObject, string propertyName)
         => PropertyManager.GetProperty(gameObject, propertyName);
 
@@ -194,6 +244,14 @@ public static class ObjectManager
     public static List<GameObject> GetAllObjects()
     {
         return _objectCache.Values.ToList();
+    }
+
+    /// <summary>
+    /// Get all object classes in the cache
+    /// </summary>
+    public static List<ObjectClass> GetAllObjectClasses()
+    {
+        return _objectClassCache.Values.ToList();
     }
 
   

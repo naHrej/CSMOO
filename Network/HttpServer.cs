@@ -26,7 +26,7 @@ public class HttpServer
         }
         else if (config.Server.Port > 0)
         {
-            prefix = $"http://localhost:{config.Server.Port}/";
+            prefix = $"http://localhost:{config.Server.Port+2}/";
         }
         else
         {

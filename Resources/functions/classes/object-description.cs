@@ -4,20 +4,20 @@ var shortDesc = This.shortDescription ?? objectName;
 var longDesc = This.longDescription ?? This.description ?? "You see nothing special about it.";
 
 // Check if this is a Room (for special formatting)
-if (This.ClassId == "obj_room" || (This.Properties.ContainsKey("isRoom") && This.Properties["isRoom"]))
+if (This.ClassId == "Room" || (This.Properties.ContainsKey("isRoom") && This.Properties["isRoom"]))
 {
     return $"=== {objectName.ToUpper()} ===\n{longDesc}\n=== END ===";
 }
 
 // For players and other living beings
-if (This.ClassId == "obj_player" || This.ClassId?.StartsWith("obj_player") == true)
+if (This.ClassId == "Player" || This.ClassId?.StartsWith("Player") == true)
 {
     var level = This.Properties.ContainsKey("level") ? $" (Level {This.Properties["level"]})" : "";
     return $"{objectName}{level}\n{longDesc}";
 }
 
 // For containers
-if (This.ClassId == "obj_container" || (This.Properties.ContainsKey("capacity") && This.Properties["capacity"] > 0))
+if (This.ClassId == "Container" || (This.Properties.ContainsKey("capacity") && This.Properties["capacity"] > 0))
 {
     var status = "";
     if (This.Properties.ContainsKey("closed") && This.Properties["closed"])
@@ -32,7 +32,7 @@ if (This.ClassId == "obj_container" || (This.Properties.ContainsKey("capacity") 
 }
 
 // For exits
-if (This.ClassId == "obj_exit")
+if (This.ClassId == "Exit")
 {
     var direction = This.Properties.ContainsKey("direction") ? $" leading {This.Properties["direction"]}" : "";
     return $"{objectName}{direction}\n{longDesc}";

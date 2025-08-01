@@ -641,7 +641,6 @@ public static class VerbResolver
             systemObject = new GameObject
             {
                 Id = Guid.NewGuid().ToString(),
-                ClassId = "Object", // Base object class
                 Properties = new BsonDocument
                 {
                     ["name"] = "System",

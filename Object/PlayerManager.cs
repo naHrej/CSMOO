@@ -33,7 +33,6 @@ public static class PlayerManager
         var player = new Player
         {
             Id = Guid.NewGuid().ToString(),
-            ClassId = playerClass.Id,
             PasswordHash = HashPassword(password),
             Location = DbProvider.Instance.FindOne<GameObject>("gameobjects", o => o.Properties.ContainsKey("isStartingRoom")),
             Properties = new BsonDocument
@@ -69,7 +68,6 @@ public static class PlayerManager
         var playerGameObject = new GameObject
         {
             Id = player.Id,
-            ClassId = player.ClassId,
             Properties = player.Properties,
             Location = DbProvider.Instance.FindOne<GameObject>("gameobjects", o => o.Properties.ContainsKey("isStartingRoom")),
             Contents = new List<string>(),

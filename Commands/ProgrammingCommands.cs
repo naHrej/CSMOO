@@ -1250,7 +1250,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
                         c.Name.Equals(className, StringComparison.OrdinalIgnoreCase));
                     result = objectClass?.Id;
                 }
-                // Check if it's a direct class ID (like "obj_room", "obj_exit", etc.)
+                // Check if it's a direct class ID (like "Room", "Exit", etc.)
                 else if (DbProvider.Instance.FindById<ObjectClass>("objectclasses", objectName) != null)
                 {
                     result = objectName; // The objectName itself is the class ID

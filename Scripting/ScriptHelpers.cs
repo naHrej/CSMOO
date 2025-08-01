@@ -167,7 +167,7 @@ public class ScriptHelpers
                     result = objectClass?.Id;
                     Logger.Debug($"Class lookup '{className}' -> {result ?? "not found"}");
                 }
-                // Check if it's a direct class ID (like "obj_room", "obj_exit", etc.)
+                // Check if it's a direct class ID (like "Room", "Exit", etc.)
                 else if (DbProvider.Instance.FindById<ObjectClass>("objectclasses", objectName) != null)
                 {
                     result = objectName; // The objectName itself is the class ID

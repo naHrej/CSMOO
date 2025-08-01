@@ -191,7 +191,7 @@ public static class FunctionResolver
             return objectClass?.Id;
         }
 
-        // Check if it's a direct class ID (like "obj_room", "obj_exit", etc.)
+        // Check if it's a direct class ID (like "Room", "Exit", etc.)
         var classById = DbProvider.Instance.FindById<ObjectClass>("objectclasses", objectRef);
         if (classById != null)
         {

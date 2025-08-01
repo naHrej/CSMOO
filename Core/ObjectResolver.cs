@@ -1,6 +1,7 @@
 using CSMOO.Database;
 using Microsoft.CodeAnalysis;
 using CSMOO.Object;
+using LiteDB;
 
 namespace CSMOO.Core;
 
@@ -44,7 +45,12 @@ public static class ObjectResolver
     if (keywordResult != null)
       return [keywordResult];
 
-    // 2. DBREF or object ID (global)
+    // 2. Class name resolution (Room, Exit, Item, Player, Container, GameObject)
+    var classResult = MatchClassName(normName);
+    if (classResult != null)
+      return [classResult];
+
+    // 3. DBREF or object ID (global)
     var dbrefResult = MatchDBref(normName);
     if (dbrefResult != null)
       return [dbrefResult];
@@ -53,16 +59,16 @@ public static class ObjectResolver
     if (idResult != null)
       return [idResult];
 
-    // 3. Local/Inventory search
+    // 4. Local/Inventory search
     var localObjs = effectiveLocation != null ? ObjectManager.GetObjectsInLocation(effectiveLocation.Id).ToList() : new List<GameObject>();
     var inventoryObjs = ObjectManager.GetObjectsInLocation(looker.Id).ToList();
     var candidates = localObjs.Concat(second: inventoryObjs).ToList();
 
-    // 4. Type filter
+    // 5. Type filter
     if (!string.IsNullOrEmpty(objectType))
       candidates = candidates.Where(obj => obj.ClassId == objectType || (obj.Properties.ContainsKey("type") && obj.Properties["type"].AsString == objectType)).ToList();
 
-    // 5. Name/alias/dynamic alias/exit alias match
+    // 6. Name/alias/dynamic alias/exit alias match
     return MatchNameOrAlias(normName, candidates: candidates);
   }
 
@@ -90,6 +96,57 @@ public static class ObjectResolver
       default:
         return null;
     }
+  }
+
+  /// <summary>
+  /// Implements class name matching for core object types (Room, Exit, Item, Player, Container, GameObject).
+  /// Returns the class object itself when a class name is requested.
+  /// Supports patterns: "Room", "class:Room", "Room.class"
+  /// </summary>
+  private static GameObject? MatchClassName(string name)
+  {
+    string className = name;
+    
+    // Handle "class:ClassName" pattern
+    if (name.StartsWith("class:", StringComparison.OrdinalIgnoreCase))
+    {
+      className = name.Substring(6); // Remove "class:" prefix
+    }
+    // Handle "ClassName.class" pattern
+    else if (name.EndsWith(".class", StringComparison.OrdinalIgnoreCase))
+    {
+      className = name.Substring(0, name.Length - 6); // Remove ".class" suffix
+    }
+    
+    // Check if the className matches any of our core class names (case-insensitive)
+    var coreClassNames = new[] { "Room", "Exit", "Item", "Player", "Container", "GameObject" };
+    
+    foreach (var coreClassName in coreClassNames)
+    {
+      if (string.Equals(className, coreClassName, StringComparison.OrdinalIgnoreCase))
+      {
+        // Try to find the actual object class definition
+        var objectClass = CoreClassFactory.GetCoreClass(coreClassName);
+        if (objectClass != null)
+        {
+          // Return a placeholder GameObject representing the class
+          // This allows commands like "@verb Room" or "@verb class:Room" to work
+          return new GameObject
+          {
+            Id = objectClass.Id,
+            Properties = new BsonDocument
+            {
+              ["name"] = objectClass.Name,
+              ["shortDescription"] = $"the {objectClass.Name} class",
+              ["longDescription"] = objectClass.Description,
+              ["isClassObject"] = true
+            }
+          };
+        }
+      }
+    }
+    
+    return null;
   }
 
   /// <summary>
@@ -160,7 +217,7 @@ public static class ObjectResolver
         }
       }
       // Dynamic exit aliases (for exits)
-      if (obj.ClassId == "obj_exit" && obj.Properties.ContainsKey("direction"))
+      if (obj.ClassId == "Exit" && obj.Properties.ContainsKey("direction"))
       {
         var dir = obj.Properties["direction"].AsString?.ToLowerInvariant();
         if (!string.IsNullOrEmpty(dir))

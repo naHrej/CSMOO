@@ -3,7 +3,7 @@ try
 {
     desc.Append($"<section class='room' style='color:red;margin:0'>");
     desc.Append($"<h3 class='name' style='margin:0'>{This.Name}");
-    desc.Append($"<span class='dbref' style='color:maroon'> ({This.ClassId.Replace("obj_","")})</span>");
+    desc.Append($"<span class='dbref' style='color:maroon'> ({This.ClassId})</span>");
     desc.Append($"</h3>");
     desc.Append($"<p class='description' style='color:#FF6666;margin:0'>");
     desc.Append(This.longDescription ?? This.shortDescription ?? "You see nothing special.");

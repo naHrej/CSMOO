@@ -21,5 +21,5 @@ if (resolved == null)
     notify(player, $"You don't see '{target}' here.");
     return false;
 }
-notify(player, resolved.Description() ?? $"<h3>{resolved.Name}</h3><p>You see nothing special about this {resolved.ClassId.Replace("obj_","")}.</p>");
+notify(player, resolved.Description() ?? $"<h3>{resolved.Name}</h3><p>You see nothing special about this {resolved.ClassId}.</p>");
 return true;

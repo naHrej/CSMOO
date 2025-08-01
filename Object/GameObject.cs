@@ -14,6 +14,7 @@ public class GameObject : DynamicObject
     [BsonId]
     public string Id { get; set; } = Guid.NewGuid().ToString();
 
+
     /// <summary>
     /// Objects name (human-readable identifier)
     /// Preferred over using name form properties collection
@@ -50,8 +51,7 @@ public class GameObject : DynamicObject
     /// </summary>
     public string ClassId
     {
-        get => Properties.ContainsKey("classid") ? Properties["classid"].AsString : string.Empty;
-        set => Properties["classid"] = value != null ? new BsonValue(value) : BsonValue.Null;
+        get => this.GetType().Name;
     }
 
     /// <summary>

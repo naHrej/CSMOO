@@ -205,6 +205,51 @@ public static class Builtins
     {
         return DbProvider.Instance.FindAll<ObjectClass>("objectclasses").ToList<dynamic>();
     }
+
+    public static List<dynamic> GetObjectsByClass(string className)
+    {
+        if (string.IsNullOrEmpty(className)) return new List<dynamic>();
+        
+        var objectClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c =>
+            c.Name.Equals(className, StringComparison.OrdinalIgnoreCase));
+        
+        if (objectClass == null) return new List<dynamic>();
+        
+        return ObjectManager.GetAllObjects()
+            .Where(obj => obj.ClassId == objectClass.Id)
+            .Cast<dynamic>()
+            .ToList();
+    }
+    
+    /// <summary>
+    /// Get an object class by its name
+    /// </summary>
+    public static ObjectClass? GetClassByName(string className)
+    {
+        if (string.IsNullOrEmpty(className)) return null;
+        return ObjectManager.GetClassByName(className);
+    }
+    
+    /// <summary>
+    /// Get an object class by its ID
+    /// </summary>
+    public static ObjectClass? GetClass(string classId)
+    {
+        if (string.IsNullOrEmpty(classId)) return null;
+        return ObjectManager.GetClass(classId);
+    }
+
+    public static List<Verb> GetVerbsOnClass(string classId)
+    {
+        if (string.IsNullOrEmpty(classId)) return new List<Verb>();
+        return DbProvider.Instance.FindVerbsByObjectId(classId).ToList();
+    }
+
+    public static List<Function> GetFunctionsOnClass(string classId)
+    {
+        if (string.IsNullOrEmpty(classId)) return new List<Function>();
+        return FunctionResolver.GetFunctionsForObject(classId, true);
+    }
     
     /// <summary>
     /// Check if a player has a specific permission flag
@@ -423,7 +468,7 @@ public static class Builtins
             return objectClass?.Id;
         }
 
-        // Check if it's a direct class ID (like "obj_room", "obj_exit", etc.)
+        // Check if it's a direct class ID (like "Room", "Exit", etc.)
         var classById = DbProvider.Instance.FindById<ObjectClass>("objectclasses", objectName);
         if (classById != null)
         {
@@ -645,7 +690,7 @@ public static class Builtins
             if (gameObject != null)
             {
                 var player = GetPlayerFromObject(gameObject);
-                if (player != null && (excludePlayer == null || player.Id != excludePlayer.Id))
+                if (player != null && (excludePlayer == null || player?.Id != excludePlayer.Id))
                 {
                     // The script engine will handle the actual notification
                     // This is a placeholder for the interface
