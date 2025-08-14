@@ -196,6 +196,49 @@ public static class ScriptStackTrace
     }
 
     /// <summary>
+    /// Get the correct line number for a frame based on its position in the stack
+    /// </summary>
+    private static int GetFrameLineNumber(ScriptStackFrame frame, bool isErrorFrame)
+    {
+        Logger.Debug(frame.Name);
+        // For error frames, use existing line number if available and correct
+        if (isErrorFrame && frame.LineNumber > 0)
+        {
+            return frame.LineNumber;
+        }
+
+        // For calling frames, always recalculate to find the calling line
+        if (string.IsNullOrEmpty(frame.SourceCode))
+        {
+            return frame.LineNumber > 0 ? frame.LineNumber : 0;
+        }
+
+        
+        var lines = frame.SourceCode.Split(new[] { '\r', '\n' }, StringSplitOptions.None);
+
+        if (isErrorFrame)
+        {
+            // For error frames, look for throw statements
+            for (int i = 0; i < lines.Length; i++)
+            {
+                var line = lines[i].Trim();
+                if (line.Contains("throw"))
+                {
+                    return i + 1;
+                }
+            }
+            // Fallback to existing line number for error frames
+            return frame.LineNumber > 0 ? frame.LineNumber : 0;
+        }
+        else
+        {
+
+            // For calling frames, don't use the existing line number as it's likely wrong
+            return 0;
+        }
+    }
+
+    /// <summary>
     /// Get the source line that caused the error with surrounding context
     /// </summary>
     public static string GetErrorContext(string sourceCode, int lineNumber)
@@ -302,19 +345,22 @@ public static class ScriptStackTrace
             for (int i = 0; i < frames.Length && i < 4; i++) // Limit to 4 frames total
             {
                 var frame = frames[i];
-                var lineInfo = frame.LineNumber > 0 ? $"(line {frame.LineNumber})" : "";
-                
+                bool isErrorFrame = (i == 0); // First frame is the error frame
+                var lineNumber = GetFrameLineNumber(frame, isErrorFrame);
+                var lineInfo = lineNumber > 0 ? $"(line {lineNumber})" : "";
+
                 // Use different separator for verbs vs functions
+                var qualifier = isErrorFrame ? "at" : "from";
                 var separator = frame.Type == "verb" ? ":" : ".";
                 var ending = frame.Type == "verb" ? "" : "()"; // Functions have parentheses
-                var color = i == 0 ? "#ffd43b" : "#74c0fc"; // First frame is highlighted
-                sb.Append($"<span style='color: #ff6b6b;'>at </span>");
+                var color = i == 0 ? "#ff6b6b" : "#ffa8a8"; // First frame is highlighted
+                sb.Append($"<span style='color: {color}'>{qualifier} </span>");
                 sb.Append($"<span style='color: {color};'>{HtmlEncode(frame.ObjectName)}</span>");
-                sb.Append($"{separator}<span style='color: #ff6b6b;'>{HtmlEncode(frame.Name)}</span>");
+                sb.Append($"{separator}<span style='color: {color};'>{HtmlEncode(frame.Name)}</span>");
                 sb.Append($"<span style='color: {color};'>{ending}</span>");
                 if (!string.IsNullOrEmpty(lineInfo))
                 {
-                    sb.Append($"<span style='color: #ff6b6b;'> {lineInfo}</span>");
+                    sb.Append($"<span style='color: {color};'> {lineInfo}</span>");
                 }
                 if (i < frames.Length - 1 && i < 3) // Don't add newline after last item
                 {
@@ -381,7 +427,9 @@ public static class ScriptStackTrace
             for (int i = 0; i < frames.Length && i < 4; i++) // Limit to 4 frames total
             {
                 var frame = frames[i];
-                var lineInfo = frame.LineNumber > 0 ? $" (line {frame.LineNumber})" : "";
+                bool isErrorFrame = (i == 0); // First frame is the error frame
+                var lineNumber = GetFrameLineNumber(frame, isErrorFrame);
+                var lineInfo = lineNumber > 0 ? $" (line {lineNumber})" : "";
                 
                 // Use different separator for verbs vs functions
                 var separator = frame.Type == "verb" ? ":" : ".";
