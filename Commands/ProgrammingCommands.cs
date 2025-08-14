@@ -55,7 +55,7 @@ public class ProgrammingCommands
             "@list" => HandleListCommand(parts),
             "@edit" => HandleEditCommand(parts),
             "@verbs" => HandleVerbsCommand(parts),
-            "@funcs" => HandleFuncsCommand(parts),
+            "@funcs" => HandleFunctionsCommand(parts),
             "@rmverb" => HandleRemoveVerbCommand(parts),
             "@flag" => HandleFlagCommand(parts),
             "@flags" => HandleFlagsCommand(parts),
@@ -65,7 +65,7 @@ public class ProgrammingCommands
             "@remove" when parts.Length > 1 && parts[1] == "verb" => HandleRemoveVerbByIdCommand(parts),
             "@cleanup" when parts.Length > 1 && parts[1] == "player" => HandleCleanupPlayerCommand(parts),
             "@cleanup" => HandleCleanupCommand(parts),
-            "@func" => HandleFuncCommand(parts),
+            "@func" => HandleFunctionCommand(parts),
             "@function" => HandleFunctionCommand(parts),
             "@functions" => HandleFunctionsCommand(parts),
             "@funcreload" => HandleFuncReloadCommand(parts),
@@ -673,7 +673,7 @@ public class ProgrammingCommands
         _commandProcessor.SendToPlayer($"{progDataPrefix}{GetObjectName(function.ObjectId)}.{function.Name}()");
 _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{function.Name}()");
         _commandProcessor.SendToPlayer($"{progDataPrefix}Signature: {function.ReturnType} {function.Name}({paramString})");
-        _commandProcessor.SendToPlayer($"{progDataPrefix}Permissions: {function.Permissions}");
+        _commandProcessor.SendToPlayer($"{progDataPrefix}Permissions: {function.AccessModifier}");
         if (!string.IsNullOrEmpty(function.Description))
             _commandProcessor.SendToPlayer($"{progDataPrefix}Description: {function.Description}");
         _commandProcessor.SendToPlayer($"{progDataPrefix}Created by: {function.CreatedBy} on {function.CreatedAt:yyyy-MM-dd HH:mm}");
@@ -872,8 +872,8 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
                 if (!string.IsNullOrEmpty(function.Description))
                     info += $" - {function.Description}";
                 
-                if (function.Permissions != "public")
-                    info += $" [{function.Permissions}]";
+                if (function.AccessModifier != "public")
+                    info += $" [{function.AccessModifier}]";
                 
                 // Show where the function comes from
                 if (source != "instance")
@@ -888,55 +888,6 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
         if (!allVerbs.Any() && !allFunctions.Any())
         {
             _commandProcessor.SendToPlayer("No verbs or functions defined.");
-        }
-
-        return true;
-    }
-
-    /// <summary>
-    /// @funcs <object> - List all functions on an object
-    /// </summary>
-    private bool HandleFuncsCommand(string[] parts)
-    {
-        var objectName = parts.Length > 1 ? parts[1] : "here";
-        var objectId = ResolveObject(objectName);
-        
-        if (objectId == null)
-        {
-            _commandProcessor.SendToPlayer($"Object '{objectName}' not found.");
-            return true;
-        }
-
-        var allFunctions = FunctionResolver.GetAllFunctionsOnObject(objectId);
-        
-        _commandProcessor.SendToPlayer($"=== Functions on {GetObjectName(objectId)} ===");
-        
-        // Show functions
-        if (allFunctions.Any())
-        {
-            foreach (var (function, source) in allFunctions.OrderBy(f => f.function.Name))
-            {
-                var paramString = string.Join(", ", function.ParameterTypes.Zip(function.ParameterNames, (type, name) => $"{type} {name}"));
-                var info = $"  {function.ReturnType} {function.Name}({paramString})";
-                
-                if (!string.IsNullOrEmpty(function.Description))
-                    info += $" - {function.Description}";
-                
-                if (function.Permissions != "public")
-                    info += $" [{function.Permissions}]";
-                
-                // Show where the function comes from
-                if (source != "instance")
-                    info += $" (from {source})";
-                
-                info += $" (ID: {function.Id})";
-                
-                _commandProcessor.SendToPlayer(info);
-            }
-        }
-        else
-        {
-            _commandProcessor.SendToPlayer("No functions defined.");
         }
 
         return true;
@@ -1030,18 +981,12 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
     }
 
     /// <summary>
-    /// @function <object> <name> [returnType] - Create a new function
-    /// </summary>
-    private bool HandleFunctionCommand(string[] parts)
-    {
-        return HandleFuncCommand(parts);
-    }
-
-    /// <summary>
     /// @functions <object> - List functions on an object
     /// </summary>
     private bool HandleFunctionsCommand(string[] parts)
     {
+        var isProg = PermissionManager.HasFlag(_player, PermissionManager.Flag.Programmer);
+
         if (parts.Length != 2)
         {
             _commandProcessor.SendToPlayer("Usage: @functions <object>");
@@ -1066,8 +1011,9 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
         _commandProcessor.SendToPlayer($"Functions on {GetObjectName(objectId)}:");
         foreach (var function in functions.OrderBy(f => f.Name))
         {
-            var signature = $"{function.ReturnType} {function.Name}({string.Join(", ", function.ParameterTypes)})";
-            var info = $"  {signature}";
+            var progInfo = $"<b>{function.Name} - {function.Id}</b><br/>";
+            var signature = $"• {function.AccessModifier} {function.ReturnType} {function.Name}({string.Join(", ", function.ParameterTypes)})";
+            var info = $"{(isProg ? progInfo : "")} {signature}";
             
             if (!string.IsNullOrEmpty(function.Description))
                 info += $" - {function.Description}";
@@ -1974,7 +1920,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
     /// <summary>
     /// @func <object> <name> [returnType] [param1Type] [param2Type] ... - Create a new function with type checking
     /// </summary>
-    private bool HandleFuncCommand(string[] parts)
+    private bool HandleFunctionCommand(string[] parts)
     {
         if (parts.Length < 2)
         {
@@ -2088,7 +2034,20 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
         var existingFunction = FunctionManager.FindFunction(objectId, functionName);
         if (existingFunction != null)
         {
-            _commandProcessor.SendToPlayer($"Function '{functionName}' already exists on {GetObjectName(objectId)}.");
+            // Update existing function signature
+            existingFunction.ReturnType = returnType;
+            existingFunction.ParameterTypes = parameterTypes.ToArray();
+            existingFunction.ParameterNames = parameterNames.ToArray();
+            existingFunction.AccessModifier = permissions;
+            existingFunction.ModifiedAt = DateTime.UtcNow;
+
+            var functionsCollection = GameDatabase.Instance.GetCollection<Function>("functions");
+            functionsCollection.Update(existingFunction);
+
+            var updateParamString = string.Join(", ", parameterTypes.Zip(parameterNames, (type, name) => $"{type} {name}"));
+            _commandProcessor.SendToPlayer($"Updated {permissions} function '{returnType} {functionName}({updateParamString})' on {GetObjectName(objectId)}.");
+            _commandProcessor.SendToPlayer($"Function ID: {existingFunction.Id}");
+            _commandProcessor.SendToPlayer($"Use '@program function:{existingFunction.Id}' to modify the code for this function.");
             return true;
         }
 
@@ -2103,7 +2062,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
         var function = FunctionManager.CreateFunction(gameObject, functionName, parameterTypes.ToArray(), parameterNames.ToArray(), returnType, "", _player.Name);
 
         // Set visibility
-        function.Permissions = permissions;
+        function.AccessModifier = permissions;
         var functions = GameDatabase.Instance.GetCollection<Function>("functions");
         functions.Update(function);
 
@@ -2184,7 +2143,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
             "@list" => HandleListCommand(parts),
             "@edit" => HandleEditCommand(parts),
             "@verbs" => HandleVerbsCommand(parts),
-            "@funcs" => HandleFuncsCommand(parts),
+            "@funcs" => HandleFunctionsCommand(parts),
             "@rmverb" => HandleRemoveVerbCommand(parts),
             "@flag" => HandleFlagCommand(parts),
             "@flags" => HandleFlagsCommand(parts),
@@ -2194,7 +2153,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
             "@remove" when parts.Length > 1 && parts[1] == "verb" => HandleRemoveVerbByIdCommand(parts),
             "@cleanup" when parts.Length > 1 && parts[1] == "player" => HandleCleanupPlayerCommand(parts),
             "@cleanup" => HandleCleanupCommand(parts),
-            "@func" => HandleFuncCommand(parts),
+            "@func" => HandleFunctionCommand(parts),
             "@function" => HandleFunctionCommand(parts),
             "@functions" => HandleFunctionsCommand(parts),
             "@funcreload" => HandleFuncReloadCommand(parts),

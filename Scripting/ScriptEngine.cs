@@ -9,6 +9,7 @@ using LiteDB;
 using CSMOO.Object;
 using CSMOO.Functions;
 using CSMOO.Verbs;
+using System.Runtime.CompilerServices;
 
 namespace CSMOO.Scripting;
 
@@ -177,7 +178,45 @@ public class ScriptEngine
     public object? ExecuteFunction(Function function, object?[] parameters, Player player, 
         CommandProcessor? commandProcessor = null, string? thisObjectId = null)
     {
+
+        var actualThisObjectId = thisObjectId ?? function.ObjectId;
         var previousContext = Builtins.UnifiedContext; // Store previous context
+        var thisObject = ObjectManager.GetObject(actualThisObjectId);
+        var playerObject = ObjectManager.GetObject(player.Id);
+        switch (function.AccessModifier)
+        {
+            case "private":
+                {
+                    if (actualThisObjectId == previousContext?.This?.Id ?? playerObject?.Id)
+                    {
+                        break;
+                    }
+                    else
+                    {
+
+                        throw new UnauthorizedAccessException($"Function '{function.Name}' is private to {thisObject?.Name}.");
+                    }
+                }
+            case "internal":
+                {
+                    if (thisObject?.Owner?.Id == previousContext?.This?.Owner.Id)
+                    {
+                        break;
+                    }
+                    else
+                    {
+                        throw new UnauthorizedAccessException($"Function '{function.Name}' is internal to {thisObject?.Owner?.Name}.");
+                    }
+                }
+            case "public":
+                {
+                    break;
+                }
+            default:
+                {
+                    throw new ArgumentException($"Unknown function permission: {function.AccessModifier}");
+                }
+        }
         try
         {
             // Validate parameter count
@@ -195,9 +234,8 @@ public class ScriptEngine
                 }
             }
 
-            var actualThisObjectId = thisObjectId ?? function.ObjectId;
-            var thisObject = ObjectManager.GetObject(actualThisObjectId);
-            var playerObject = ObjectManager.GetObject(player.Id);
+            
+
 
             // Debug logging to identify null objects
             if (thisObject == null)
@@ -255,7 +293,7 @@ public class ScriptEngine
 
             // Build script code that declares the parameters as variables
             var scriptCode = new StringBuilder();
-            
+
             // Declare each parameter as a local variable
             for (int i = 0; i < function.ParameterNames.Length && i < parameters.Length; i++)
             {
@@ -266,11 +304,11 @@ public class ScriptEngine
                     scriptCode.AppendLine($"{paramType} {paramName} = ({paramType})GetParameter(\"{paramName}\");");
                 }
             }
-            
+
             // Add the actual function code with DBref/ID preprocessing
             var preprocessedFunctionCode = PreprocessObjectReferenceSyntax(function.Code);
             scriptCode.AppendLine(preprocessedFunctionCode);
-            
+
             var finalCode = scriptCode.ToString();
 
             // Set Builtins context for script execution
@@ -278,7 +316,7 @@ public class ScriptEngine
 
             // Create and execute script with timeout protection
             var script = CSharpScript.Create(finalCode, _scriptOptions, typeof(ScriptGlobals));
-            
+
             // Execute with timeout
             using var cts = new CancellationTokenSource(Config.Instance.Scripting.MaxExecutionTimeMs);
             ScriptState<object> result;
