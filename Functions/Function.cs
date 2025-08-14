@@ -43,7 +43,7 @@ public class Function
     /// <summary>
     /// Who can call this function (public, owner, wizard)
     /// </summary>
-    public string Permissions { get; set; } = "public";
+    public string AccessModifier { get; set; } = "public";
     
     /// <summary>
     /// Description of what this function does

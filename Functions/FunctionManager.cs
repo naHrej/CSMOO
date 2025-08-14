@@ -224,7 +224,7 @@ public static class FunctionManager
         var function = GetFunction(functionId);
         if (function == null) return false;
 
-        function.Permissions = permissions;
+        function.AccessModifier = permissions;
         return UpdateFunction(function);
     }
 }
