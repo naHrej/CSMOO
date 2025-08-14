@@ -4,6 +4,7 @@ using CSMOO.Database;
 using CSMOO.Scripting;
 using CSMOO.Logging;
 using CSMOO.Object;
+using CSMOO.Exceptions;
 
 namespace CSMOO.Verbs;
 
@@ -550,8 +551,38 @@ public static class VerbResolver
         }
         catch (Exception ex)
         {
-            Logger.Error($"Error executing verb '{verb.Name}': {ex.Message}");
-            commandProcessor?.SendToPlayer($"Error executing command \"{verb.Name.ToUpperInvariant()}\":{ex.Message}");
+            // Check if it's our custom script exception with enhanced error reporting
+            if (ex is ScriptExecutionException scriptEx)
+            {
+                Logger.Error(scriptEx.ToString());
+                
+                // Send the full HTML formatted error to the player via command processor
+                commandProcessor?.SendToPlayer(scriptEx.ToString());
+            }
+            else
+            {
+                Logger.Error($"Error executing verb '{verb.Name}': {ex.Message}");
+                var errorMessage = $"Error executing command \"{verb.Name.ToUpperInvariant()}\":{ex.Message}";
+                
+                // Send to command processor
+                commandProcessor?.SendToPlayer(errorMessage);
+                
+                // Also send directly to the player's session
+                if (player?.SessionGuid.HasValue == true && commandProcessor != null)
+                {
+                    try
+                    {
+                        commandProcessor.SendToPlayer(errorMessage, player.SessionGuid.Value);
+                    }
+                    catch
+                    {
+                        // Fallback handled by commandProcessor?.SendToPlayer above
+                    }
+                }
+            }
+            
+            // Clear the script stack trace in case of unhandled errors
+            ScriptStackTrace.Clear();
             return false;
         }
     }

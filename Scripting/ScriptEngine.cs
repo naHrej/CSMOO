@@ -10,6 +10,7 @@ using CSMOO.Object;
 using CSMOO.Functions;
 using CSMOO.Verbs;
 using System.Runtime.CompilerServices;
+using CSMOO.Exceptions;
 
 namespace CSMOO.Scripting;
 
@@ -30,6 +31,7 @@ public class ScriptEngine
                 typeof(Enumerable).Assembly,                // System.Linq
                 typeof(GameObject).Assembly,                // Our game objects
                 typeof(ObjectManager).Assembly,             // Our managers
+                typeof(ScriptGlobals).Assembly,             // CSMOO.Scripting namespace
                 typeof(HtmlAgilityPack.HtmlDocument).Assembly, // HtmlAgilityPack
                 Assembly.GetExecutingAssembly()             // Current assembly
             )
@@ -127,6 +129,9 @@ public class ScriptEngine
             // Set Builtins context for script execution
             Builtins.UnifiedContext = globals;
             
+            // Push this verb onto the script call stack
+            ScriptStackTrace.PushVerbFrame(verb, thisObject);
+            
             // Create script with timeout protection
             var script = CSharpScript.Create(completeScript, _scriptOptions, typeof(ScriptGlobals));
             
@@ -145,28 +150,63 @@ public class ScriptEngine
                 
                 // If not a boolean, assume success and return the string representation
                 var stringResult = returnValue?.ToString() ?? "";
+                
+                // Don't clear the stack trace here - let the top-level caller handle it
+                // ScriptStackTrace.Clear();
+                
                 return (true, stringResult);
             }
             catch (AggregateException ex) when (ex.InnerException is OperationCanceledException)
             {
-                throw new TimeoutException($"Script execution timed out after {Config.Instance.Scripting.MaxExecutionTimeMs}ms");
+                ScriptStackTrace.UpdateCurrentFrame(ex, verb.Code);
+                throw new ScriptExecutionException($"Script execution timed out after {Config.Instance.Scripting.MaxExecutionTimeMs}ms", ex);
             }
-            catch (OperationCanceledException)
+            catch (AggregateException ex) when (ex.InnerException != null)
             {
-                throw new TimeoutException($"Script execution timed out after {Config.Instance.Scripting.MaxExecutionTimeMs}ms");
+                // Unwrap AggregateException to get the real exception
+                ScriptStackTrace.UpdateCurrentFrame(ex.InnerException, verb.Code);
+                
+                // If the inner exception is already a ScriptExecutionException, just re-throw it
+                if (ex.InnerException is ScriptExecutionException)
+                {
+                    throw ex.InnerException;
+                }
+                else
+                {
+                    throw new ScriptExecutionException(ex.InnerException.Message, ex.InnerException);
+                }
+            }
+            catch (OperationCanceledException ex)
+            {
+                ScriptStackTrace.UpdateCurrentFrame(ex, verb.Code);
+                throw new ScriptExecutionException($"Script execution timed out after {Config.Instance.Scripting.MaxExecutionTimeMs}ms", ex);
+            }
+            catch (Exception ex)
+            {
+                ScriptStackTrace.UpdateCurrentFrame(ex, verb.Code);
+                
+                // If it's already a ScriptExecutionException, preserve the original stack frames
+                if (ex is ScriptExecutionException scriptEx)
+                {
+                    throw; // Just re-throw to preserve the original exception with its frames
+                }
+                else
+                {
+                    throw new ScriptExecutionException(ex.Message, ex);
+                }
             }
         }
         catch (Exception ex)
         {
-            Logger.Error($"Script execution error in verb '{verb.Name}': {ex.Message}");
-            if (ex.InnerException != null)
-            {
-                Logger.Error($"Inner exception: {ex.InnerException.Message}");
-            }
+            // Just update the current frame and re-throw - let the caller handle messaging
+            ScriptStackTrace.UpdateCurrentFrame(ex, verb.Code);
             throw;
         }
         finally
         {
+            // Pop the verb frame from the script call stack
+            ScriptStackTrace.PopFrame();
+            
             // Restore previous Builtins context to support nested function calls
             Builtins.UnifiedContext = previousContext;
         }
@@ -194,7 +234,7 @@ public class ScriptEngine
                     else
                     {
 
-                        throw new UnauthorizedAccessException($"Function '{function.Name}' is private to {thisObject?.Name}.");
+                        throw new ScriptExecutionException($"Function '{function.Name}' is private to {thisObject?.Name}({thisObject?.Id}).");
                     }
                 }
             case "internal":
@@ -205,7 +245,7 @@ public class ScriptEngine
                     }
                     else
                     {
-                        throw new UnauthorizedAccessException($"Function '{function.Name}' is internal to {thisObject?.Owner?.Name}.");
+                        throw new ScriptExecutionException($"Function '{function.Name}' is internal to {thisObject?.Owner?.Name}({thisObject?.Owner?.Id}).");
                     }
                 }
             case "public":
@@ -214,7 +254,7 @@ public class ScriptEngine
                 }
             default:
                 {
-                    throw new ArgumentException($"Unknown function permission: {function.AccessModifier}");
+                    throw new ScriptExecutionException($"Unknown function permission: {function.AccessModifier}");
                 }
         }
         try
@@ -313,6 +353,9 @@ public class ScriptEngine
 
             // Set Builtins context for script execution
             Builtins.UnifiedContext = globals;
+            
+            // Push this function onto the script call stack
+            ScriptStackTrace.PushFunctionFrame(function, thisObject);
 
             // Create and execute script with timeout protection
             var script = CSharpScript.Create(finalCode, _scriptOptions, typeof(ScriptGlobals));
@@ -326,11 +369,42 @@ public class ScriptEngine
             }
             catch (AggregateException ex) when (ex.InnerException is OperationCanceledException)
             {
-                throw new TimeoutException($"Function '{function.Name}' execution timed out after {Config.Instance.Scripting.MaxExecutionTimeMs}ms");
+                ScriptStackTrace.UpdateCurrentFrame(ex, function.Code);
+                throw new ScriptExecutionException($"Function '{function.Name}' execution timed out after {Config.Instance.Scripting.MaxExecutionTimeMs}ms", ex);
             }
-            catch (OperationCanceledException)
+            catch (AggregateException ex) when (ex.InnerException != null)
             {
-                throw new TimeoutException($"Function '{function.Name}' execution timed out after {Config.Instance.Scripting.MaxExecutionTimeMs}ms");
+                // Unwrap AggregateException to get the real exception
+                ScriptStackTrace.UpdateCurrentFrame(ex.InnerException, function.Code);
+                
+                // If the inner exception is already a ScriptExecutionException, just re-throw it
+                if (ex.InnerException is ScriptExecutionException)
+                {
+                    throw ex.InnerException;
+                }
+                else
+                {
+                    throw new ScriptExecutionException(ex.InnerException.Message, ex.InnerException);
+                }
+            }
+            catch (OperationCanceledException ex)
+            {
+                ScriptStackTrace.UpdateCurrentFrame(ex, function.Code);
+                throw new ScriptExecutionException($"Function '{function.Name}' execution timed out after {Config.Instance.Scripting.MaxExecutionTimeMs}ms", ex);
+            }
+            catch (Exception ex)
+            {
+                ScriptStackTrace.UpdateCurrentFrame(ex, function.Code);
+                
+                // If it's already a ScriptExecutionException, preserve the original stack frames
+                if (ex is ScriptExecutionException scriptEx)
+                {
+                    throw; // Just re-throw to preserve the original exception with its frames
+                }
+                else
+                {
+                    throw new ScriptExecutionException(ex.Message, ex);
+                }
             }
 
             // Validate return type
@@ -340,15 +414,22 @@ public class ScriptEngine
                 Logger.Warning($"Function '{function.Name}' returned unexpected type. Expected '{function.ReturnType}', got '{returnValue?.GetType().Name ?? "null"}'.");
             }
 
+            // Don't clear the stack trace here - let the top-level caller handle it
+            // ScriptStackTrace.Clear();
+
             return returnValue;
         }
         catch (Exception ex)
         {
-            Logger.Error($"Error executing function '{function.Name}': {ex.Message}");
+            // Just update the current frame and re-throw - let the caller handle messaging
+            ScriptStackTrace.UpdateCurrentFrame(ex, function.Code);
             throw;
         }
         finally
         {
+            // Pop the function frame from the script call stack
+            ScriptStackTrace.PopFrame();
+            
             // Restore previous Builtins context to support nested function calls
             Builtins.UnifiedContext = previousContext;
         }

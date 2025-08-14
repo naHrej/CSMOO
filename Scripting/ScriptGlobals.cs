@@ -358,10 +358,9 @@ public class ScriptGlobals
             var inputArgs = args.Select(a => a?.ToString() ?? "").ToArray();
             var input = verbName + (inputArgs.Length > 0 ? " " + string.Join(" ", inputArgs) : "");
             
-            // Get Database.Player from GameObject
-            var playerGameObject = GetPlayerGameObject();
-            var dbPlayer = playerGameObject as Player ?? 
-                          DbProvider.Instance.FindById<Player>("players", playerGameObject?.Id ?? "");
+            // Get Database.Player from the original Player context
+            // This ensures the original calling player is preserved throughout the call chain
+            var dbPlayer = Player as Player;
             
             if (dbPlayer == null || CommandProcessor == null)
             {
@@ -379,8 +378,8 @@ public class ScriptGlobals
         }
         catch (Exception ex)
         {
-            var playerGameObject = GetPlayerGameObject();
-            if (playerGameObject != null) notify(playerGameObject, $"Error calling {objectRef}:{verbName}() - {ex.Message}");
+            var dbPlayer = Player as Player;
+            if (dbPlayer != null) notify(dbPlayer, $"Error calling {objectRef}:{verbName}() - {ex.Message}");
             return null;
         }
     }
@@ -390,10 +389,9 @@ public class ScriptGlobals
     /// </summary>
     public object? CallFunction(string objectRef, string functionName, params object?[] parameters)
     {
-        // Get Database.Player from GameObject
-        var playerGameObject = GetPlayerGameObject();
-        var dbPlayer =
-                      DbProvider.Instance.FindById<Player>("players", playerGameObject?.Id ?? "");
+        // Use the original Database.Player that was set in the ScriptGlobals
+        // This ensures the original calling player is preserved throughout the call chain
+        var dbPlayer = Player as Player;
         
         if (dbPlayer == null)
             throw new InvalidOperationException("No player context available.");

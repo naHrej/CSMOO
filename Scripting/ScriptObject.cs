@@ -3,6 +3,8 @@ using CSMOO.Database;
 using CSMOO.Commands;
 using CSMOO.Verbs;
 using CSMOO.Functions;
+using CSMOO.Logging;
+using CSMOO.Exceptions;
 using LiteDB;
 using CSMOO.Object;
 
@@ -185,16 +187,27 @@ public class ScriptObject : DynamicObject
     /// </summary>
     public object? CallFunction(string functionName, params object?[]? args)
     {
-        // Find the function on this object or its class hierarchy
-        var function = FindFunction(functionName);
-        if (function == null)
+        try
         {
-            throw new ArgumentException($"Function '{functionName}' not found on object {_objectId}");
-        }
+            // Find the function on this object or its class hierarchy
+            var function = FindFunction(functionName);
+            if (function == null)
+            {
+                throw new ArgumentException($"Function '{functionName}' not found on object {_objectId}");
+            }
 
-        // Execute the function using the unified script engine
-        var functionEngine = new ScriptEngine();
-        return functionEngine.ExecuteFunction(function, args ?? new object[0], _currentPlayer, _commandProcessor, _objectId);
+            // Execute the function using the unified script engine
+            var functionEngine = new ScriptEngine();
+            var result = functionEngine.ExecuteFunction(function, args ?? new object[0], _currentPlayer, _commandProcessor, _objectId);
+            return result;
+        }
+        catch (Exception ex)
+        {
+            // Just log and re-throw - don't wrap in additional ScriptExecutionException
+            // This prevents nested error message chains
+            Logger.Error($"Exception in ScriptObject.CallFunction for {_objectId}.{functionName}: {ex.Message}");
+            throw;
+        }
     }
 
     /// <summary>

@@ -406,9 +406,10 @@ public class GameObject : DynamicObject
                 currentPlayer, commandProcessor, Id);
             return true;
         }
-        catch (Exception ex)
+        catch
         {
-            throw new InvalidOperationException($"Error calling function '{methodName}' on object {Name}({Id}): {ex.Message}", ex);
+            // Just re-throw the original exception to avoid verbose message wrapping
+            throw;
         }
     }
 

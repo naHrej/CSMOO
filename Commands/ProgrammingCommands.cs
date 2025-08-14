@@ -1012,17 +1012,30 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
         foreach (var function in functions.OrderBy(f => f.Name))
         {
             var progInfo = $"<b>{function.Name} - {function.Id}</b><br/>";
-            var signature = $"• {function.AccessModifier} {function.ReturnType} {function.Name}({string.Join(", ", function.ParameterTypes)})";
+            var signature = $"• {function.AccessModifier} {HtmlEncode(function.ReturnType)} {function.Name}({string.Join(", ", function.ParameterTypes.Select(HtmlEncode))})";
             var info = $"{(isProg ? progInfo : "")} {signature}";
             
             if (!string.IsNullOrEmpty(function.Description))
-                info += $" - {function.Description}";
-            
+                info += $" - {HtmlEncode(function.Description)}";
+
             _commandProcessor.SendToPlayer(info);
         }
 
         return true;
     }
+    
+    private string HtmlEncode(string text)
+{
+    if (string.IsNullOrEmpty(text))
+        return text;
+    
+    return text.Replace("&", "&amp;")
+               .Replace("<", "&lt;")
+               .Replace(">", "&gt;")
+               .Replace("\"", "&quot;")
+               .Replace("'", "&#39;");
+}
+
 
     /// <summary>
     /// @debug verbs <object> - Show ALL verbs in database for debugging
@@ -1068,7 +1081,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
         }
 
         // Look for verbs with 'ooc' pattern specifically
-        var oocVerbs = allVerbs.Where(v => 
+        var oocVerbs = allVerbs.Where(v =>
             (!string.IsNullOrEmpty(v.Name) && v.Name.ToLower().Contains("ooc")) ||
             (!string.IsNullOrEmpty(v.Code) && v.Code.Contains("OOC"))
         ).ToList();

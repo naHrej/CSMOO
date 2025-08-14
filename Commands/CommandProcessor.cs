@@ -10,6 +10,7 @@ using CSMOO.Verbs;
 using CSMOO.Functions;
 using LiteDB;
 using CSMOO.Object;
+using CSMOO.Exceptions;
 
 namespace CSMOO.Commands;
 
@@ -327,7 +328,18 @@ public class CommandProcessor
         }
         catch (Exception ex)
         {
-            SendToPlayer($"Script error: {ex.Message}");
+            if (ex is ScriptExecutionException scriptEx)
+            {
+                // Send the full HTML formatted error to the player
+                SendToPlayer(scriptEx.ToString());
+            }
+            else
+            {
+                SendToPlayer($"Script error: {ex.Message}");
+            }
+            
+            // Clear the script stack trace in case of unhandled errors
+            ScriptStackTrace.Clear();
         }
     }
 
