@@ -554,10 +554,10 @@ public static class VerbResolver
             // Check if it's our custom script exception with enhanced error reporting
             if (ex is ScriptExecutionException scriptEx)
             {
-                Logger.Error(scriptEx.ToString());
+                Logger.Error(scriptEx.ToString()); // Plain text for console
                 
-                // Send the full HTML formatted error to the player via command processor
-                commandProcessor?.SendToPlayer(scriptEx.ToString());
+                // Send the HTML formatted error to the player via command processor
+                commandProcessor?.SendToPlayer(scriptEx.ToHtmlString());
             }
             else
             {

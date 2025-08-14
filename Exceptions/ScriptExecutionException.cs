@@ -65,6 +65,14 @@ public class ScriptExecutionException : Exception
 
     public override string ToString()
     {
+        return ScriptStackTrace.FormatErrorPlainText(this, SourceCode);
+    }
+
+    /// <summary>
+    /// Get the HTML formatted version of this exception for player display
+    /// </summary>
+    public string ToHtmlString()
+    {
         return ScriptStackTrace.FormatError(this, SourceCode);
     }
 }

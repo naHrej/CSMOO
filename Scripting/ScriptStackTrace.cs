@@ -119,31 +119,33 @@ public static class ScriptStackTrace
                         // For script submissions, try to find the relevant line
                         if (!string.IsNullOrEmpty(sourceCode))
                         {
-                            var lines = sourceCode.Split('\n');
+                            var lines = sourceCode.Split(new[] { '\r', '\n' }, StringSplitOptions.None);
                             
                             // First priority: look for throw statements (actual error locations)
+                            // Count ALL lines including blank lines (like a normal text editor)
                             for (int i = 0; i < lines.Length; i++)
                             {
                                 var line = lines[i].Trim();
                                 if (line.Contains("throw"))
                                 {
-                                    return i + 1;
+                                    return i + 1; // Line numbers are 1-based
                                 }
                             }
                             
                             // Second priority: look for function calls that might be causing the error
-                            // But be more specific - look for actual method calls, not just any function call
+                            // Look for general dynamic method call patterns
                             for (int i = 0; i < lines.Length; i++)
                             {
                                 var line = lines[i].Trim();
-                                // Look for specific patterns that indicate method calls
-                                if (line.Contains(".Description()") || 
-                                    line.Contains(".Players()") ||
-                                    line.Contains(".Contents()") ||
-                                    line.Contains(".Exits()") ||
-                                    (line.Contains("notify(") && line.Contains(".")))
+                                // Look for dynamic method call patterns like:
+                                // - object.method() calls
+                                // - notify() calls with dynamic content
+                                // - variable assignments with method calls
+                                if ((line.Contains(".") && line.Contains("(") && line.Contains(")")) ||
+                                    line.Contains("notify(") ||
+                                    (line.Contains("=") && line.Contains("(") && line.Contains(")")))
                                 {
-                                    return i + 1;
+                                    return i + 1; // Line numbers are 1-based
                                 }
                             }
                             
@@ -304,13 +306,15 @@ public static class ScriptStackTrace
                 
                 // Use different separator for verbs vs functions
                 var separator = frame.Type == "verb" ? ":" : ".";
+                var ending = frame.Type == "verb" ? "" : "()"; // Functions have parentheses
                 var color = i == 0 ? "#ffd43b" : "#74c0fc"; // First frame is highlighted
-                
+                sb.Append($"<span style='color: #ff6b6b;'>at </span>");
                 sb.Append($"<span style='color: {color};'>{HtmlEncode(frame.ObjectName)}</span>");
-                sb.Append($"{separator}<span style='color: #e9ecef;'>{HtmlEncode(frame.Name)}</span>");
+                sb.Append($"{separator}<span style='color: #ff6b6b;'>{HtmlEncode(frame.Name)}</span>");
+                sb.Append($"<span style='color: {color};'>{ending}</span>");
                 if (!string.IsNullOrEmpty(lineInfo))
                 {
-                    sb.Append($"<span style='color: #ff8cc8;'> {lineInfo}</span>");
+                    sb.Append($"<span style='color: #ff6b6b;'> {lineInfo}</span>");
                 }
                 if (i < frames.Length - 1 && i < 3) // Don't add newline after last item
                 {
@@ -326,6 +330,69 @@ public static class ScriptStackTrace
             sb.Append($"<div style='color: #ff6b6b; font-weight: bold; margin: 4px 0;'>");
             sb.Append($"<span style='color: #ffa8a8;'>{HtmlEncode(ex.GetType().Name)}: {HtmlEncode(rootMessage)}</span>");
             sb.Append("</div>");
+        }
+
+        return sb.ToString();
+    }
+
+    /// <summary>
+    /// Create a formatted error message with custom stack trace in plain text (for console logging)
+    /// </summary>
+    public static string FormatErrorPlainText(Exception ex, string sourceCode = "")
+    {
+        var sb = new StringBuilder();
+        
+        // Update current frame with error details
+        if (!string.IsNullOrEmpty(sourceCode))
+        {
+            UpdateCurrentFrame(ex, sourceCode);
+        }
+
+        // Get the root cause message (unwrap nested ScriptExecutionExceptions)
+        var rootMessage = ex.Message;
+        var currentEx = ex;
+        while (currentEx.InnerException != null && currentEx is ScriptExecutionException)
+        {
+            currentEx = currentEx.InnerException;
+            if (!currentEx.Message.Contains("Error in function") && !currentEx.Message.Contains("Error in verb"))
+            {
+                rootMessage = currentEx.Message;
+                break;
+            }
+        }
+
+        // Get the script stack trace - use pre-captured frames from ScriptExecutionException if available
+        ScriptStackFrame[] frames;
+        if (ex is ScriptExecutionException scriptEx && scriptEx.ScriptStack?.Length > 0)
+        {
+            frames = scriptEx.ScriptStack;
+        }
+        else
+        {
+            frames = GetCallStack();
+        }
+        
+        if (frames.Length > 0)
+        {
+            // Header with exception type and message
+            sb.AppendLine($"{ex.GetType().Name}: {rootMessage}");
+            
+            // Stack trace in plain text
+            for (int i = 0; i < frames.Length && i < 4; i++) // Limit to 4 frames total
+            {
+                var frame = frames[i];
+                var lineInfo = frame.LineNumber > 0 ? $" (line {frame.LineNumber})" : "";
+                
+                // Use different separator for verbs vs functions
+                var separator = frame.Type == "verb" ? ":" : ".";
+                
+                sb.AppendLine($"  at {frame.ObjectName}{separator}{frame.Name}{lineInfo}");
+            }
+        }
+        else
+        {
+            // Fallback if no stack frames available
+            sb.AppendLine($"{ex.GetType().Name}: {rootMessage}");
         }
 
         return sb.ToString();
