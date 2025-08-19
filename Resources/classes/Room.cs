@@ -5,68 +5,52 @@ public class Room
     /// </summary>
     public string Description()
     {
-        var desc = new StringBuilder();
-        desc.Append($"<section class='room' style='color:red;margin:0'>");
-        
-        // Room name and description
-        desc.Append($"<h3 style='color:dodgerblue;margin:0;font-weight:bold'>{This.Name}</h3>");
-        
-        var roomDescription = Builtins.GetProperty(This, "description");
-        if (!string.IsNullOrEmpty(roomDescription))
+        StringBuilder desc = new StringBuilder("");
+        try
         {
-            desc.Append($"<p style='margin:0.5em 0'>{roomDescription}</p>");
-        }
-        
-        // Show exits
-        var exits = Exits();
-        if (exits.Count > 0)
-        {
-            var exitNames = new List<string>();
-            foreach (var exit in exits)
+            desc.Append($"<section class='room' style='color:red;margin:0'>");
+            desc.Append($"<h3 class='name' style='margin:0'>{This.Name}");
+            desc.Append($"<span class='dbref' style='color:maroon'> ({This.ClassId})</span>");
+            desc.Append($"</h3>");
+            desc.Append($"<p class='description' style='color:#FF6666;margin:0'>");
+            desc.Append(This.longDescription ?? This.shortDescription ?? "You see nothing special.");
+            desc.Append($"</p>");
+            var Room = This;
+            if (Room.Exits().Count > 0)
             {
-                var dir = Builtins.GetProperty(exit, "direction");
-                if (dir != null)
+                desc.Append("<div class='header'>Exits:</div>");
+                desc.Append("<ul style='margin:0'>");
+                foreach (var exit in Room.Exits())
                 {
-                    exitNames.Add($"<span class='exit' style='color:yellow'>{dir}</span>");
+                    desc.Append($"<li style='color:yellow'>{exit.Name}</li>");
                 }
+                desc.Append("</ul>");
             }
-            if (exitNames.Count > 0)
+            if (Room.Players().Count > 0)
             {
-                desc.Append($"<p style='margin:0.5em 0'>Exits: {string.Join(", ", exitNames)}</p>");
+                desc.Append("<div class='header'>Players:</div>");
+                desc.Append("<ul style='margin:0'>");
+                foreach (var plyr in Room.Players())
+                {
+                    desc.Append($"<li style='color:yellow'>{plyr.Name}</li>");
+                }
+                desc.Append("</ul>");
+            }
+            if (Room.Contents().Count > 0)
+            {
+                desc.Append("<div class='header'>Contents:</div>");
+                desc.Append("<ul style='margin:0'>");
+                foreach (var item in Room.Contents())
+                {
+                    desc.Append($"<li style='color:yellow'>{item.Name}</li>");
+                }
+                desc.Append("</ul>");
             }
         }
-        
-        // Show contents (objects and players)
-        var contents = Contents();
-        var players = Players();
-        
-        if (contents.Count > 0)
+        catch (Exception ex)
         {
-            var itemNames = new List<string>();
-            foreach (var item in contents)
-            {
-                itemNames.Add($"<span class='object' style='color:lightgreen'>{item.Name}</span>");
-            }
-            if (itemNames.Count > 0)
-            {
-                desc.Append($"<p style='margin:0.5em 0'>You see: {string.Join(", ", itemNames)}</p>");
-            }
+
         }
-        
-        if (players.Count > 0)
-        {
-            var playerNames = new List<string>();
-            foreach (var player in players)
-            {
-                playerNames.Add($"<span class='player' style='color:lightblue'>{player.Name}</span>");
-            }
-            if (playerNames.Count > 0)
-            {
-                desc.Append($"<p style='margin:0.5em 0'>Players here: {string.Join(", ", playerNames)}</p>");
-            }
-        }
-        
-        desc.Append("</section>");
         return desc.ToString();
     }
 
