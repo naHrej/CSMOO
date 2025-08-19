@@ -1,8 +1,0 @@
-{
-  "name": "Description",
-  "targetClass": "Player", 
-  "description": "Returns a formatted description of any player",
-  "returnType": "string",
-  "parameters": [],
-  "parameterNames": []
-}

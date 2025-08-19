@@ -2,58 +2,39 @@ using LiteDB;
 using CSMOO.Logging;
 using CSMOO.Object;
 using CSMOO.Database;
+using CSMOO.Parsing;
 
 namespace CSMOO.Functions;
 
 /// <summary>
-/// Statistics for function loading operations
-/// </summary>
-public struct FunctionLoadStats
-{
-    public int Loaded { get; set; }
-    public int Skipped { get; set; }
-}
-
 /// <summary>
-/// Handles loading and initializing functions from JSON definitions
+/// Handles loading and initializing functions from C# class definitions
 /// </summary>
 public static class FunctionInitializer
 {
-    private static readonly string FunctionsPath = GetResourcePath("functions");
-    private static readonly string SystemFunctionsPath = Path.Combine(FunctionsPath, "system");
-    private static readonly string ClassFunctionsPath = Path.Combine(FunctionsPath, "classes");
+    private static readonly string ResourcesPath = GetResourcePath();
 
     /// <summary>
-    /// Gets the absolute path to a resource directory, with fallback for development scenarios
+    /// Gets the absolute path to the resources directory
     /// </summary>
-    private static string GetResourcePath(string resourceName)
+    private static string GetResourcePath()
     {
-        
-        var possiblePaths = new List<string>();
         var workingDirectory = Directory.GetCurrentDirectory();
-
-        // Strategy 2: Current working directory with explicit path
-        possiblePaths.Add(Path.Combine(workingDirectory, "Resources", resourceName));
-        Logger.Debug($"Trying resource path: {possiblePaths.Last()}");
-        
-        // If none exist, return the first option (app directory based) for error reporting
-        return possiblePaths[0];
+        var resourcesPath = Path.Combine(workingDirectory, "Resources");
+        Logger.Debug($"Resources path: {resourcesPath}");
+        return resourcesPath;
     }
 
     /// <summary>
-    /// Loads and creates all functions from JSON definitions
+    /// Loads and creates all functions from C# class definitions
     /// </summary>
     public static void LoadAndCreateFunctions()
     {
-        Logger.Info("Loading function definitions from JSON files...");
+        Logger.Info("Loading function definitions from C# files...");
 
-        var classStats = LoadClassFunctions();
-        var systemStats = LoadSystemFunctions();
+        var stats = LoadFunctions();
 
-        var totalLoaded = classStats.Loaded + systemStats.Loaded;
-        var totalSkipped = classStats.Skipped + systemStats.Skipped;
-
-        Logger.Info($"Function definitions loaded successfully - Created: {totalLoaded}, Skipped: {totalSkipped}");
+        Logger.Info($"Function definitions loaded successfully - Created: {stats.Loaded}, Skipped: {stats.Skipped}");
     }
 
     /// <summary>
@@ -81,15 +62,12 @@ public static class FunctionInitializer
         var countAfterDelete = DbProvider.Instance.FindAll<Function>("functions").Count();
         Logger.Debug($"Cleared {systemFunctions.Count} system function definitions - {countAfterDelete} functions remaining (preserving {inGameFunctions.Count} in-game functions)");
 
-        // Reload all functions from JSON files
-        var classStats = LoadClassFunctions();
-        var systemStats = LoadSystemFunctions();
+        // Reload all functions from C# files
+        var stats = LoadFunctions();
 
-        var totalLoaded = classStats.Loaded + systemStats.Loaded;
-        var totalSkipped = classStats.Skipped + systemStats.Skipped;
         var countAfterReload = DbProvider.Instance.FindAll<Function>("functions").Count();
 
-        Logger.Info($"Function definitions reloaded successfully - Created: {totalLoaded}, Skipped: {totalSkipped}, Total in DB: {countAfterReload}");
+        Logger.Info($"Function definitions reloaded successfully - Created: {stats.Loaded}, Skipped: {stats.Skipped}, Total in DB: {countAfterReload}");
     }
 
     /// <summary>
@@ -108,150 +86,103 @@ public static class FunctionInitializer
         var countAfterDelete = DbProvider.Instance.FindAll<Function>("functions").Count();
         Logger.Debug($"Cleared ALL function definitions - {countAfterDelete} functions remaining");
 
-        // Reload all functions from JSON files
-        var classStats = LoadClassFunctions();
-        var systemStats = LoadSystemFunctions();
+        // Reload all functions from C# files
+        var stats = LoadFunctions();
 
-        var totalLoaded = classStats.Loaded + systemStats.Loaded;
-        var totalSkipped = classStats.Skipped + systemStats.Skipped;
         var countAfterReload = DbProvider.Instance.FindAll<Function>("functions").Count();
 
-        Logger.Info($"ALL function definitions force reloaded - Created: {totalLoaded}, Skipped: {totalSkipped}, Total in DB: {countAfterReload}");
+        Logger.Info($"ALL function definitions force reloaded - Created: {stats.Loaded}, Skipped: {stats.Skipped}, Total in DB: {countAfterReload}");
     }
 
     /// <summary>
-    /// Load class-based function definitions
+    /// Loads and creates functions from all C# definitions in Resources directory
     /// </summary>
-    private static FunctionLoadStats LoadClassFunctions()
+    public static (int Loaded, int Skipped) LoadFunctions()
     {
-        var stats = new FunctionLoadStats();
+        int loaded = 0;
+        int skipped = 0;
+
+        Logger.Debug($"Looking for functions in: {ResourcesPath}");
         
-        if (!Directory.Exists(ClassFunctionsPath))
+        if (!Directory.Exists(ResourcesPath))
         {
-            Logger.Debug($"Class functions directory not found: {ClassFunctionsPath}");
-            return stats;
+            Logger.Debug($"Resources directory not found: {ResourcesPath}");
+            return (loaded, skipped);
         }
 
-        var jsonFiles = Directory.GetFiles(ClassFunctionsPath, "*.json");
-        Logger.Debug($"Found {jsonFiles.Length} class function definition files");
+        var csFiles = Directory.GetFiles(ResourcesPath, "*.cs", SearchOption.AllDirectories);
+        Logger.Debug($"Found {csFiles.Length} C# files in Resources directory");
 
-        foreach (var file in jsonFiles)
+        foreach (var filePath in csFiles)
         {
-            try
-            {
-                var json = File.ReadAllText(file);
-                var functionDef = System.Text.Json.JsonSerializer.Deserialize<FunctionDefinition>(json);
-
-                if (functionDef == null || string.IsNullOrEmpty(functionDef.Name) || string.IsNullOrEmpty(functionDef.TargetClass))
-                {
-                    Logger.Warning($"Invalid function definition in {file}");
-                    continue;
-                }
-
-                // If code is missing or empty, look for a .cs file with the same base name
-                if (functionDef.Code == null || functionDef.Code.Length == 0)
-                {
-                    var csFile = TryFindCodeFile(file);
-                    if (!string.IsNullOrEmpty(csFile) && File.Exists(csFile))
-                    {
-                        functionDef.Code = new[] { File.ReadAllText(csFile) };
-                        Logger.Debug($"Loaded code from {csFile} for function {functionDef.Name}");
-                    }
-                    else
-                    {
-                        Logger.Debug($"No .cs file found for {file}");
-                    }
-                }
-
-                var functionStats = CreateClassFunction(functionDef);
-                stats.Loaded += functionStats.Loaded;
-                stats.Skipped += functionStats.Skipped;
-            }
-            catch (Exception ex)
-            {
-                Logger.Error($"Error loading function definition from {file}: {ex.Message}");
-            }
+            Logger.Debug($"Processing functions file: {filePath}");
+            var (loadedCount, skippedCount) = LoadFunctionsFromFile(filePath);
+            loaded += loadedCount;
+            skipped += skippedCount;
         }
-        
-        return stats;
+
+        Logger.Debug($"Functions - Loaded: {loaded}, Skipped: {skipped}");
+        return (loaded, skipped);
     }
 
     /// <summary>
-    /// Load system function definitions
+    /// Load functions from a specific C# file
     /// </summary>
-    private static FunctionLoadStats LoadSystemFunctions()
+    private static (int Loaded, int Skipped) LoadFunctionsFromFile(string filePath)
     {
-        var stats = new FunctionLoadStats();
+        int loaded = 0;
+        int skipped = 0;
         
-        if (!Directory.Exists(SystemFunctionsPath))
+        try
         {
-            Logger.Debug($"System functions directory not found: {SystemFunctionsPath}");
-            return stats;
-        }
-
-        var systemObjectId = GetOrCreateSystemObject();
-        if (systemObjectId == null)
-        {
-            Logger.Error("Failed to create system object for system functions");
-            return stats;
-        }
-
-        var jsonFiles = Directory.GetFiles(SystemFunctionsPath, "*.json");
-        Logger.Debug($"Found {jsonFiles.Length} system function definition files");
-
-        foreach (var file in jsonFiles)
-        {
-            try
+            var functionDefs = CodeDefinitionParser.ParseFunctions(filePath);
+            
+            foreach (var functionDef in functionDefs)
             {
-                var json = File.ReadAllText(file);
-                var functionDef = System.Text.Json.JsonSerializer.Deserialize<FunctionDefinition>(json);
-
-                if (functionDef == null || string.IsNullOrEmpty(functionDef.Name))
+                if (string.IsNullOrEmpty(functionDef.Name))
                 {
-                    Logger.Warning($"Invalid function definition in {file}");
+                    Logger.Warning($"Invalid function definition in {filePath}");
                     continue;
                 }
 
-                // If code is missing or empty, look for a .cs file with the same base name
-                if (functionDef.Code == null || functionDef.Code.Length == 0)
+                // Determine if this is a class function or system function
+                if (functionDef.TargetClass?.ToLower() == "system" || string.IsNullOrEmpty(functionDef.TargetClass))
                 {
-                    var csFile = TryFindCodeFile(file);
-                    if (!string.IsNullOrEmpty(csFile) && File.Exists(csFile))
+                    // System function (global)
+                    var systemObjectId = GetOrCreateSystemObject();
+                    if (systemObjectId != null)
                     {
-                        functionDef.Code = new[] { File.ReadAllText(csFile) };
-                        Logger.Debug($"Loaded code from {csFile} for function {functionDef.Name}");
-                    }
-                    else
-                    {
-                        Logger.Debug($"No .cs file found for {file}");
+                        var (loadedCount, skippedCount) = CreateSystemFunction(systemObjectId, functionDef);
+                        loaded += loadedCount;
+                        skipped += skippedCount;
                     }
                 }
-
-                var functionStats = CreateSystemFunction(systemObjectId, functionDef);
-                stats.Loaded += functionStats.Loaded;
-                stats.Skipped += functionStats.Skipped;
-            }
-            catch (Exception ex)
-            {
-                Logger.Error($"Error loading function definition from {file}: {ex.Message}");
+                else
+                {
+                    var (loadedCount, skippedCount) = CreateClassFunction(functionDef);
+                    loaded += loadedCount;
+                    skipped += skippedCount;
+                }
             }
         }
+        catch (Exception ex)
+        {
+            Logger.Error($"Error loading function definition from {filePath}: {ex.Message}");
+        }
         
-        return stats;
+        return (loaded, skipped);
     }
 
     /// <summary>
     /// Create a function on a class from a definition
     /// </summary>
-    private static FunctionLoadStats CreateClassFunction(FunctionDefinition functionDef)
+    private static (int Loaded, int Skipped) CreateClassFunction(FunctionDefinition functionDef)
     {
-        var stats = new FunctionLoadStats();
-        
         var targetClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == functionDef.TargetClass);
         if (targetClass == null)
         {
             Logger.Warning($"Target class '{functionDef.TargetClass}' not found for function '{functionDef.Name}'");
-            return stats;
+            return (0, 0);
         }
 
         var existingFunctions = DbProvider.Instance.FindAll<Function>("functions").ToList();
@@ -281,23 +212,20 @@ public static class FunctionInitializer
                 DbProvider.Instance.Update("functions", function);
             }
             Logger.Debug($"Created class function '{functionDef.Name}' on {functionDef.TargetClass}");
-            stats.Loaded = 1;
+            return (1, 0);
         }
         else
         {
             Logger.Debug($"Class function '{functionDef.Name}' on {functionDef.TargetClass} already exists, skipping");
-            stats.Skipped = 1;
+            return (0, 1);
         }
-        
-        return stats;
     }
 
     /// <summary>
     /// Create a system function from a definition
     /// </summary>
-    private static FunctionLoadStats CreateSystemFunction(string systemObjectId, FunctionDefinition functionDef)
+    private static (int Loaded, int Skipped) CreateSystemFunction(string systemObjectId, FunctionDefinition functionDef)
     {
-        var stats = new FunctionLoadStats();
         var existingFunctions = DbProvider.Instance.FindAll<Function>("functions").ToList();
         // Only create if it doesn't already exist
         if (!existingFunctions.Any(f => f.ObjectId == systemObjectId && f.Name == functionDef.Name))
@@ -306,7 +234,7 @@ public static class FunctionInitializer
             if (systemObject == null)
             {
                 Logger.Error($"System object with ID {systemObjectId} not found for function '{functionDef.Name}'");
-                return stats;
+                return (0, 0);
             }
             // Find the system object GameObject
             var function = FunctionManager.CreateFunction(
@@ -325,15 +253,13 @@ public static class FunctionInitializer
                 DbProvider.Instance.Update("functions", function);
             }
             Logger.Debug($"Created system function '{functionDef.Name}'");
-            stats.Loaded = 1;
+            return (1, 0);
         }
         else
         {
             Logger.Debug($"System function '{functionDef.Name}' already exists, skipping");
-            stats.Skipped = 1;
+            return (0, 1);
         }
-        
-        return stats;
     }
 
     /// <summary>

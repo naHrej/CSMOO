@@ -23,11 +23,14 @@ public static class WorldInitializer
             // Create fundamental object classes
             CoreClassFactory.CreateCoreClasses();
             
-            // Load and create verbs from JSON files
+            // Load and create verbs from C# class definitions
             VerbInitializer.LoadAndCreateVerbs();
             
-            // Load and create functions from JSON files
+            // Load and create functions from C# class definitions
             FunctionInitializer.LoadAndCreateFunctions();
+            
+            // Load and set properties from C# class definitions
+            PropertyInitializer.LoadAndSetProperties();
             
             // Create the starting room and basic world areas
             RoomManager.CreateStartingRoom();

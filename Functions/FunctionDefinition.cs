@@ -3,7 +3,7 @@ using System.Text.Json.Serialization;
 namespace CSMOO.Functions;
 
 /// <summary>
-/// Represents a function definition loaded from JSON
+/// Represents a function definition loaded from C# class definitions
 /// </summary>
 public class FunctionDefinition
 {

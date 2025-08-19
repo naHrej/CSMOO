@@ -1,7 +1,0 @@
-{
-  "name": "examine",
-  "aliases": "ex exa",
-  "pattern": "*",
-  "description": "Examine an object in detail"
-}
-

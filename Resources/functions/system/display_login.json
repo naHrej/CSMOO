@@ -1,7 +1,0 @@
-{
-  "name": "display_login",
-  "returnType": "string",
-  "parameters": [],
-  "parameterNames": [],
-  "description": "Display the login banner for new connections"
-}

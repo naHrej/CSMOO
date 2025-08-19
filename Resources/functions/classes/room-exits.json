@@ -1,8 +1,0 @@
-{
-  "name": "Exits",
-  "targetClass": "Room", 
-  "description": "Returns a list of Exits from the room",
-  "returnType": "List<dynamic>",
-  "parameters": [],
-  "parameterNames": []
-}

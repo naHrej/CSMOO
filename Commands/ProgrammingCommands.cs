@@ -1903,7 +1903,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
                 
                 _commandProcessor.SendToPlayer("");
                 _commandProcessor.SendToPlayer("ℹ️ Core hot reload vs Verb hot reload:");
-                _commandProcessor.SendToPlayer("• Verb hot reload: Changes to JSON files in resources/verbs/");
+                _commandProcessor.SendToPlayer("• Verb hot reload: Changes to C# class definitions in resources/");
                 _commandProcessor.SendToPlayer("• Core hot reload: Changes to C# application code files");
                 break;
 
@@ -2102,7 +2102,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
     }
 
     /// <summary>
-    /// @funcreload - Hot reload all function definitions from JSON files
+    /// @funcreload - Hot reload all function definitions from C# class definitions
     /// </summary>
     private bool HandleFuncReloadCommand(string[] parts)
     {
@@ -2250,7 +2250,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
     }
 
     /// <summary>
-    /// @propload - Hot reload all property definitions from JSON files
+    /// @propload - Hot reload all property definitions from C# class definitions
     /// </summary>
     private bool HandlePropLoadCommand(string[] parts)
     {

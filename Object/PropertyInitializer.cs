@@ -1,59 +1,38 @@
 using LiteDB;
 using CSMOO.Logging;
 using CSMOO.Database;
+using CSMOO.Parsing;
 
 namespace CSMOO.Object;
 
 /// <summary>
-/// Statistics for property loading operations
-/// </summary>
-public struct PropertyLoadStats
-{
-    public int Loaded { get; set; }
-    public int Skipped { get; set; }
-}
-
-/// <summary>
-/// Handles loading and initializing object properties from JSON definitions
+/// Handles loading and initializing object properties from JSON definitions and C# class definitions
 /// </summary>
 public static class PropertyInitializer
 {
-    private static readonly string PropertiesPath = GetResourcePath("properties");
-    private static readonly string SystemPropertiesPath = Path.Combine(PropertiesPath, "system");
-    private static readonly string ClassPropertiesPath = Path.Combine(PropertiesPath, "classes");
-    private static readonly string InstancePropertiesPath = Path.Combine(PropertiesPath, "instances");
+    private static readonly string ResourcesPath = GetResourcePath();
 
     /// <summary>
-    /// Gets the absolute path to a resource directory, with fallback for development scenarios
+    /// Gets the absolute path to the resources directory
     /// </summary>
-    private static string GetResourcePath(string resourceName)
+    private static string GetResourcePath()
     {
-        var possiblePaths = new List<string>();
         var workingDirectory = Directory.GetCurrentDirectory();
-
-        // Strategy: Current working directory with explicit path
-        possiblePaths.Add(Path.Combine(workingDirectory, "resources", resourceName));
-        Logger.Debug($"Trying resource path: {possiblePaths.Last()}");
-        
-        // If none exist, return the first option (app directory based) for error reporting
-        return possiblePaths[0];
+        var resourcesPath = Path.Combine(workingDirectory, "Resources");
+        Logger.Debug($"Resources path: {resourcesPath}");
+        return resourcesPath;
     }
 
     /// <summary>
-    /// Loads and sets all properties from JSON definitions
+    /// Loads and sets all properties from C# class definitions
     /// </summary>
     public static void LoadAndSetProperties()
     {
-        Logger.Info("Loading property definitions from JSON files...");
+        Logger.Info("Loading property definitions from C# files...");
 
-        var systemStats = LoadSystemProperties();
-        var classStats = LoadClassProperties();
-        var instanceStats = LoadInstanceProperties();
+        var stats = LoadProperties();
 
-        var totalLoaded = systemStats.Loaded + classStats.Loaded + instanceStats.Loaded;
-        var totalSkipped = systemStats.Skipped + classStats.Skipped + instanceStats.Skipped;
-
-        Logger.Info($"Property definitions loaded successfully - Set: {totalLoaded}, Skipped: {totalSkipped}");
+        Logger.Info($"Property definitions loaded successfully - Set: {stats.Loaded}, Skipped: {stats.Skipped}");
     }
 
     /// <summary>
@@ -66,199 +45,122 @@ public static class PropertyInitializer
         // For properties, we don't clear existing ones as they might be modified by players
         // Instead, we only update properties that have overwrite=true in their definition
         
-        var systemStats = LoadSystemProperties();
-        var classStats = LoadClassProperties();
-        var instanceStats = LoadInstanceProperties();
+        var stats = LoadProperties();
 
-        var totalLoaded = systemStats.Loaded + classStats.Loaded + instanceStats.Loaded;
-        var totalSkipped = systemStats.Skipped + classStats.Skipped + instanceStats.Skipped;
-
-        Logger.Info($"Property definitions reloaded successfully - Set: {totalLoaded}, Skipped: {totalSkipped}");
+        Logger.Info($"Property definitions reloaded successfully - Set: {stats.Loaded}, Skipped: {stats.Skipped}");
     }
 
     /// <summary>
-    /// Load system object properties
+    /// Loads and creates properties from all C# class definitions in Resources directory
     /// </summary>
-    private static PropertyLoadStats LoadSystemProperties()
+    public static (int Loaded, int Skipped) LoadProperties()
     {
-        var stats = new PropertyLoadStats();
+        int loaded = 0;
+        int skipped = 0;
+
+        Logger.Debug($"Looking for properties in: {ResourcesPath}");
         
-        if (!Directory.Exists(SystemPropertiesPath))
+        if (!Directory.Exists(ResourcesPath))
         {
-            Logger.Debug($"System properties directory not found: {SystemPropertiesPath}");
-            return stats;
+            Logger.Debug($"Resources directory not found: {ResourcesPath}");
+            return (loaded, skipped);
         }
 
-        var systemObjectId = GetOrCreateSystemObject();
-        if (systemObjectId == null)
+        // Load from C# files
+        var csFiles = Directory.GetFiles(ResourcesPath, "*.cs", SearchOption.AllDirectories);
+        Logger.Debug($"Found {csFiles.Length} C# files in Resources directory");
+
+        foreach (var filePath in csFiles)
         {
-            Logger.Error("Failed to get system object for system properties");
-            return stats;
+            Logger.Debug($"Processing properties C# file: {filePath}");
+            var (loadedCount, skippedCount) = LoadPropertiesFromCsFile(filePath);
+            loaded += loadedCount;
+            skipped += skippedCount;
         }
 
-        var systemObject = ObjectManager.GetObject(systemObjectId);
-        if (systemObject == null)
-        {
-            Logger.Error("Failed to retrieve system object for properties");
-            return stats;
-        }
-
-        var jsonFiles = Directory.GetFiles(SystemPropertiesPath, "*.json");
-        Logger.Debug($"Found {jsonFiles.Length} system property definition files");
-
-        foreach (var file in jsonFiles)
-        {
-            try
-            {
-                var json = File.ReadAllText(file);
-                var propertyDefs = System.Text.Json.JsonSerializer.Deserialize<PropertyDefinition[]>(json);
-
-                if (propertyDefs == null)
-                {
-                    Logger.Warning($"Invalid property definitions in {file}");
-                    continue;
-                }
-
-                foreach (var propDef in propertyDefs)
-                {
-                    if (string.IsNullOrEmpty(propDef.Name))
-                    {
-                        Logger.Warning($"Property definition missing name in {file}");
-                        continue;
-                    }
-
-                    var baseDirectory = Path.GetDirectoryName(file);
-                    var propStats = SetSystemProperty(systemObject, propDef, baseDirectory!);
-                    stats.Loaded += propStats.Loaded;
-                    stats.Skipped += propStats.Skipped;
-                }
-            }
-            catch (Exception ex)
-            {
-                Logger.Error($"Error loading property definitions from {file}: {ex.Message}");
-            }
-        }
-        
-        return stats;
+        Logger.Debug($"Properties - Loaded: {loaded}, Skipped: {skipped}");
+        return (loaded, skipped);
     }
 
     /// <summary>
-    /// Load class-based property definitions
+    /// Load properties from a C# file
     /// </summary>
-    private static PropertyLoadStats LoadClassProperties()
+    private static (int Loaded, int Skipped) LoadPropertiesFromCsFile(string filePath)
     {
-        var stats = new PropertyLoadStats();
+        int loaded = 0;
+        int skipped = 0;
         
-        if (!Directory.Exists(ClassPropertiesPath))
+        try
         {
-            Logger.Debug($"Class properties directory not found: {ClassPropertiesPath}");
-            return stats;
-        }
+            var propDefs = CodeDefinitionParser.ParseProperties(filePath);
+            var baseDirectory = Path.GetDirectoryName(filePath) ?? "";
 
-        var jsonFiles = Directory.GetFiles(ClassPropertiesPath, "*.json");
-        Logger.Debug($"Found {jsonFiles.Length} class property definition files");
-
-        foreach (var file in jsonFiles)
-        {
-            try
+            foreach (var propDef in propDefs)
             {
-                var json = File.ReadAllText(file);
-                var propertyDefs = System.Text.Json.JsonSerializer.Deserialize<PropertyDefinition[]>(json);
-
-                if (propertyDefs == null)
+                if (string.IsNullOrEmpty(propDef.Name))
                 {
-                    Logger.Warning($"Invalid property definitions in {file}");
+                    Logger.Warning($"Invalid property definition in {filePath}");
                     continue;
                 }
 
-                foreach (var propDef in propertyDefs)
+                // Handle special file reference values
+                if (propDef.Value != null)
                 {
-                    if (string.IsNullOrEmpty(propDef.Name) || string.IsNullOrEmpty(propDef.TargetClass))
+                    var valueStr = propDef.Value.ToString();
+                    if (valueStr != null && valueStr.Contains("IsFileReference") && valueStr.Contains("Filename"))
                     {
-                        Logger.Warning($"Property definition missing name or targetClass in {file}");
-                        continue;
+                        // Extract filename from the anonymous object representation
+                        var match = System.Text.RegularExpressions.Regex.Match(valueStr, @"Filename = ([^,}]+)");
+                        if (match.Success)
+                        {
+                            propDef.Filename = match.Groups[1].Value.Trim();
+                            propDef.Value = null; // Clear the value since we'll use filename
+                        }
                     }
-
-                    var baseDirectory = Path.GetDirectoryName(file);
-                    var propStats = SetClassProperty(propDef, baseDirectory!);
-                    stats.Loaded += propStats.Loaded;
-                    stats.Skipped += propStats.Skipped;
-                }
-            }
-            catch (Exception ex)
-            {
-                Logger.Error($"Error loading property definitions from {file}: {ex.Message}");
-            }
-        }
-        
-        return stats;
-    }
-
-    /// <summary>
-    /// Load instance-based property definitions
-    /// </summary>
-    private static PropertyLoadStats LoadInstanceProperties()
-    {
-        var stats = new PropertyLoadStats();
-        
-        if (!Directory.Exists(InstancePropertiesPath))
-        {
-            Logger.Debug($"Instance properties directory not found: {InstancePropertiesPath}");
-            return stats;
-        }
-
-        var jsonFiles = Directory.GetFiles(InstancePropertiesPath, "*.json");
-        Logger.Debug($"Found {jsonFiles.Length} instance property definition files");
-
-        foreach (var file in jsonFiles)
-        {
-            try
-            {
-                var json = File.ReadAllText(file);
-                var propertyDefs = System.Text.Json.JsonSerializer.Deserialize<PropertyDefinition[]>(json);
-
-                if (propertyDefs == null)
-                {
-                    Logger.Warning($"Invalid property definitions in {file}");
-                    continue;
                 }
 
-                foreach (var propDef in propertyDefs)
+                // Determine if this is a class property or system property
+                if (propDef.TargetClass?.ToLower() == "system" || string.IsNullOrEmpty(propDef.TargetClass))
                 {
-                    if (string.IsNullOrEmpty(propDef.Name) || string.IsNullOrEmpty(propDef.TargetObject))
+                    // System property (global)
+                    var systemObjectId = GetOrCreateSystemObject();
+                    if (systemObjectId != null)
                     {
-                        Logger.Warning($"Property definition missing name or targetObject in {file}");
-                        continue;
+                        var systemObject = ObjectManager.GetObject(systemObjectId);
+                        if (systemObject != null)
+                        {
+                            var (loadedCount, skippedCount) = SetSystemProperty(systemObject, propDef, baseDirectory);
+                            loaded += loadedCount;
+                            skipped += skippedCount;
+                        }
                     }
-
-                    var baseDirectory = Path.GetDirectoryName(file);
-                    var propStats = SetInstanceProperty(propDef, baseDirectory!);
-                    stats.Loaded += propStats.Loaded;
-                    stats.Skipped += propStats.Skipped;
+                }
+                else
+                {
+                    var (loadedCount, skippedCount) = SetClassProperty(propDef, baseDirectory);
+                    loaded += loadedCount;
+                    skipped += skippedCount;
                 }
             }
-            catch (Exception ex)
-            {
-                Logger.Error($"Error loading property definitions from {file}: {ex.Message}");
-            }
+        }
+        catch (Exception ex)
+        {
+            Logger.Error($"Error loading properties from C# file {filePath}: {ex.Message}");
         }
         
-        return stats;
+        return (loaded, skipped);
     }
 
     /// <summary>
     /// Set a property on the system object
     /// </summary>
-    private static PropertyLoadStats SetSystemProperty(GameObject systemObject, PropertyDefinition propDef, string baseDirectory)
+    private static (int Loaded, int Skipped) SetSystemProperty(GameObject systemObject, PropertyDefinition propDef, string baseDirectory)
     {
-        var stats = new PropertyLoadStats();
-        
         // Never delete properties, only add or overwrite if explicitly requested
         if (systemObject.Properties.ContainsKey(propDef.Name) && !propDef.Overwrite)
         {
             Logger.Debug($"System property '{propDef.Name}' already exists, skipping (overwrite=false)");
-            stats.Skipped = 1;
-            return stats;
+            return (0, 1);
         }
 
         try
@@ -276,36 +178,32 @@ public static class PropertyInitializer
             }
             
             Logger.Debug($"Set system property '{propDef.Name}' = {value}");
-            stats.Loaded = 1;
+            return (1, 0);
         }
         catch (Exception ex)
         {
             Logger.Error($"Error setting system property '{propDef.Name}': {ex.Message}");
+            return (0, 1);
         }
-        
-        return stats;
     }
 
     /// <summary>
     /// Set a property on a class (affects all instances of that class)
     /// </summary>
-    private static PropertyLoadStats SetClassProperty(PropertyDefinition propDef, string baseDirectory)
+    private static (int Loaded, int Skipped) SetClassProperty(PropertyDefinition propDef, string baseDirectory)
     {
-        var stats = new PropertyLoadStats();
-        
         var targetClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == propDef.TargetClass);
         if (targetClass == null)
         {
             Logger.Warning($"Target class '{propDef.TargetClass}' not found for property '{propDef.Name}'");
-            return stats;
+            return (0, 0);
         }
 
         // Never delete properties, only add or overwrite if explicitly requested
         if (targetClass.Properties.ContainsKey(propDef.Name) && !propDef.Overwrite)
         {
             Logger.Debug($"Class property '{propDef.Name}' on {propDef.TargetClass} already exists, skipping (overwrite=false)");
-            stats.Skipped = 1;
-            return stats;
+            return (0, 1);
         }
 
         try
@@ -323,37 +221,33 @@ public static class PropertyInitializer
             
             DbProvider.Instance.Update("objectclasses", targetClass);
             Logger.Debug($"Set class property '{propDef.Name}' on {propDef.TargetClass} = {value}");
-            stats.Loaded = 1;
+            return (1, 0);
         }
         catch (Exception ex)
         {
             Logger.Error($"Error setting class property '{propDef.Name}' on {propDef.TargetClass}: {ex.Message}");
+            return (0, 1);
         }
-        
-        return stats;
     }
 
     /// <summary>
     /// Set a property on a specific object instance
     /// </summary>
-    private static PropertyLoadStats SetInstanceProperty(PropertyDefinition propDef, string baseDirectory)
+    private static (int Loaded, int Skipped) SetInstanceProperty(PropertyDefinition propDef, string baseDirectory)
     {
-        var stats = new PropertyLoadStats();
-        
         // Resolve the target object
         var targetObject = ResolveObject(propDef.TargetObject!);
         if (targetObject == null)
         {
             Logger.Warning($"Target object '{propDef.TargetObject}' not found for property '{propDef.Name}'");
-            return stats;
+            return (0, 0);
         }
 
         // Never delete properties, only add or overwrite if explicitly requested
         if (targetObject.Properties.ContainsKey(propDef.Name) && !propDef.Overwrite)
         {
             Logger.Debug($"Instance property '{propDef.Name}' on {propDef.TargetObject} already exists, skipping (overwrite=false)");
-            stats.Skipped = 1;
-            return stats;
+            return (0, 1);
         }
 
         try
@@ -371,14 +265,13 @@ public static class PropertyInitializer
             }
             
             Logger.Debug($"Set instance property '{propDef.Name}' on {propDef.TargetObject} = {value}");
-            stats.Loaded = 1;
+            return (1, 0);
         }
         catch (Exception ex)
         {
             Logger.Error($"Error setting instance property '{propDef.Name}' on {propDef.TargetObject}: {ex.Message}");
+            return (0, 1);
         }
-        
-        return stats;
     }
 
     /// <summary>

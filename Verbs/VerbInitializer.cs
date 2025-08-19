@@ -2,6 +2,7 @@ using LiteDB;
 using CSMOO.Logging;
 using CSMOO.Object;
 using CSMOO.Database;
+using CSMOO.Parsing;
 
 namespace CSMOO.Verbs;
 
@@ -15,44 +16,33 @@ public struct VerbLoadStats
 }
 
 /// <summary>
-/// Handles loading and initializing verbs from JSON definitions
+/// Handles loading and initializing verbs from C# class definitions
 /// </summary>
 public static class VerbInitializer
 {
-    private static readonly string VerbsPath = GetResourcePath("verbs");
-    private static readonly string SystemVerbsPath = Path.Combine(VerbsPath, "system");
-    private static readonly string ClassVerbsPath = Path.Combine(VerbsPath, "classes");
+    private static readonly string ResourcesPath = GetResourcePath();
 
     /// <summary>
-    /// Gets the absolute path to a resource directory, with fallback for development scenarios
+    /// Gets the absolute path to the resources directory
     /// </summary>
-    private static string GetResourcePath(string resourceName)
+    private static string GetResourcePath()
     {
-        var possiblePaths = new List<string>();
         var workingDirectory = Directory.GetCurrentDirectory();
-
-        // Strategy 2: Current working directory with explicit path
-        possiblePaths.Add(Path.Combine(workingDirectory, "Resources", resourceName));
-        Logger.Debug($"Trying resource path: {possiblePaths.Last()}");
-        
-        // If none exist, return the first option (app directory based) for error reporting
-        return possiblePaths[0];
+        var resourcesPath = Path.Combine(workingDirectory, "Resources");
+        Logger.Debug($"Resources path: {resourcesPath}");
+        return resourcesPath;
     }
 
     /// <summary>
-    /// Loads and creates all verbs from JSON definitions
+    /// Loads and creates all verbs from C# class definitions
     /// </summary>
     public static void LoadAndCreateVerbs()
     {
-        Logger.Info("Loading verb definitions from JSON files...");
+        Logger.Info("Loading verb definitions from C# files...");
 
-        var classStats = LoadClassVerbs();
-        var systemStats = LoadSystemVerbs();
+        var stats = LoadVerbs();
 
-        var totalLoaded = classStats.Loaded + systemStats.Loaded;
-        var totalSkipped = classStats.Skipped + systemStats.Skipped;
-
-        Logger.Info($"Verb definitions loaded successfully - Created: {totalLoaded}, Skipped: {totalSkipped}");
+        Logger.Info($"Verb definitions loaded successfully - Created: {stats.Loaded}, Skipped: {stats.Skipped}");
     }
 
     /// <summary>
@@ -80,15 +70,12 @@ public static class VerbInitializer
         var countAfterDelete = DbProvider.Instance.FindAll<Verb>("verbs").Count();
         Logger.Debug($"Cleared {systemVerbs.Count} system verb definitions - {countAfterDelete} verbs remaining (preserving {inGameVerbs.Count} in-game verbs)");
 
-        // Reload all verbs from JSON files
-        var classStats = LoadClassVerbs();
-        var systemStats = LoadSystemVerbs();
+        // Reload all verbs from C# files
+        var stats = LoadVerbs();
 
-        var totalLoaded = classStats.Loaded + systemStats.Loaded;
-        var totalSkipped = classStats.Skipped + systemStats.Skipped;
         var countAfterReload = DbProvider.Instance.FindAll<Verb>("verbs").Count();
 
-        Logger.Info($"Verb definitions reloaded successfully - Created: {totalLoaded}, Skipped: {totalSkipped}, Total in DB: {countAfterReload}");
+        Logger.Info($"Verb definitions reloaded successfully - Created: {stats.Loaded}, Skipped: {stats.Skipped}, Total in DB: {countAfterReload}");
     }
 
     /// <summary>
@@ -107,128 +94,68 @@ public static class VerbInitializer
         var countAfterDelete = DbProvider.Instance.FindAll<Verb>("verbs").Count();
         Logger.Debug($"Cleared ALL verb definitions - {countAfterDelete} verbs remaining");
 
-        // Reload all verbs from JSON files
-        var classStats = LoadClassVerbs();
-        var systemStats = LoadSystemVerbs();
+        // Reload all verbs from C# files
+        var stats = LoadVerbs();
 
-        var totalLoaded = classStats.Loaded + systemStats.Loaded;
-        var totalSkipped = classStats.Skipped + systemStats.Skipped;
         var countAfterReload = DbProvider.Instance.FindAll<Verb>("verbs").Count();
 
-        Logger.Info($"ALL verb definitions force reloaded - Created: {totalLoaded}, Skipped: {totalSkipped}, Total in DB: {countAfterReload}");
+        Logger.Info($"ALL verb definitions force reloaded - Created: {stats.Loaded}, Skipped: {stats.Skipped}, Total in DB: {countAfterReload}");
     }
 
     /// <summary>
-    /// Load class-based verb definitions
+    /// Load verb definitions from all C# files in Resources directory
     /// </summary>
-    private static VerbLoadStats LoadClassVerbs()
+    private static VerbLoadStats LoadVerbs()
     {
         var stats = new VerbLoadStats();
         
-        if (!Directory.Exists(ClassVerbsPath))
+        if (!Directory.Exists(ResourcesPath))
         {
-            Logger.Debug($"Class verbs directory not found: {ClassVerbsPath}");
+            Logger.Debug($"Resources directory not found: {ResourcesPath}");
             return stats;
         }
 
-        var jsonFiles = Directory.GetFiles(ClassVerbsPath, "*.json");
-        Logger.Debug($"Found {jsonFiles.Length} class verb definition files");
+        // Get all .cs files recursively from Resources directory
+        var csFiles = Directory.GetFiles(ResourcesPath, "*.cs", SearchOption.AllDirectories);
+        Logger.Debug($"Found {csFiles.Length} C# files in Resources directory");
 
-        foreach (var file in jsonFiles)
+        foreach (var file in csFiles)
         {
             try
             {
-                var json = File.ReadAllText(file);
-                var verbDef = System.Text.Json.JsonSerializer.Deserialize<VerbDefinition>(json);
-
-                if (verbDef == null || string.IsNullOrEmpty(verbDef.Name) || string.IsNullOrEmpty(verbDef.TargetClass))
+                var verbDefs = CodeDefinitionParser.ParseVerbs(file);
+                
+                foreach (var verbDef in verbDefs)
                 {
-                    Logger.Warning($"Invalid verb definition in {file}");
-                    continue;
-                }
-
-                // If code is missing or empty, look for a .cs file with the same base name
-                if (verbDef.Code == null || verbDef.Code.Length == 0)
-                {
-                    var csFile = TryFindCodeFile(file);
-                    if (!string.IsNullOrEmpty(csFile) && File.Exists(csFile))
+                    if (string.IsNullOrEmpty(verbDef.Name))
                     {
-                        verbDef.Code = new[] { File.ReadAllText(csFile) };
-                        Logger.Debug($"Loaded code from {csFile} for verb {verbDef.Name}");
+                        Logger.Warning($"Invalid verb definition in {file}");
+                        continue;
+                    }
+
+                    // Determine if this should be a system verb or class verb based on class name
+                    VerbLoadStats verbStats;
+                    if (verbDef.TargetClass?.ToLower() == "system")
+                    {
+                        var systemObjectId = GetOrCreateSystemObject();
+                        if (systemObjectId != null)
+                        {
+                            verbStats = CreateSystemVerb(systemObjectId, verbDef);
+                        }
+                        else
+                        {
+                            Logger.Error("Failed to create system object for system verbs");
+                            continue;
+                        }
                     }
                     else
                     {
-                        Logger.Debug($"No .cs file found for {file}");
+                        verbStats = CreateClassVerb(verbDef);
                     }
+                    
+                    stats.Loaded += verbStats.Loaded;
+                    stats.Skipped += verbStats.Skipped;
                 }
-
-                var verbStats = CreateClassVerb(verbDef);
-                stats.Loaded += verbStats.Loaded;
-                stats.Skipped += verbStats.Skipped;
-            }
-            catch (Exception ex)
-            {
-                Logger.Error($"Error loading verb definition from {file}: {ex.Message}");
-            }
-        }
-        
-        return stats;
-    }
-
-    /// <summary>
-    /// Load system verb definitions
-    /// </summary>
-    private static VerbLoadStats LoadSystemVerbs()
-    {
-        var stats = new VerbLoadStats();
-        
-        if (!Directory.Exists(SystemVerbsPath))
-        {
-            Logger.Debug($"System verbs directory not found: {SystemVerbsPath}");
-            return stats;
-        }
-
-        var systemObjectId = GetOrCreateSystemObject();
-        if (systemObjectId == null)
-        {
-            Logger.Error("Failed to create system object for system verbs");
-            return stats;
-        }
-
-        var jsonFiles = Directory.GetFiles(SystemVerbsPath, "*.json");
-        Logger.Debug($"Found {jsonFiles.Length} system verb definition files");
-
-        foreach (var file in jsonFiles)
-        {
-            try
-            {
-                var json = File.ReadAllText(file);
-                var verbDef = System.Text.Json.JsonSerializer.Deserialize<VerbDefinition>(json);
-
-                if (verbDef == null || string.IsNullOrEmpty(verbDef.Name))
-                {
-                    Logger.Warning($"Invalid verb definition in {file}");
-                    continue;
-                }
-
-                // If code is missing or empty, look for a .cs file with the same base name
-                if (verbDef.Code == null || verbDef.Code.Length == 0)
-                {
-                    var csFile = TryFindCodeFile(file);
-                    if (!string.IsNullOrEmpty(csFile) && File.Exists(csFile))
-                    {
-                        verbDef.Code = new[] { File.ReadAllText(csFile) };
-                        Logger.Debug($"Loaded code from {csFile} for verb {verbDef.Name}");
-                    }
-                    else
-                    {
-                        Logger.Debug($"No .cs file found for {file}");
-                    }
-                }
-
-                var verbStats = CreateSystemVerb(systemObjectId, verbDef);
-                stats.Loaded += verbStats.Loaded;
-                stats.Skipped += verbStats.Skipped;
             }
             catch (Exception ex)
             {
