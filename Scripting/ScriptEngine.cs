@@ -74,7 +74,7 @@ public class ScriptEngine
         try
         {
             var actualThisObjectId = thisObjectId ?? verb.ObjectId;
-            var thisObject = ObjectManager.GetObject(actualThisObjectId);
+            var thisObject = ObjectManager.GetObject(verb.ObjectId);
             var playerObject = ObjectManager.GetObject(player.Id);
 
             // Debug logging to identify null objects
@@ -90,7 +90,7 @@ public class ScriptEngine
             var globals = new ScriptGlobals
             {
                 Player = player, // Always the Database.Player
-                This = thisObject ?? CreateNullGameObject(actualThisObjectId),
+                This = thisObject,
                 Caller = previousContext?.This ?? playerObject, // The object that called this verb (or Player if no previous context)
                 CallDepth = (previousContext?.CallDepth ?? 0) + 1, // Track call depth
                 CommandProcessor = commandProcessor,

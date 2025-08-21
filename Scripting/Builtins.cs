@@ -1229,7 +1229,7 @@ public static class Builtins
             {
                 Name = "script",
                 Code = scriptCode,
-                ObjectId = thisObjectId ?? "system"
+                ObjectId = player?.Id ?? "system"
             };
             
             return engine.ExecuteVerb(tempVerb, input ?? "", player, commandProcessor, thisObjectId);

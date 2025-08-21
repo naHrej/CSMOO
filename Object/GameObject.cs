@@ -2,6 +2,8 @@ using System.Dynamic;
 using LiteDB;
 using CSMOO.Functions;
 using CSMOO.Database;
+using CSMOO.Scripting;
+using CSMOO.Exceptions;
 
 namespace CSMOO.Object;
 
@@ -189,6 +191,10 @@ public class GameObject : DynamicObject
     /// </summary>
     public override bool TryGetMember(GetMemberBinder binder, out object? result)
     {
+        if (!PermissionCheck())
+        {
+            throw new PrivateAccessException($"Cannot get property '{binder.Name}' on object {Id}");
+        }
         var propertyName = binder.Name;
 
         try
@@ -281,6 +287,11 @@ public class GameObject : DynamicObject
     public override bool TrySetMember(SetMemberBinder binder, object? value)
     {
         var propertyName = binder.Name;
+
+        if(!PermissionCheck())
+        {
+            throw new PrivateAccessException($"Cannot set property '{propertyName}' on object {Id}");
+        }
 
         try
         {
@@ -469,6 +480,11 @@ public class GameObject : DynamicObject
             "getlocation" => "GetLocation",
             _ => null
         };
+    }
+
+    private bool PermissionCheck()
+    {
+        return this.Id == Builtins.UnifiedContext?.This?.Id;
     }
 
     /// <summary>
