@@ -193,7 +193,7 @@ public class GameObject : DynamicObject
     {
         if (!PermissionCheck())
         {
-            throw new PrivateAccessException($"Cannot get property '{binder.Name}' on object {Id}");
+            throw new PrivateAccessException($"Cannot get property '{binder.Name}' on object {this.Name}");
         }
         var propertyName = binder.Name;
 
@@ -290,7 +290,7 @@ public class GameObject : DynamicObject
 
         if(!PermissionCheck())
         {
-            throw new PrivateAccessException($"Cannot set property '{propertyName}' on object {Id}");
+            throw new PrivateAccessException($"Cannot set property '{propertyName}' on object {this.Name}");
         }
 
         try
@@ -373,7 +373,7 @@ public class GameObject : DynamicObject
             if (Properties.ContainsKey("_isNullObject") &&
                 Properties["_isNullObject"].AsBoolean)
             {
-                throw new InvalidOperationException($"Cannot call method '{methodName}' on missing object {Id}");
+                throw new InvalidOperationException($"Cannot call method '{methodName}' on missing object {this.Name}");
             }
 
             // Find the function on this object using the FunctionResolver
