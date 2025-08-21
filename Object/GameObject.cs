@@ -193,7 +193,7 @@ public class GameObject : DynamicObject
     {
         if (!PermissionCheck())
         {
-            throw new PrivateAccessException($"Cannot get property '{binder.Name}' on object {this.Name}");
+            throw new PrivateAccessException($"Cannot get property '{binder.Name}' on object {Name}(#{DbRef})");
         }
         var propertyName = binder.Name;
 
@@ -270,14 +270,14 @@ public class GameObject : DynamicObject
             var suggestion = GetPropertySuggestion(propertyName);
             if (!string.IsNullOrEmpty(suggestion))
             {
-                throw new InvalidOperationException($"Property '{propertyName}' not found on object {Id}. Did you mean '{suggestion}'? (Property names are case-sensitive)");
+                throw new InvalidOperationException($"Property '{propertyName}' not found on object {Name}(#{DbRef}). Did you mean '{suggestion}'? (Property names are case-sensitive)");
             }
             result = null;
             return true;
         }
         catch (Exception ex)
         {
-            throw new InvalidOperationException($"Error accessing property '{propertyName}' on object {Id}: {ex.Message}", ex);
+            throw new InvalidOperationException($"Error accessing property '{propertyName}' on object {Name}(#{DbRef}): {ex.Message}", ex);
         }
     }
 
@@ -290,7 +290,7 @@ public class GameObject : DynamicObject
 
         if(!PermissionCheck())
         {
-            throw new PrivateAccessException($"Cannot set property '{propertyName}' on object {this.Name}");
+            throw new PrivateAccessException($"Cannot set property '{propertyName}' on object {Name}(#{DbRef})");
         }
 
         try
@@ -299,7 +299,7 @@ public class GameObject : DynamicObject
             if (Properties.ContainsKey("_isNullObject") &&
                 Properties["_isNullObject"].AsBoolean)
             {
-                throw new InvalidOperationException($"Cannot set property '{propertyName}' on missing object {Id}");
+                throw new InvalidOperationException($"Cannot set property '{propertyName}' on missing object {Name}(#{DbRef})");
             }
 
             // Prevent setting read-only GameObject properties
@@ -356,7 +356,7 @@ public class GameObject : DynamicObject
         }
         catch (Exception ex)
         {
-            throw new InvalidOperationException($"Error setting property '{propertyName}' on object {Id}: {ex.Message}", ex);
+            throw new InvalidOperationException($"Error setting property '{propertyName}' on object {Name}(#{DbRef}): {ex.Message}", ex);
         }
     }
 
@@ -373,7 +373,7 @@ public class GameObject : DynamicObject
             if (Properties.ContainsKey("_isNullObject") &&
                 Properties["_isNullObject"].AsBoolean)
             {
-                throw new InvalidOperationException($"Cannot call method '{methodName}' on missing object {this.Name}");
+                throw new InvalidOperationException($"Cannot call method '{methodName}' on missing object {Name}(#{DbRef})");
             }
 
             // Find the function on this object using the FunctionResolver
@@ -384,10 +384,10 @@ public class GameObject : DynamicObject
                 var suggestion = GetMethodSuggestion(methodName);
                 if (!string.IsNullOrEmpty(suggestion))
                 {
-                    throw new ArgumentException($"Function '{methodName}' not found on object {Id}. Did you mean '{suggestion}'? (Function names are case-sensitive)");
+                    throw new ArgumentException($"Function '{methodName}' not found on object {Name}(#{DbRef}). Did you mean '{suggestion}'? (Function names are case-sensitive)");
                 }
 
-                throw new ArgumentException($"Function '{methodName}' not found on object {Id}. Check function name and ensure it's defined on this object or its class.");
+                throw new ArgumentException($"Function '{methodName}' not found on object {Name}(#{DbRef}). Check function name and ensure it's defined on this object or its class.");
             }
 
             // Get the current player from the UnifiedContext if available
