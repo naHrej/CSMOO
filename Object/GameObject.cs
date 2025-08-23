@@ -215,7 +215,7 @@ public class GameObject : DynamicObject
                     }
                     else
                     {
-                        throw new InvalidOperationException("Cannot access 'Properties' directly. Use ObjectManager.GetProperty() for individual properties.");
+                        throw new PropertyAccessException("Cannot access 'Properties' directly. Use ObjectManager.GetProperty() for individual properties.");
                     }
 
                 case "id":
@@ -286,14 +286,14 @@ public class GameObject : DynamicObject
             var suggestion = GetPropertySuggestion(propertyName);
             if (!string.IsNullOrEmpty(suggestion))
             {
-                throw new InvalidOperationException($"Property '{propertyName}' not found on object {Name}(#{DbRef}). Did you mean '{suggestion}'? (Property names are case-sensitive)");
+                throw new PropertyAccessException($"Property '{propertyName}' not found on object {Name}(#{DbRef}). Did you mean '{suggestion}'? (Property names are case-sensitive)");
             }
             result = null;
             return true;
         }
         catch (Exception ex)
         {
-            throw new InvalidOperationException($"Error accessing property '{propertyName}' on object {Name}(#{DbRef}): {ex.Message}", ex);
+            throw new PropertyAccessException($"Error accessing property '{propertyName}' on object {Name}(#{DbRef}): {ex.Message}", ex);
         }
     }
 
@@ -312,7 +312,7 @@ public class GameObject : DynamicObject
             if (Properties.ContainsKey("_isNullObject") &&
                 Properties["_isNullObject"].AsBoolean)
             {
-                throw new InvalidOperationException($"Cannot set property '{propertyName}' on missing object {Name}(#{DbRef})");
+                throw new ObjectStateException($"Cannot set property '{propertyName}' on missing object {Name}(#{DbRef})");
             }
 
             // Prevent setting read-only GameObject properties
@@ -320,15 +320,15 @@ public class GameObject : DynamicObject
             {
                 case "properties":
 
-                    throw new InvalidOperationException("Cannot access 'Properties' directly. Use ObjectManager.GetProperty() for individual properties.");
+                    throw new PropertyAccessException("Cannot access 'Properties' directly. Use ObjectManager.GetProperty() for individual properties.");
 
                 case "id":
                 case "dbref":
                 case "classid":
                 case "createdat":
-                    throw new InvalidOperationException($"Property '{propertyName}' is read-only");
+                    throw new PropertyAccessException($"Property '{propertyName}' is read-only");
                 case "name":
-                    throw new InvalidOperationException($"Property '{propertyName}' is read-only");
+                    throw new PropertyAccessException($"Property '{propertyName}' is read-only");
                 case "aliases":
                     if (value is List<string> aliasesList)
                     {
@@ -341,7 +341,7 @@ public class GameObject : DynamicObject
                     ObjectManager.MoveObject(Id, value?.ToString());
                     return true;
                 case "contents":
-                    throw new InvalidOperationException("Contents property cannot be set directly. Use object movement commands instead.");
+                    throw new PropertyAccessException("Contents property cannot be set directly. Use object movement commands instead.");
                 case "modifiedat":
                     ModifiedAt = value is DateTime dt ? dt : DateTime.UtcNow;
                     DbProvider.Instance.Update("gameobjects", this);
@@ -373,7 +373,7 @@ public class GameObject : DynamicObject
         }
         catch (Exception ex)
         {
-            throw new InvalidOperationException($"Error setting property '{propertyName}' on object {Name}(#{DbRef}): {ex.Message}", ex);
+            throw new PropertyAccessException($"Error setting property '{propertyName}' on object {Name}(#{DbRef}): {ex.Message}", ex);
         }
     }
 
@@ -390,7 +390,7 @@ public class GameObject : DynamicObject
             if (Properties.ContainsKey("_isNullObject") &&
                 Properties["_isNullObject"].AsBoolean)
             {
-                throw new InvalidOperationException($"Cannot call method '{methodName}' on missing object {Name}(#{DbRef})");
+                throw new ObjectStateException($"Cannot call method '{methodName}' on missing object {Name}(#{DbRef})");
             }
 
             // Find the function on this object using the FunctionResolver
@@ -401,10 +401,10 @@ public class GameObject : DynamicObject
                 var suggestion = GetMethodSuggestion(methodName);
                 if (!string.IsNullOrEmpty(suggestion))
                 {
-                    throw new ArgumentException($"Function '{methodName}' not found on object {Name}(#{DbRef}). Did you mean '{suggestion}'? (Function names are case-sensitive)");
+                    throw new FunctionExecutionException($"Function '{methodName}' not found on object {Name}(#{DbRef}). Did you mean '{suggestion}'? (Function names are case-sensitive)");
                 }
 
-                throw new ArgumentException($"Function '{methodName}' not found on object {Name}(#{DbRef}). Check function name and ensure it's defined on this object or its class.");
+                throw new FunctionExecutionException($"Function '{methodName}' not found on object {Name}(#{DbRef}). Check function name and ensure it's defined on this object or its class.");
             }
 
             // Get the current player from the UnifiedContext if available
@@ -425,7 +425,7 @@ public class GameObject : DynamicObject
 
             if (currentPlayer == null)
             {
-                throw new InvalidOperationException($"Cannot execute function '{methodName}': no current player context available");
+                throw new ContextException($"Cannot execute function '{methodName}': no current player context available");
             }
 
             // Execute the function using the UnifiedScriptEngine
@@ -508,10 +508,10 @@ public class GameObject : DynamicObject
         var accessor = PropAccessors[propertyName].AsString.ToLowerInvariant();
 
         if (set && accessor.Contains("readonly"))
-            throw new InvalidOperationException($"Property '{propertyName}' is read-only");
+            throw new PropertyAccessException($"Property '{propertyName}' is read-only");
 
         if (This == null)
-            throw new InvalidOperationException("Current context is null, cannot check property permissions");
+            throw new ContextException("Current context is null, cannot check property permissions");
 
         switch (true)
         {
@@ -519,13 +519,13 @@ public class GameObject : DynamicObject
                 throw new PrivateAccessException($"Cannot access property '{propertyName}' on object {Name}(#{DbRef})");
 
             case true when accessor.StartsWith("internal") && (This.Id != this.Id && This.Id != this.Owner?.Id):
-                throw new InvalidOperationException($"Cannot access internal property '{propertyName}' on object {Name}(#{DbRef})");
+                throw new PermissionException($"Cannot access internal property '{propertyName}' on object {Name}(#{DbRef})");
 
             case true when accessor.Contains("adminonly") && !This.IsAdmin:
-                throw new InvalidOperationException($"Property '{propertyName}' is admin-only");
+                throw new PermissionException($"Property '{propertyName}' is admin-only");
 
             case true when accessor.Contains("constant"):
-                throw new InvalidOperationException($"Property '{propertyName}' is constant");
+                throw new PropertyAccessException($"Property '{propertyName}' is constant");
         }
 
         return true;
