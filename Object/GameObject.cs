@@ -286,26 +286,12 @@ public class GameObject : DynamicObject
     {
         if (!Properties.ContainsKey(propertyName))
         {
-            throw new PropertyAccessException($"Property '{propertyName}' not found on object {Name}(#{DbRef})");
+            result = null;
+            return false;
         }
 
-        var rawValue = Properties[propertyName].RawValue;
-        
-        // Try to resolve as a GameObject if it's a Guid string
-        if (rawValue is string strValue && Guid.TryParse(strValue, out var guid))
-        {
-            var obj = ObjectManager.GetObject(strValue);
-            if (obj != null)
-            {
-                result = obj as dynamic;
-                return true;
-            }
-            // If not found, return the string value
-            result = strValue;
-            return true;
-        }
-        
-        result = rawValue;
+        var bsonValue = Properties[propertyName];
+        result = ConvertFromBsonValue(bsonValue);
         return true;
     }
 
@@ -427,6 +413,43 @@ public class GameObject : DynamicObject
             BsonValue bv => bv,
             _ => new BsonValue(value.ToString() ?? "")
         };
+    }
+
+    /// <summary>
+    /// Converts a BsonValue back to an appropriate C# type for script consumption
+    /// </summary>
+    private object? ConvertFromBsonValue(BsonValue bsonValue)
+    {
+        if (bsonValue.IsNull)
+            return null;
+
+        return bsonValue.Type switch
+        {
+            BsonType.String => HandleStringBsonValue(bsonValue),
+            BsonType.Int32 => bsonValue.AsInt32,
+            BsonType.Int64 => bsonValue.AsInt64,
+            BsonType.Double => bsonValue.AsDouble,
+            BsonType.Boolean => bsonValue.AsBoolean,
+            BsonType.DateTime => bsonValue.AsDateTime,
+            BsonType.Array => bsonValue.AsArray.Select(ConvertFromBsonValue).ToList(),
+            BsonType.Document => bsonValue.AsDocument.ToDictionary(
+                kvp => kvp.Key, 
+                kvp => ConvertFromBsonValue(kvp.Value)
+            ),
+            _ => bsonValue.RawValue // Fallback to raw value for unsupported types
+        };
+    }
+
+    private object HandleStringBsonValue(BsonValue bsonValue)
+    {
+        var stringValue = bsonValue.AsString;
+        // Try to resolve GameObject references stored as Guid strings
+        if (Guid.TryParse(stringValue, out var guid))
+        {
+            var gameObject = ObjectManager.GetObject(stringValue);
+            return gameObject != null ? (object)gameObject : stringValue; // Return GameObject if found, otherwise the string
+        }
+        return stringValue;
     }
 
     private void UpdateObjectInDatabase()
