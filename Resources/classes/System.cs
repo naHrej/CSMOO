@@ -8,9 +8,10 @@ public class System
 
     public int test = 1;
 
-    private int protectedValue = 1;
+    [AdminOnly]
+    private readonly int protectedValue = 1;
 
-    
+
     [VerbAliases("\"")]
     [VerbDescription("Speak to others in the room")]
     [VerbPattern("*")]
@@ -262,11 +263,10 @@ public class System
         // First, try to resolve as a class name
         var classTarget = Builtins.GetClassByName(targetName);
         var isExaminingClass = classTarget != null;
-        var target = (GameObject)null;
-        var targetPlayer = (Player)null;
+        dynamic target = null;
+        dynamic targetPlayer = null;
         var targetId = "";
-        var objectClass = (ObjectClass)null;
-
+        ObjectClass objectClass = null;
         if (isExaminingClass)
         {
             // Examining a class definition
@@ -283,21 +283,17 @@ public class System
                 notify(Player, $"You can't see '{targetName}' here.");
                 return true;
             }
-
             targetId = target.Id;
             objectClass = Builtins.GetObjectClass(target);
-            notify(Player, $"<hr/><p>Examining {target.Properties["name"]} '{targetName}' ({target.Id})</p>");
-
+            notify(Player, $"<hr/><p>Examining {target.Properties["name"].AsString} '{targetName}' ({target.Id})</p>");
             // Check if target is a player (only for object instances)
             if (Builtins.IsPlayerObject(target))
             {
                 targetPlayer = (Player)target;
             }
         }
-
         // Get basic properties using different approaches for classes vs instances
         string name, shortDesc, longDesc;
-
         if (isExaminingClass)
         {
             // For class definitions, use class properties
@@ -312,10 +308,8 @@ public class System
             shortDesc = target.shortDescription ?? "";
             longDesc = target.longDescription ?? target.description ?? "";
         }
-
         // Build the examination output
         var output = new StringBuilder();
-
         // Object name and short description
         if (!string.IsNullOrEmpty(shortDesc))
         {
@@ -325,7 +319,6 @@ public class System
         {
             output.AppendLine(name);
         }
-
         // Long description
         if (!string.IsNullOrEmpty(longDesc))
         {
@@ -335,7 +328,6 @@ public class System
         {
             output.AppendLine("You see nothing special.");
         }
-
         // Show contents if it's a container (only for object instances)
         if (!isExaminingClass)
         {
@@ -353,13 +345,11 @@ public class System
                 }
             }
         }
-
         // For class definitions, show default properties and instances
         if (isExaminingClass)
         {
             output.AppendLine();
             output.AppendLine("=== Class Information ===");
-
             // Show inheritance
             if (!string.IsNullOrEmpty(objectClass.ParentClassId))
             {
@@ -370,7 +360,6 @@ public class System
             {
                 output.AppendLine("Inherits from: (none - root class)");
             }
-
             // Show if it's abstract
             if (objectClass.IsAbstract)
             {
@@ -380,9 +369,8 @@ public class System
             {
                 output.AppendLine("Type: Concrete class");
             }
-
             // Show default properties
-            if (objectClass.Properties?.Any() == true)
+            if (objectClass.Properties?.Count > 0)
             {
                 output.AppendLine();
                 output.AppendLine("Default Properties:");
@@ -396,12 +384,11 @@ public class System
                     output.AppendLine($"  {prop.Key}: {value}");
                 }
             }
-
             // Show instances of this class
             var instances = Builtins.GetObjectsByClass(objectClass.Id);
             output.AppendLine();
             output.AppendLine($"Instances: {instances.Count()}");
-            if (instances.Any() && (Builtins.IsAdmin(Player) || Builtins.IsModerator(Player)))
+            if (instances.Count > 0 && (Builtins.IsAdmin(Player) || Builtins.IsModerator(Player)))
             {
                 var limitedInstances = instances.Take(10);
                 foreach (var instance in limitedInstances)
@@ -415,13 +402,11 @@ public class System
                 }
             }
         }
-
         // Administrative information for Admin/Moderator users
         if (Builtins.IsAdmin(Player) || Builtins.IsModerator(Player))
         {
             output.AppendLine();
             output.AppendLine("=== Administrative Information ===");
-
             if (isExaminingClass)
             {
                 // Administrative info for class definitions
@@ -433,16 +418,16 @@ public class System
             else
             {
                 // Administrative info for object instances
+                output.AppendLine($"Owner: {target.Owner}(#{target.Owner})");
                 output.AppendLine($"Object ID: {target.Id}");
                 output.AppendLine($"DB Reference: #{target.DbRef}");
                 output.AppendLine($"Created: {target.CreatedAt}");
                 output.AppendLine($"Modified: {target.ModifiedAt}");
-
                 // Show player flags if examining a player
                 if (targetPlayer != null)
                 {
                     var flags = Builtins.GetPlayerFlags(targetPlayer);
-                    if (flags.Any())
+                    if (flags.Count > 0)
                     {
                         output.AppendLine($"Player Flags: {string.Join(", ", flags)}");
                     }
@@ -452,18 +437,16 @@ public class System
                     }
                 }
             }
-
             // Show object class for both cases
             if (objectClass != null)
             {
                 output.AppendLine($"Class: {objectClass.Name}");
             }
-
             // Show verbs (different approach for classes vs instances)
             if (isExaminingClass)
             {
                 var verbs = Builtins.GetVerbsOnClass(objectClass.Id);
-                if (verbs.Any())
+                if (verbs.Count > 0)
                 {
                     output.AppendLine("Class Verbs:");
                     foreach (var verb in verbs.OrderBy(v => v.Name))
@@ -491,9 +474,8 @@ public class System
                 var allVerbsWithSource = VerbResolver.GetAllVerbsOnObject(targetId);
                 var instanceVerbs = allVerbsWithSource.Where(v => v.source == "instance").ToList();
                 var inheritedVerbs = allVerbsWithSource.Where(v => v.source != "instance").ToList();
-
                 // Show instance-specific verbs
-                if (instanceVerbs.Any())
+                if (instanceVerbs.Count > 0)
                 {
                     output.AppendLine("Instance Verbs:");
                     foreach (var (verb, source) in instanceVerbs.OrderBy(v => v.verb.Name))
@@ -514,9 +496,8 @@ public class System
                 {
                     output.AppendLine("Instance Verbs: none");
                 }
-
                 // Show inherited verbs
-                if (inheritedVerbs.Any())
+                if (inheritedVerbs.Count > 0)
                 {
                     output.AppendLine("Inherited Verbs:");
                     foreach (var (verb, source) in inheritedVerbs.OrderBy(v => v.verb.Name))
@@ -539,12 +520,11 @@ public class System
                     output.AppendLine("Inherited Verbs: none");
                 }
             }
-
             // Show functions (different approach for classes vs instances)
             if (isExaminingClass)
             {
                 var functions = Builtins.GetFunctionsOnClass(objectClass.Id);
-                if (functions.Any())
+                if (functions.Count > 0)
                 {
                     output.AppendLine("Class Functions:");
                     foreach (var func in functions.OrderBy(f => f.Name))
@@ -569,9 +549,8 @@ public class System
                 var allFunctionsWithSource = FunctionResolver.GetAllFunctionsOnObject(targetId);
                 var instanceFunctions = allFunctionsWithSource.Where(f => f.source == "instance").ToList();
                 var inheritedFunctions = allFunctionsWithSource.Where(f => f.source != "instance").ToList();
-
                 // Show instance-specific functions
-                if (instanceFunctions.Any())
+                if (instanceFunctions.Count > 0)
                 {
                     output.AppendLine("Instance Functions:");
                     foreach (var (func, source) in instanceFunctions.OrderBy(f => f.function.Name))
@@ -589,9 +568,8 @@ public class System
                 {
                     output.AppendLine("Instance Functions: none");
                 }
-
                 // Show inherited functions
-                if (inheritedFunctions.Any())
+                if (inheritedFunctions.Count > 0)
                 {
                     output.AppendLine("Inherited Functions:");
                     foreach (var (func, source) in inheritedFunctions.OrderBy(f => f.function.Name))
@@ -611,18 +589,15 @@ public class System
                     output.AppendLine("Inherited Functions: none");
                 }
             }
-
             // Show properties (only for object instances, classes already show default properties above)
             if (!isExaminingClass)
             {
                 // For properties, we need to separate instance vs inherited differently
                 // Instance properties are those directly in target.Properties
                 // Inherited properties come from the class hierarchy
-
                 var instanceProperties = new List<KeyValuePair<string, object>>();
                 var inheritedProperties = new List<KeyValuePair<string, object>>();
-
-                if (target.Properties?.Any() == true)
+                if (target.Properties?.Count > 0)
                 {
                     // Convert instance properties to list
                     foreach (var prop in target.Properties)
@@ -630,14 +605,13 @@ public class System
                         instanceProperties.Add(new KeyValuePair<string, object>(prop.Key, prop.Value));
                     }
                 }
-
                 // Get properties from class hierarchy (excluding those overridden in instance)
                 if (objectClass != null)
                 {
                     var inheritanceChain = CSMOO.Object.ObjectManager.GetInheritanceChain(objectClass.Id);
                     foreach (var classInChain in inheritanceChain)
                     {
-                        if (classInChain.Properties?.Any() == true)
+                        if (classInChain.Properties?.Count > 0)
                         {
                             foreach (var classProp in classInChain.Properties)
                             {
@@ -650,9 +624,8 @@ public class System
                         }
                     }
                 }
-
                 // Show instance properties
-                if (instanceProperties.Any())
+                if (instanceProperties.Count > 0)
                 {
                     output.AppendLine("Instance Properties:");
                     foreach (var prop in instanceProperties.OrderBy(p => p.Key))
@@ -662,16 +635,18 @@ public class System
                         {
                             value = value.Substring(0, 47) + "...";
                         }
-                        output.AppendLine($"  {prop.Key}: {value}");
+                        var accessor = target.PropAccessors.ContainsKey(prop.Key) && !target.PropAccessors[prop.Key].IsNull 
+                            ? target.PropAccessors[prop.Key].AsString : "public";
+                        accessor = accessor.TrimEnd();
+                        output.AppendLine($"  {prop.Key} [{accessor}]: {value}");
                     }
                 }
                 else
                 {
                     output.AppendLine("Instance Properties: none");
                 }
-
                 // Show inherited properties
-                if (inheritedProperties.Any())
+                if (inheritedProperties.Count > 0)
                 {
                     output.AppendLine("Inherited Properties:");
                     foreach (var prop in inheritedProperties.OrderBy(p => p.Key))
@@ -690,8 +665,8 @@ public class System
                 }
             }
         }
-
         notify(Player, output.ToString().TrimEnd());
+
     }
 
     [VerbAliases("take")]
