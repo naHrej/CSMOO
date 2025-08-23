@@ -399,6 +399,13 @@ public class GameObject : DynamicObject
 
     private void SetCustomProperty(string propertyName, object? value)
     {
+        if (value == null)
+        {
+            // If value is null, remove the property
+            Properties.Remove(propertyName);
+            ObjectManager.RemoveProperty(this, propertyName);
+            return;
+        }
         var bsonValue = ConvertToBsonValue(value);
         Properties[propertyName] = bsonValue;
         ObjectManager.SetProperty(this, propertyName, bsonValue);
