@@ -198,102 +198,123 @@ public class GameObject : DynamicObject
     /// </summary>
     public override bool TryGetMember(GetMemberBinder binder, out object? result)
     {
-    
         var propertyName = binder.Name;
         PermissionCheck(propertyName);
 
         try
         {
-            // Handle special GameObject properties first
-            switch (propertyName.ToLower())
-            {
-                case "properties":
-                    if (Builtins.UnifiedContext?.This?.Properties.ContainsKey("isSystemObject"))
-                    {
-                        result = ObjectManager.GetAllPropertyNames(this);
-                        return true;
-                    }
-                    else
-                    {
-                        throw new PropertyAccessException("Cannot access 'Properties' directly. Use ObjectManager.GetProperty() for individual properties.");
-                    }
+            // Handle built-in GameObject properties
+            if (TryGetBuiltInProperty(propertyName, out result))
+                return true;
 
-                case "id":
-                    result = Id;
-                    return true;
-                case "name":
-                    result = Name;
-                    return true;
-                case "aliases":
-                    result = Aliases;
-                    return true;
-                case "dbref":
-                    result = DbRef;
-                    return true;
-                case "classid":
-                    result = Properties.ContainsKey("classid") ? Properties["classid"].AsString : string.Empty;
-                    return true;
-                case "location":
-                    result = Location;
-                    return true;
-                case "contents":
-                    result = Contents;
-                    return true;
-                case "createdat":
-                    result = CreatedAt;
-                    return true;
-                case "modifiedat":
-                    result = ModifiedAt;
-                    return true;
-                case "owner":
-                    result = Owner;
-                    return true;
-            }
-
-
-
-            // Check if this is a null object (missing from database)
-            if (Properties.ContainsKey("_isNullObject") &&
-                Properties["_isNullObject"].AsBoolean)
+            // Validate object state for custom properties
+            if (IsNullObject())
             {
                 result = null;
-                return true; // Return null for any property on a missing object
-            }
-
-
-
-            // Try to get the property from the instance's Properties dictionary only
-            if (Properties.ContainsKey(propertyName))
-            {
-                var rawValue = Properties[propertyName].RawValue;
-                // Try to resolve as a GameObject if it's a Guid string
-                if (rawValue is string strValue && Guid.TryParse(strValue, out var guid))
-                {
-                    var obj = ObjectManager.GetObject(strValue);
-                    if (obj != null)
-                    {
-                        result = obj as dynamic;
-                        return true;
-                    }
-                    // If not found, return the string value
-                    result = strValue;
-                    return true;
-                }
-                result = rawValue;
                 return true;
             }
-            // Check if this might be a case sensitivity issue with built-in properties
-            var suggestion = GetPropertySuggestion(propertyName);
-            if (!string.IsNullOrEmpty(suggestion))
-            {
-                throw new PropertyAccessException($"Property '{propertyName}' not found on object {Name}(#{DbRef}). Did you mean '{suggestion}'? (Property names are case-sensitive)");
-            }
+
+            // Handle custom properties
+            if (TryGetCustomProperty(propertyName, out result))
+                return true;
+
+            // Property not found - provide helpful error message
+            HandlePropertyNotFound(propertyName);
             result = null;
             return true;
         }
         catch (Exception ex)
         {
             throw new PropertyAccessException($"Error accessing property '{propertyName}' on object {Name}(#{DbRef}): {ex.Message}", ex);
+        }
+    }
+
+    private bool TryGetBuiltInProperty(string propertyName, out object? result)
+    {
+        switch (propertyName.ToLower())
+        {
+            case "properties":
+                if (Builtins.UnifiedContext?.This?.Properties.ContainsKey("isSystemObject") == true)
+                {
+                    result = ObjectManager.GetAllPropertyNames(this);
+                    return true;
+                }
+                throw new PropertyAccessException("Cannot access 'Properties' directly. Use ObjectManager.GetProperty() for individual properties.");
+
+            case "id":
+                result = Id;
+                return true;
+            case "name":
+                result = Name;
+                return true;
+            case "aliases":
+                result = Aliases;
+                return true;
+            case "dbref":
+                result = DbRef;
+                return true;
+            case "classid":
+                result = Properties.ContainsKey("classid") ? Properties["classid"].AsString : string.Empty;
+                return true;
+            case "location":
+                result = Location;
+                return true;
+            case "contents":
+                result = Contents;
+                return true;
+            case "createdat":
+                result = CreatedAt;
+                return true;
+            case "modifiedat":
+                result = ModifiedAt;
+                return true;
+            case "owner":
+                result = Owner;
+                return true;
+            default:
+                result = null;
+                return false; // Not a built-in property
+        }
+    }
+
+    private bool IsNullObject()
+    {
+        return Properties.ContainsKey("_isNullObject") && Properties["_isNullObject"].AsBoolean;
+    }
+
+    private bool TryGetCustomProperty(string propertyName, out object? result)
+    {
+        if (!Properties.ContainsKey(propertyName))
+        {
+            throw new PropertyAccessException($"Property '{propertyName}' not found on object {Name}(#{DbRef})");
+        }
+
+        var rawValue = Properties[propertyName].RawValue;
+        
+        // Try to resolve as a GameObject if it's a Guid string
+        if (rawValue is string strValue && Guid.TryParse(strValue, out var guid))
+        {
+            var obj = ObjectManager.GetObject(strValue);
+            if (obj != null)
+            {
+                result = obj as dynamic;
+                return true;
+            }
+            // If not found, return the string value
+            result = strValue;
+            return true;
+        }
+        
+        result = rawValue;
+        return true;
+    }
+
+    private void HandlePropertyNotFound(string propertyName)
+    {
+        var suggestion = GetPropertySuggestion(propertyName);
+        if (!string.IsNullOrEmpty(suggestion))
+        {
+            throw new PropertyAccessException($"Property '{propertyName}' not found on object {Name}(#{DbRef}). Did you mean '{suggestion}'? (Property names are case-sensitive)");
         }
     }
 
@@ -305,76 +326,105 @@ public class GameObject : DynamicObject
         var propertyName = binder.Name;
         PermissionCheck(propertyName, true);
 
-
         try
         {
-            // Check if this is a null object (missing from database)
-            if (Properties.ContainsKey("_isNullObject") &&
-                Properties["_isNullObject"].AsBoolean)
-            {
-                throw new ObjectStateException($"Cannot set property '{propertyName}' on missing object {Name}(#{DbRef})");
-            }
+            // Validate object state
+            ValidateObjectForPropertySetting(propertyName);
 
-            // Prevent setting read-only GameObject properties
-            switch (propertyName.ToLower())
-            {
-                case "properties":
+            // Handle special built-in properties
+            if (HandleBuiltInPropertySetting(propertyName, value))
+                return true;
 
-                    throw new PropertyAccessException("Cannot access 'Properties' directly. Use ObjectManager.GetProperty() for individual properties.");
-
-                case "id":
-                case "dbref":
-                case "classid":
-                case "createdat":
-                    throw new PropertyAccessException($"Property '{propertyName}' is read-only");
-                case "name":
-                    throw new PropertyAccessException($"Property '{propertyName}' is read-only");
-                case "aliases":
-                    if (value is List<string> aliasesList)
-                    {
-                        Aliases = aliasesList;
-                        DbProvider.Instance.Update("gameobjects", this);
-                    }
-                    return true;
-                case "location":
-                    // Special handling for location changes
-                    ObjectManager.MoveObject(Id, value?.ToString());
-                    return true;
-                case "contents":
-                    throw new PropertyAccessException("Contents property cannot be set directly. Use object movement commands instead.");
-                case "modifiedat":
-                    ModifiedAt = value is DateTime dt ? dt : DateTime.UtcNow;
-                    DbProvider.Instance.Update("gameobjects", this);
-                    return true;
-                case "owner":
-                    Owner = value as GameObject ?? null!;
-                    DbProvider.Instance.Update("gameobjects", this);
-                    return true;
-            }
-
-            // If value is a GameObject, store its Id instead
-            BsonValue bsonValue = value switch
-            {
-                null => BsonValue.Null,
-                GameObject go => new BsonValue(go.Id),
-                string s => new BsonValue(s),
-                int i => new BsonValue(i),
-                long l => new BsonValue(l),
-                double d => new BsonValue(d),
-                float f => new BsonValue((double)f),
-                bool b => new BsonValue(b),
-                DateTime dt => new BsonValue(dt),
-                BsonValue bv => bv,
-                _ => new BsonValue(value.ToString() ?? "")
-            };
-            Properties[propertyName] = bsonValue;
-            ObjectManager.SetProperty(this, propertyName, value is BsonValue bson ? bson : new BsonValue(value));
+            // Handle custom property setting
+            SetCustomProperty(propertyName, value);
             return true;
         }
         catch (Exception ex)
         {
             throw new PropertyAccessException($"Error setting property '{propertyName}' on object {Name}(#{DbRef}): {ex.Message}", ex);
         }
+    }
+
+    private void ValidateObjectForPropertySetting(string propertyName)
+    {
+        if (Properties.ContainsKey("_isNullObject") && Properties["_isNullObject"].AsBoolean)
+        {
+            throw new ObjectStateException($"Cannot set property '{propertyName}' on missing object {Name}(#{DbRef})");
+        }
+    }
+
+    private bool HandleBuiltInPropertySetting(string propertyName, object? value)
+    {
+        switch (propertyName.ToLower())
+        {
+            case "properties":
+                throw new PropertyAccessException("Cannot access 'Properties' directly. Use ObjectManager.GetProperty() for individual properties.");
+
+            case "id":
+            case "dbref":
+            case "classid":
+            case "createdat":
+            case "name":
+                throw new PropertyAccessException($"Property '{propertyName}' is read-only");
+
+            case "aliases":
+                if (value is List<string> aliasesList)
+                {
+                    Aliases = aliasesList;
+                    UpdateObjectInDatabase();
+                }
+                return true;
+
+            case "location":
+                ObjectManager.MoveObject(Id, value?.ToString());
+                return true;
+
+            case "contents":
+                throw new PropertyAccessException("Contents property cannot be set directly. Use object movement commands instead.");
+
+            case "modifiedat":
+                ModifiedAt = value is DateTime dt ? dt : DateTime.UtcNow;
+                UpdateObjectInDatabase();
+                return true;
+
+            case "owner":
+                Owner = value as GameObject ?? null!;
+                UpdateObjectInDatabase();
+                return true;
+
+            default:
+                return false; // Not a built-in property
+        }
+    }
+
+    private void SetCustomProperty(string propertyName, object? value)
+    {
+        var bsonValue = ConvertToBsonValue(value);
+        Properties[propertyName] = bsonValue;
+        ObjectManager.SetProperty(this, propertyName, bsonValue);
+    }
+
+    private BsonValue ConvertToBsonValue(object? value)
+    {
+        return value switch
+        {
+            null => BsonValue.Null,
+            GameObject go => new BsonValue(go.Id),
+            string s => new BsonValue(s),
+            int i => new BsonValue(i),
+            long l => new BsonValue(l),
+            double d => new BsonValue(d),
+            float f => new BsonValue((double)f),
+            bool b => new BsonValue(b),
+            DateTime dt => new BsonValue(dt),
+            BsonValue bv => bv,
+            _ => new BsonValue(value.ToString() ?? "")
+        };
+    }
+
+    private void UpdateObjectInDatabase()
+    {
+        DbProvider.Instance.Update("gameobjects", this);
     }
 
     /// <summary>
@@ -386,49 +436,16 @@ public class GameObject : DynamicObject
 
         try
         {
-            // Check if this is a null object (missing from database)
-            if (Properties.ContainsKey("_isNullObject") &&
-                Properties["_isNullObject"].AsBoolean)
-            {
-                throw new ObjectStateException($"Cannot call method '{methodName}' on missing object {Name}(#{DbRef})");
-            }
+            // Validate object state
+            ValidateObjectForMethodInvocation(methodName);
 
-            // Find the function on this object using the FunctionResolver
-            var function = FunctionResolver.FindFunction(Id, methodName);
-            if (function == null)
-            {
-                // Check if this might be a case sensitivity issue
-                var suggestion = GetMethodSuggestion(methodName);
-                if (!string.IsNullOrEmpty(suggestion))
-                {
-                    throw new FunctionExecutionException($"Function '{methodName}' not found on object {Name}(#{DbRef}). Did you mean '{suggestion}'? (Function names are case-sensitive)");
-                }
+            // Find and validate the function
+            var function = FindAndValidateFunction(methodName);
 
-                throw new FunctionExecutionException($"Function '{methodName}' not found on object {Name}(#{DbRef}). Check function name and ensure it's defined on this object or its class.");
-            }
+            // Get execution context
+            var (currentPlayer, commandProcessor) = GetExecutionContext(methodName);
 
-            // Get the current player from the UnifiedContext if available
-            Player? currentPlayer = null;
-            Commands.CommandProcessor? commandProcessor = null;
-
-            if (Scripting.Builtins.UnifiedContext != null)
-            {
-                // Try to get Database.Player from the dynamic Player object
-                var playerObj = Scripting.Builtins.UnifiedContext.Player;
-                if (playerObj is GameObject playerGameObj)
-                {
-                    currentPlayer = ObjectManager.GetObject<Player>(playerGameObj.Id);
-                }
-
-                commandProcessor = Scripting.Builtins.UnifiedContext.CommandProcessor;
-            }
-
-            if (currentPlayer == null)
-            {
-                throw new ContextException($"Cannot execute function '{methodName}': no current player context available");
-            }
-
-            // Execute the function using the UnifiedScriptEngine
+            // Execute the function
             var engine = new Scripting.ScriptEngine();
             result = engine.ExecuteFunction(function, args ?? new object[0],
                 currentPlayer, commandProcessor, Id);
@@ -436,9 +453,58 @@ public class GameObject : DynamicObject
         }
         catch
         {
-            // Just re-throw the original exception to avoid verbose message wrapping
+            // Re-throw original exception to preserve stack trace
             throw;
         }
+    }
+
+    private void ValidateObjectForMethodInvocation(string methodName)
+    {
+        if (Properties.ContainsKey("_isNullObject") && Properties["_isNullObject"].AsBoolean)
+        {
+            throw new ObjectStateException($"Cannot call method '{methodName}' on missing object {Name}(#{DbRef})");
+        }
+    }
+
+    private Function FindAndValidateFunction(string methodName)
+    {
+        var function = FunctionResolver.FindFunction(Id, methodName);
+        if (function != null)
+            return function;
+
+        // Provide helpful error message with suggestion if available
+        var suggestion = GetMethodSuggestion(methodName);
+        if (!string.IsNullOrEmpty(suggestion))
+        {
+            throw new FunctionExecutionException($"Function '{methodName}' not found on object {Name}(#{DbRef}). Did you mean '{suggestion}'? (Function names are case-sensitive)");
+        }
+
+        throw new FunctionExecutionException($"Function '{methodName}' not found on object {Name}(#{DbRef}). Check function name and ensure it's defined on this object or its class.");
+    }
+
+    private (Player currentPlayer, Commands.CommandProcessor? commandProcessor) GetExecutionContext(string methodName)
+    {
+        Player? currentPlayer = null;
+        Commands.CommandProcessor? commandProcessor = null;
+
+        if (Scripting.Builtins.UnifiedContext != null)
+        {
+            // Extract player from the unified context
+            var playerObj = Scripting.Builtins.UnifiedContext.Player;
+            if (playerObj is GameObject playerGameObj)
+            {
+                currentPlayer = ObjectManager.GetObject<Player>(playerGameObj.Id);
+            }
+
+            commandProcessor = Scripting.Builtins.UnifiedContext.CommandProcessor;
+        }
+
+        if (currentPlayer == null)
+        {
+            throw new ContextException($"Cannot execute function '{methodName}': no current player context available");
+        }
+
+        return (currentPlayer, commandProcessor);
     }
 
     /// <summary>
@@ -501,32 +567,42 @@ public class GameObject : DynamicObject
 
     private bool PermissionCheck(string propertyName, bool set = false)
     {
-        var This = Builtins.UnifiedContext?.This;
+        // If no accessor is defined, assume public access
         if (!PropAccessors.ContainsKey(propertyName))
-            return true; // Assume public if no accessor set
+            return true;
 
         var accessor = PropAccessors[propertyName].AsString.ToLowerInvariant();
+        var currentContext = Builtins.UnifiedContext?.This;
 
+        // Check for read-only constraint on write operations
         if (set && accessor.Contains("readonly"))
             throw new PropertyAccessException($"Property '{propertyName}' is read-only");
 
-        if (This == null)
+        // Check for constant constraint (no access allowed)
+        if (accessor.Contains("constant"))
+            throw new PropertyAccessException($"Property '{propertyName}' is constant");
+
+        // Ensure we have a valid context for permission checks
+        if (currentContext == null)
             throw new ContextException("Current context is null, cannot check property permissions");
 
-        switch (true)
+        // Check private access: only the object itself can access
+        if (accessor.StartsWith("private") && currentContext.Id != this.Id)
+            throw new PrivateAccessException($"Cannot access property '{propertyName}' on object {Name}(#{DbRef})");
+
+        // Check internal access: only the object itself or its owner can access
+        if (accessor.StartsWith("internal"))
         {
-            case true when accessor.StartsWith("private") && This.Id != this.Id:
-                throw new PrivateAccessException($"Cannot access property '{propertyName}' on object {Name}(#{DbRef})");
-
-            case true when accessor.StartsWith("internal") && (This.Id != this.Id && This.Id != this.Owner?.Id):
+            bool isSelfAccess = currentContext.Id == this.Id;
+            bool isOwnerAccess = currentContext.Id == this.Owner?.Id;
+            
+            if (!isSelfAccess && !isOwnerAccess)
                 throw new PermissionException($"Cannot access internal property '{propertyName}' on object {Name}(#{DbRef})");
-
-            case true when accessor.Contains("adminonly") && !This.IsAdmin:
-                throw new PermissionException($"Property '{propertyName}' is admin-only");
-
-            case true when accessor.Contains("constant"):
-                throw new PropertyAccessException($"Property '{propertyName}' is constant");
         }
+
+        // Check admin-only access: only admin users can access
+        if (accessor.Contains("adminonly") && !currentContext.IsAdmin)
+            throw new PermissionException($"Property '{propertyName}' is admin-only");
 
         return true;
     }
