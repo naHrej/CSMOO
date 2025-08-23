@@ -528,13 +528,6 @@ public static class VerbResolver
             }
         }
 
-        // 6. Fallback: Check if this is a movement command (single word that matches an exit)
-        if (parts.Length == 1)
-        {
-            var direction = parts[0].ToLower();
-            return TryExecuteMovementCommand(direction, player, commandProcessor);
-        }
-
         return false; // No verb found
     }
 
@@ -585,78 +578,6 @@ public static class VerbResolver
             ScriptStackTrace.Clear();
             return false;
         }
-    }
-
-    /// <summary>
-    /// Tries to execute a movement command by calling the 'go' verb with the direction
-    /// </summary>
-    private static bool TryExecuteMovementCommand(string direction, Player player, Commands.CommandProcessor commandProcessor)
-    {
-        // Get current room
-        if (string.IsNullOrEmpty(player.Location?.Id))
-            return false;
-        var room = player.Location;
-        if (room == null) return false;
-
-        // Get exits from current room to check if the direction is valid
-        var exitClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "Exit");
-        if (exitClass == null) return false;
-
-        var exits = ObjectManager.GetObjectsInLocation(room.Id)
-            .Where(obj => obj.ClassId == exitClass.Id)
-            .ToList();
-
-        if (exits.Count == 0) return false;
-
-        // Common direction mappings
-        var directionMap = new Dictionary<string, string> {
-            {"n", "north"}, {"s", "south"}, {"e", "east"}, {"w", "west"},
-            {"ne", "northeast"}, {"nw", "northwest"}, {"se", "southeast"}, {"sw", "southwest"},
-            {"u", "up"}, {"d", "down"}
-        };
-
-        // Normalize direction (convert abbreviations to full names)
-        var normalizedDirection = directionMap.ContainsKey(direction) ? directionMap[direction] : direction;
-
-        // Check if the word matches any exit direction or alias
-        bool hasMatchingExit = false;
-        foreach (var exit in exits)
-        {
-            var exitDirection = exit.Properties.ContainsKey("direction") ? exit.Properties["direction"].AsString?.ToLower() : null;
-            var aliases = exit.Properties.ContainsKey("aliases") ? exit.Properties["aliases"].AsString?.ToLower() : null;
-            
-            if (exitDirection == direction || exitDirection == normalizedDirection)
-            {
-                hasMatchingExit = true;
-                break;
-            }
-
-            // Check aliases
-            if (!string.IsNullOrEmpty(aliases))
-            {
-                var aliasArray = aliases.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-                if (aliasArray.Any(alias => alias == direction || alias == normalizedDirection))
-                {
-                    hasMatchingExit = true;
-                    break;
-                }
-            }
-        }
-
-        if (!hasMatchingExit) return false;
-
-        // Found a matching exit, call the 'go' verb with this direction
-        var systemObject = GetOrCreateSystemObject();
-        var goVerb = GetSystemVerbs().FirstOrDefault(v => v.Name?.ToLower() == "go");
-        
-        if (goVerb != null)
-        {
-            // Execute the 'go' verb with the direction as argument
-            var goInput = $"go {normalizedDirection}";
-            return ExecuteVerb(goVerb, goInput, player, commandProcessor, systemObject.Id);
-        }
-
-        return false;
     }
 
     /// <summary>

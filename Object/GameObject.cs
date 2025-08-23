@@ -286,8 +286,7 @@ public class GameObject : DynamicObject
     {
         if (!Properties.ContainsKey(propertyName))
         {
-            result = null;
-            return false;
+            throw new PropertyAccessException($"Property '{propertyName}' not found on object {Name}(#{DbRef})");
         }
 
         var bsonValue = Properties[propertyName];

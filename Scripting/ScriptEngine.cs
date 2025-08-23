@@ -581,7 +581,6 @@ public class ScriptEngine
         scriptBuilder.AppendLine(originalCode);
         
         var completeScript = scriptBuilder.ToString();
-        Logger.Debug($"Complete generated script:\n{completeScript}");
         
         return completeScript;
     }

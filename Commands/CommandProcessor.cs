@@ -286,24 +286,27 @@ public class CommandProcessor
     /// <summary>
     /// Tries to execute the input as a "go" command for movement
     /// </summary>
-    private bool TryExecuteGoCommand(string input)
-    {
-        if (_player == null) return false;
+private bool TryExecuteGoCommand(string input)
+{
+    Logger.Debug($"TryExecuteGoCommand called with input: '{input}'");
+    if (_player == null) return false;
 
-        try
-        {
-            // Try to execute the input with "go" prepended to see if it matches a movement direction
-            var goCommand = $"go {input}";
-            
-            // Use the existing TryExecuteVerb method but specifically for the go command
-            return VerbResolver.TryExecuteVerb(goCommand, _player, this);
-        }
-        catch (Exception ex)
-        {
-            Logger.Debug($"Error in TryExecuteGoCommand: {ex.Message}");
-            return false;
-        }
+    try
+    {
+        var goCommand = $"go {input}";
+        Logger.Debug($"About to call VerbResolver.TryExecuteVerb with: '{goCommand}'"); // Add this
+        
+        var result = VerbResolver.TryExecuteVerb(goCommand, _player, this);
+        
+        Logger.Debug($"VerbResolver.TryExecuteVerb returned: {result}"); // Add this
+        return result;
     }
+    catch (Exception ex)
+    {
+        Logger.Debug($"Error in TryExecuteGoCommand: {ex.Message}");
+        return false;
+    }
+}
 
     private void HandleScript(string input)
     {
