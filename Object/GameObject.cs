@@ -62,6 +62,11 @@ public class GameObject : DynamicObject
     public BsonDocument Properties { get; set; } = new BsonDocument();
 
     /// <summary>
+    /// Instance-specific accessors for dynamic properties
+    /// </summary>
+    public BsonDocument PropAccessors { get; set; } = new BsonDocument();
+
+    /// <summary>
     /// Location of this object (ID of the room/container it's in)
     /// Null means it's not in the game world currently
     /// Preferred over using Location property directly
@@ -110,6 +115,8 @@ public class GameObject : DynamicObject
         get => Properties.ContainsKey("modifiedat") ? Properties["modifiedat"].AsDateTime : DateTime.UtcNow;
         set => Properties["modifiedat"] = new BsonValue(value);
     }
+
+    public bool IsAdmin => Permissions.Contains("admin");
 
     // Dynamic property accessors for common properties to satisfy the C# compiler
     // These forward to the dynamic property system but provide compile-time visibility
@@ -191,11 +198,9 @@ public class GameObject : DynamicObject
     /// </summary>
     public override bool TryGetMember(GetMemberBinder binder, out object? result)
     {
-        if (!PermissionCheck())
-        {
-            throw new PrivateAccessException($"Cannot get property '{binder.Name}' on object {Name}(#{DbRef})");
-        }
+    
         var propertyName = binder.Name;
+        PermissionCheck(propertyName);
 
         try
         {
@@ -298,11 +303,8 @@ public class GameObject : DynamicObject
     public override bool TrySetMember(SetMemberBinder binder, object? value)
     {
         var propertyName = binder.Name;
+        PermissionCheck(propertyName, true);
 
-        if (!PermissionCheck())
-        {
-            throw new PrivateAccessException($"Cannot set property '{propertyName}' on object {Name}(#{DbRef})");
-        }
 
         try
         {
@@ -497,13 +499,36 @@ public class GameObject : DynamicObject
         };
     }
 
-    private bool PermissionCheck()
+    private bool PermissionCheck(string propertyName, bool set = false)
     {
-        if (this.Id == Builtins.UnifiedContext?.This?.Id || Builtins.UnifiedContext?.Player?.Properties.ContainsKey("isSystemObject"))
+        var This = Builtins.UnifiedContext?.This;
+        if (!PropAccessors.ContainsKey(propertyName))
+            return true; // Assume public if no accessor set
+
+        var accessor = PropAccessors[propertyName].AsString.ToLowerInvariant();
+
+        if (set && accessor.Contains("readonly"))
+            throw new InvalidOperationException($"Property '{propertyName}' is read-only");
+
+        if (This == null)
+            throw new InvalidOperationException("Current context is null, cannot check property permissions");
+
+        switch (true)
         {
-            return true;
+            case true when accessor.StartsWith("private") && This.Id != this.Id:
+                throw new PrivateAccessException($"Cannot access property '{propertyName}' on object {Name}(#{DbRef})");
+
+            case true when accessor.StartsWith("internal") && (This.Id != this.Id && This.Id != this.Owner?.Id):
+                throw new InvalidOperationException($"Cannot access internal property '{propertyName}' on object {Name}(#{DbRef})");
+
+            case true when accessor.Contains("adminonly") && !This.IsAdmin:
+                throw new InvalidOperationException($"Property '{propertyName}' is admin-only");
+
+            case true when accessor.Contains("constant"):
+                throw new InvalidOperationException($"Property '{propertyName}' is constant");
         }
-        return false;
+
+        return true;
     }
 
     /// <summary>

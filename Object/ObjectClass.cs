@@ -26,6 +26,8 @@ public class ObjectClass
     /// These can be overridden in individual instances
     /// </summary>
     public BsonDocument Properties { get; set; } = new BsonDocument();
+
+    public BsonDocument PropAccessors { get; set; } = new BsonDocument();
     
     /// <summary>
     /// Methods/functions defined on this class (stored as code strings)

@@ -5,6 +5,7 @@ using CSMOO.Functions;
 using CSMOO.Verbs;
 using CSMOO.Object;
 using CSMOO.Logging;
+using dotless.Core.Parser;
 
 namespace CSMOO.Parsing;
 
@@ -121,6 +122,36 @@ public static class CodeDefinitionParser
         }
     }
     
+    private static string ExtractPropertyAccessor(FieldDeclarationSyntax field)
+{
+    var accessors = "";
+
+    // Check for public/private/internal/protected
+    foreach (var mod in field.Modifiers)
+    {
+        var modText = mod.Text.ToLowerInvariant();
+        if (modText is "public" or "private" or "internal" or "protected")
+            accessors += modText + " ";
+    }
+
+    // Check for readonly
+    if (field.Modifiers.Any(m => m.IsKind(SyntaxKind.ReadOnlyKeyword)))
+        accessors += "readonly ";
+
+    // Check for custom attributes like [AdminOnly]
+    foreach (var attributeList in field.AttributeLists)
+    {
+        foreach (var attribute in attributeList.Attributes)
+        {
+            var attrName = attribute.Name.ToString().ToLowerInvariant();
+            if (attrName is "adminonly" or "constant" or "writeonly")
+                accessors += attrName + " ";
+        }
+    }
+
+    return accessors;
+}
+    
     /// <summary>
     /// Parse a C# file and extract property definitions
     /// </summary>
@@ -131,18 +162,17 @@ public static class CodeDefinitionParser
             var code = File.ReadAllText(filePath);
             var tree = CSharpSyntaxTree.ParseText(code);
             var root = tree.GetCompilationUnitRoot();
-            
+
             var properties = new List<PropertyDefinition>();
-            
+
             foreach (var classDecl in root.DescendantNodes().OfType<ClassDeclarationSyntax>())
             {
                 var className = classDecl.Identifier.ValueText;
-                
+
                 foreach (var field in classDecl.DescendantNodes().OfType<FieldDeclarationSyntax>())
                 {
-                    // Only process public fields
-                    if (!field.Modifiers.Any(m => m.IsKind(SyntaxKind.PublicKeyword)))
-                        continue;
+                    // Process all fields regardless of access modifier
+                    // The access control will be handled by the Accessor property
                     
                     foreach (var variable in field.Declaration.Variables)
                     {
@@ -152,15 +182,16 @@ public static class CodeDefinitionParser
                             TargetClass = className,
                             Type = DeterminePropertyType(field.Declaration.Type),
                             Value = ExtractPropertyValue(variable),
-                            Description = ExtractDocumentation(field) ?? $"Property {variable.Identifier.ValueText} for {className}"
+                            Description = ExtractDocumentation(field) ?? $"Property {variable.Identifier.ValueText} for {className}",
+                            Accessor = ExtractPropertyAccessor(field)
                         };
-                        
+
                         properties.Add(property);
                         Logger.Debug($"Parsed property: {property.Name} for class {property.TargetClass}");
                     }
                 }
             }
-            
+
             return properties;
         }
         catch (Exception ex)

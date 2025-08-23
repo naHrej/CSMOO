@@ -61,6 +61,8 @@ public class PropertyDefinition
     [JsonPropertyName("filename")]
     public string? Filename { get; set; }
 
+    public string? Accessor { get; set; } = "public";
+
     /// <summary>
     /// Gets the property value as the appropriate type
     /// </summary>

@@ -7,6 +7,10 @@ public class System
     public string[] less = LoadFile("stylesheet.less");
 
     public int test = 1;
+
+    private int protectedValue = 1;
+
+    
     [VerbAliases("\"")]
     [VerbDescription("Speak to others in the room")]
     [VerbPattern("*")]

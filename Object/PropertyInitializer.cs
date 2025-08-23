@@ -127,8 +127,10 @@ public static class PropertyInitializer
                     if (systemObjectId != null)
                     {
                         var systemObject = ObjectManager.GetObject(systemObjectId);
+                        
                         if (systemObject != null)
                         {
+                            systemObject.PropAccessors[propDef.Name] = propDef.Accessor;
                             var (loadedCount, skippedCount) = SetSystemProperty(systemObject, propDef, baseDirectory);
                             loaded += loadedCount;
                             skipped += skippedCount;
@@ -166,6 +168,7 @@ public static class PropertyInitializer
         try
         {
             var value = propDef.GetTypedValue(baseDirectory);
+            systemObject.PropAccessors[propDef.Name] = propDef.Accessor;
             if (value is string[] lines)
             {
                 // Handle multiline properties as BsonArray
@@ -208,6 +211,7 @@ public static class PropertyInitializer
 
         try
         {
+            targetClass.PropAccessors[propDef.Name] = propDef.Accessor;
             var value = propDef.GetTypedValue(baseDirectory);
             if (value is string[] lines)
             {
