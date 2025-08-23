@@ -1191,7 +1191,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
                 // Check if it's a DBREF (starts with # followed by digits)
                 if (objectName.StartsWith("#") && int.TryParse(objectName.Substring(1), out int dbref))
                 {
-                    var obj = DbProvider.Instance.FindOne<GameObject>("gameobjects", o => o.DbRef == dbref);
+                    var obj = ObjectManager.GetObjectByDbRef(dbref);
                     result = obj?.Id;
                 }
                 // Check if it's a class reference (starts with "class:" or ends with ".class")
@@ -1277,8 +1277,8 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
         }
         
         // Finally, search globally (for admin/building purposes)
-        var allObjects = DbProvider.Instance.FindAll<GameObject>("gameobjects");
-        var globalMatch = allObjects.FirstOrDefault(obj =>
+        var allObjects = ObjectManager.GetAllObjects();
+        var globalMatch = allObjects.OfType<GameObject>().FirstOrDefault(obj =>
         {
             var objName = ObjectManager.GetProperty(obj, "name")?.AsString?.ToLower();
             var shortDesc = ObjectManager.GetProperty(obj, "shortDescription")?.AsString?.ToLower();
@@ -1300,9 +1300,9 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
     /// </summary>
     private string? GetSystemObjectId()
     {
-        // Get all objects and filter in memory (LiteDB doesn't support ContainsKey in expressions)
-        var allObjects = DbProvider.Instance.FindAll<GameObject>("gameobjects");
-        var systemObj = allObjects.FirstOrDefault(obj => 
+        // Get all objects from ObjectManager cache
+        var allObjects = ObjectManager.GetAllObjects();
+        var systemObj = allObjects.OfType<GameObject>().FirstOrDefault(obj => 
             obj.Properties.ContainsKey("isSystemObject") && obj.Properties["isSystemObject"].AsBoolean == true);
         
         if (systemObj == null)
@@ -1427,8 +1427,8 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
     private bool HandleCleanupPlayerCommand(string[] parts)
     {
         // Get the actual player object ID (not the system object)
-        var allObjects = DbProvider.Instance.FindAll<GameObject>("gameobjects").ToList();
-        var playerObject = allObjects.FirstOrDefault(obj => 
+        var allObjects = ObjectManager.GetAllObjects();
+        var playerObject = allObjects.OfType<GameObject>().FirstOrDefault(obj => 
         {
             var playerIdProp = ObjectManager.GetProperty(obj, "playerId");
             return playerIdProp != null && playerIdProp.AsString == _player.Id;
@@ -1510,8 +1510,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
         }
 
         // Find the target player
-        var targetPlayer = DbProvider.Instance.FindOne<Player>("players", p => 
-            p.Name.Equals(playerName, StringComparison.OrdinalIgnoreCase));
+        var targetPlayer = PlayerManager.FindPlayerByName(playerName);
         
         if (targetPlayer == null)
         {
@@ -1583,8 +1582,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
         {
             // Show another player's flags
             var playerName = parts[1];
-            var foundPlayer = DbProvider.Instance.FindOne<Player>("players", p => 
-                p.Name.Equals(playerName, StringComparison.OrdinalIgnoreCase));
+            var foundPlayer = PlayerManager.FindPlayerByName(playerName);
             if (foundPlayer == null)
             {
                 _commandProcessor.SendToPlayer($"Player '{playerName}' not found.");
@@ -1649,7 +1647,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
 
         _commandProcessor.SendToPlayer("Updating existing player permissions to new flag system...");
 
-        var allPlayers = DbProvider.Instance.FindAll<Player>("players").ToList();
+        var allPlayers = PlayerManager.GetAllPlayers();
         int updatedCount = 0;
 
         foreach (var player in allPlayers)

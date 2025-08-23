@@ -284,7 +284,7 @@ public static class CodeDefinitionParser
                         {
                             var aliasText = literal.Token.ValueText;
                             Logger.Debug($"Extracted alias text: '{aliasText}' from attribute");
-                            aliases.AddRange(aliasText.Split(new[] { ',', ' ', ';' }, StringSplitOptions.RemoveEmptyEntries)
+                            aliases.AddRange(aliasText.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries)
                                            .Select(a => a.Trim())
                                            .Where(a => !string.IsNullOrEmpty(a)));
                         }

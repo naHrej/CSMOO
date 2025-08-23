@@ -63,7 +63,7 @@ public class System
 
     [VerbAliases("?")]
     [VerbDescription("Show help categories and topics")]
-    [VerbPattern("{topic}")]
+    [VerbPattern("*")]
     /// <summary>
     /// Show help categories and topics
     /// </summary>
@@ -827,5 +827,34 @@ public class System
 
         // Return as single line for MUD client compatibility
         return container.ToSingleLine();
+    }
+    [VerbAliases("th think ;")]
+    public verb Script()
+    {
+        // Check if any code was provided
+        if (Args.Count == 0 || string.Join(" ", Args).Trim().Length == 0)
+        {
+            notify(Player, "Usage: script { C# code here }");
+            notify(Player, "Aliases: ;, th, think");
+            notify(Player, "Available variables: Player, This, Args, Input, Verb");
+            notify(Player, "All Builtins methods accept either objectId strings or dynamic objects");
+            notify(Player, "Example: ; notify(Player, $\"Hello {Player.Name}!\"); ");
+            notify(Player, "Example: ; SetProperty(This, \"test\", \"value\"); ");
+            return;
+        }
+
+        // Join all arguments to reconstruct the script code
+        var scriptCode = string.Join(" ", Args);
+        var result = Builtins.ExecuteScript(scriptCode, Player, CommandProcessor, This, Input);
+
+        // Only show non-null, non-empty results
+        if (!string.IsNullOrEmpty(result) && result != "null")
+        {
+            notify(Player, $"Script result: {result}");
+        }
+        else
+        {
+            notify(Player, "Script executed successfully.");
+        }
     }
 }

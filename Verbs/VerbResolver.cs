@@ -303,8 +303,8 @@ public static class VerbResolver
     /// </summary>
     private static string? FindSystemObjectId()
     {
-        var allObjects = DbProvider.Instance.FindAll<GameObject>("gameobjects").ToList();
-        var systemObj = allObjects.FirstOrDefault(obj => 
+        var allObjects = ObjectManager.GetAllObjects();
+        var systemObj = allObjects.OfType<GameObject>().FirstOrDefault(obj => 
             obj.Properties.ContainsKey("isSystemObject") && 
             obj.Properties["isSystemObject"].AsBoolean == true);
         
@@ -664,8 +664,8 @@ public static class VerbResolver
     /// </summary>
     private static GameObject GetOrCreateSystemObject()
     {
-        var allObjects = DbProvider.Instance.FindAll<GameObject>("gameobjects").ToList();
-        var systemObject = allObjects.FirstOrDefault(obj => obj.Properties.ContainsKey("isSystemObject") && obj.Properties["isSystemObject"].AsBoolean == true);
+        var allObjects = ObjectManager.GetAllObjects();
+        var systemObject = allObjects.OfType<GameObject>().FirstOrDefault(obj => obj.Properties.ContainsKey("isSystemObject") && obj.Properties["isSystemObject"].AsBoolean == true);
         if (systemObject == null)
         {
             // Create system object
@@ -680,6 +680,7 @@ public static class VerbResolver
                 }
             };
             DbProvider.Instance.Insert("gameobjects", systemObject);
+            ObjectManager.CacheGameObject(systemObject);
         }
         return systemObject;
     }

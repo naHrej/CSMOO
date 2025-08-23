@@ -22,7 +22,7 @@ public static class PlayerManager
             throw new ArgumentException("Password cannot be empty");
 
         // Check if player name already exists
-        var existingPlayer = DbProvider.Instance.FindOne<Player>("players", p => p.Name.ToLower() == name.ToLower());
+        var existingPlayer = FindPlayerByName(name);
         if (existingPlayer != null)
             throw new InvalidOperationException($"Player name '{name}' already exists");
 
@@ -91,7 +91,7 @@ public static class PlayerManager
     /// </summary>
     public static Player? AuthenticatePlayer(string name, string password)
     {
-        Player? player = DbProvider.Instance.FindOne<Player>("players", p => p.Name.ToLower() == name.ToLower());
+        Player? player = FindPlayerByName(name);
         if (player == null)
             return null;
         return VerifyPassword(password, player.PasswordHash) ? player : null;
@@ -141,7 +141,21 @@ public static class PlayerManager
     /// </summary>
     public static Player? GetPlayerBySession(Guid sessionGuid)
     {
+        // First try to find in ObjectManager cache
+        var allCachedObjects = ObjectManager.GetAllObjects();
+        var cachedPlayer = allCachedObjects.OfType<Player>().FirstOrDefault(p => p.SessionGuid == sessionGuid);
+        if (cachedPlayer != null)
+        {
+            return cachedPlayer;
+        }
+
+        // Fallback to database query and cache the result
         var player = DbProvider.Instance.FindOne<Player>("players", p => p.SessionGuid == sessionGuid);
+        if (player != null)
+        {
+            // Cache the player object for future use
+            ObjectManager.CacheGameObject(player);
+        }
         return player;
     }
 
@@ -150,9 +164,49 @@ public static class PlayerManager
     /// </summary>
     public static System.Collections.Generic.List<Player> GetOnlinePlayers()
     {
-        return DbProvider.Instance.Find<Player>("players", p => p.IsOnline)
-            .Select(p => { return p; })
-            .ToList();
+        // First try to get from ObjectManager cache
+        var allCachedObjects = ObjectManager.GetAllObjects();
+        var cachedOnlinePlayers = allCachedObjects.OfType<Player>().Where(p => p.IsOnline).ToList();
+        
+        // Also check database for any players not in cache
+        var dbOnlinePlayers = DbProvider.Instance.Find<Player>("players", p => p.IsOnline).ToList();
+        
+        // Cache any players from database that aren't already cached
+        foreach (var player in dbOnlinePlayers)
+        {
+            if (!cachedOnlinePlayers.Any(cp => cp.Id == player.Id))
+            {
+                ObjectManager.CacheGameObject(player);
+                cachedOnlinePlayers.Add(player);
+            }
+        }
+        
+        return cachedOnlinePlayers;
+    }
+
+    /// <summary>
+    /// Gets all players (both online and offline)
+    /// </summary>
+    public static System.Collections.Generic.List<Player> GetAllPlayers()
+    {
+        // First try to get from ObjectManager cache
+        var allCachedObjects = ObjectManager.GetAllObjects();
+        var cachedPlayers = allCachedObjects.OfType<Player>().ToList();
+        
+        // Also check database for any players not in cache
+        var dbPlayers = DbProvider.Instance.FindAll<Player>("players").ToList();
+        
+        // Cache any players from database that aren't already cached
+        foreach (var player in dbPlayers)
+        {
+            if (!cachedPlayers.Any(cp => cp.Id == player.Id))
+            {
+                ObjectManager.CacheGameObject(player);
+                cachedPlayers.Add(player);
+            }
+        }
+        
+        return cachedPlayers;
     }
 
     /// <summary>
@@ -160,8 +214,21 @@ public static class PlayerManager
     /// </summary>
     public static Player? FindPlayerByName(string name)
     {
-        var player = DbProvider.Instance.FindOne<Player>("players", p => p.Name.ToLower() == name.ToLower());
+        // First try to find in ObjectManager cache
+        var allCachedObjects = ObjectManager.GetAllObjects();
+        var cachedPlayer = allCachedObjects.OfType<Player>().FirstOrDefault(p => p.Name.ToLower() == name.ToLower());
+        if (cachedPlayer != null)
+        {
+            return cachedPlayer;
+        }
 
+        // Fallback to database query and cache the result
+        var player = DbProvider.Instance.FindOne<Player>("players", p => p.Name.ToLower() == name.ToLower());
+        if (player != null)
+        {
+            // Cache the player object for future use
+            ObjectManager.CacheGameObject(player);
+        }
         return player;
     }
 

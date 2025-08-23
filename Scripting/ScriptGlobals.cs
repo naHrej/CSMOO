@@ -212,8 +212,8 @@ public class ScriptGlobals
     public void notify(GameObject targetPlayer, string message)
     {
         var dbPlayer = targetPlayer as Player ?? 
-                      DbProvider.Instance.FindById<Player>("players", targetPlayer.Id);
-        
+                      CSMOO.Object.ObjectManager.GetObject<Player>(targetPlayer.Id);
+
         if (dbPlayer != null)
         {
             CommandProcessor?.SendToPlayer(message, dbPlayer.SessionGuid);
@@ -226,13 +226,15 @@ public class ScriptGlobals
     public GameObject? GetPlayer(string nameOrId)
     {
         // Try by name first
-        var player = DbProvider.Instance.FindOne<Player>("players", p => 
-            p.Name.Equals(nameOrId, StringComparison.OrdinalIgnoreCase));
+        var player = CSMOO.Object.ObjectManager.GetAllObjects()
+            .FirstOrDefault(obj => obj is Player && 
+                                   (obj.Name.Equals(nameOrId, StringComparison.OrdinalIgnoreCase) || 
+                                    obj.Id.Equals(nameOrId, StringComparison.OrdinalIgnoreCase)));
         
         if (player != null) return CSMOO.Object.ObjectManager.GetObject(player.Id);
         
         // Try by ID
-        var playerById = DbProvider.Instance.FindById<Player>("players", nameOrId);
+        var playerById = CSMOO.Object.ObjectManager.GetObject<Player>(nameOrId);
         return playerById != null ? CSMOO.Object.ObjectManager.GetObject(playerById.Id) : null;
     }
 
@@ -265,7 +267,7 @@ public class ScriptGlobals
     private bool IsRoom(GameObject obj)
     {
         // Check if it inherits from Room class
-        var roomClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "Room");
+        var roomClass = CSMOO.Object.ObjectManager.GetAllObjectClasses().FirstOrDefault(c => c.Name == "Room");
         if (roomClass != null && (obj.ClassId == roomClass.Id || CSMOO.Object.ObjectManager.InheritsFrom(obj.ClassId, roomClass.Id)))
         {
             return true;
@@ -285,7 +287,7 @@ public class ScriptGlobals
     private bool HasRoomCharacteristics(GameObject obj)
     {
         // First check if it inherits from Room class
-        var roomClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "Room");
+        var roomClass = CSMOO.Object.ObjectManager.GetAllObjectClasses().FirstOrDefault(c => c.Name == "Room");
         if (roomClass != null && (obj.ClassId == roomClass.Id || CSMOO.Object.ObjectManager.InheritsFrom(obj.ClassId, roomClass.Id)))
         {
             return true;
@@ -433,7 +435,7 @@ public class ScriptGlobals
         // Check if it's a DBREF (starts with # followed by digits)
         if (objectRef.StartsWith("#") && int.TryParse(objectRef.Substring(1), out int dbref))
         {
-            var obj = DbProvider.Instance.FindOne<GameObject>("gameobjects", o => o.DbRef == dbref);
+            var obj = CSMOO.Object.ObjectManager.FindByDbRef(dbref);
             return obj?.Id;
         }
         
@@ -441,29 +443,29 @@ public class ScriptGlobals
         if (objectRef.StartsWith("class:", StringComparison.OrdinalIgnoreCase))
         {
             var className = objectRef.Substring(6);
-            var objectClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => 
-                c.Name.Equals(className, StringComparison.OrdinalIgnoreCase));
+            var objectClass = CSMOO.Object.ObjectManager.GetAllObjectClasses()
+                .FirstOrDefault(c => c.Name.Equals(className, StringComparison.OrdinalIgnoreCase));
             return objectClass?.Id;
         }
         
         if (objectRef.EndsWith(".class", StringComparison.OrdinalIgnoreCase))
         {
             var className = objectRef.Substring(0, objectRef.Length - 6);
-            var objectClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => 
-                c.Name.Equals(className, StringComparison.OrdinalIgnoreCase));
+            var objectClass = CSMOO.Object.ObjectManager.GetAllObjectClasses()
+                .FirstOrDefault(c => c.Name.Equals(className, StringComparison.OrdinalIgnoreCase));
             return objectClass?.Id;
         }
 
         // Check if it's a direct class ID
         // var classById = GameDatabase.Instance.ObjectClasses.FindById(objectRef); // removed direct usage
-        if (DbProvider.Instance.FindById<ObjectClass>("objectclasses", objectRef) is { } classByIdObj)
+        if (CSMOO.Object.ObjectManager.GetAllObjectClasses().FirstOrDefault(c => c.Id == objectRef) is { } classByIdObj)
         {
             return classByIdObj.Id;
         }
         
         // Try to find by name
         // var allObjects = GameDatabase.Instance.GameObjects.FindAll(); // removed direct usage
-        var match = DbProvider.Instance.FindAll<GameObject>("gameobjects")
+        var match = CSMOO.Object.ObjectManager.GetAllObjects()
             .FirstOrDefault(obj =>
             {
                 var objName = (CSMOO.Object.ObjectManager.GetProperty(obj, "name") as BsonValue)?.AsString;
@@ -472,8 +474,9 @@ public class ScriptGlobals
         if (match != null) return match.Id;
         
         // Try as class name
-        var objectClass2 = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => 
-            c.Name.Equals(objectRef, StringComparison.OrdinalIgnoreCase));
+        var objectClass2 = CSMOO.Object.ObjectManager.GetAllObjectClasses()
+            .FirstOrDefault(c => 
+                c.Name.Equals(objectRef, StringComparison.OrdinalIgnoreCase));
         return objectClass2?.Id;
     }
 
@@ -483,7 +486,7 @@ public class ScriptGlobals
     private string GetSystemObjectId()
     {
         // var allObjects = GameDatabase.Instance.GameObjects.FindAll(); // removed direct usage
-        var systemObj = DbProvider.Instance.FindAll<GameObject>("gameobjects")
+        var systemObj = CSMOO.Object.ObjectManager.GetAllObjects()
             .FirstOrDefault(obj => 
                 (obj.Properties.ContainsKey("name") && obj.Properties["name"].AsString == "system") ||
                 (obj.Properties.ContainsKey("isSystemObject") && obj.Properties["isSystemObject"].AsBoolean == true));

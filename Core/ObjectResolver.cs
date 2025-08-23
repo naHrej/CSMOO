@@ -16,7 +16,7 @@ public static class ObjectResolver
   /// If a location is specified, it will be used as if the looker is in that location even if they are not.
   /// The objectType can be used to filter results by class or type.
   /// </summary>
-  public static List<GameObject> ResolveObjects(
+  public static List<dynamic> ResolveObjects(
       string name,
       GameObject looker,
       GameObject? location = null,
@@ -25,7 +25,7 @@ public static class ObjectResolver
     Logging.Logger.Debug($"Resolving objects for '{name}' as seen by {looker.Name} (ID: {looker.Id}) in location {location?.Name ?? "none"} with type filter '{objectType}'");
 
     if (string.IsNullOrWhiteSpace(name) || looker == null)
-      return new List<GameObject>();
+      return new List<dynamic>();
 
     string normName = name.Trim();
     string lowerName = normName.ToLowerInvariant();
@@ -156,7 +156,7 @@ public static class ObjectResolver
   {
     if (dbRef.StartsWith('#') && int.TryParse(dbRef.AsSpan(1), out var dbref))
     {
-      return DbProvider.Instance.FindOne<GameObject>("gameobjects", o => o.DbRef == dbref);
+      return ObjectManager.FindByDbRef(dbref);
     }
     return null;
   }
@@ -178,10 +178,10 @@ public static class ObjectResolver
   /// - Dynamic alias: capital letters and digits in name.
   /// - Exit alias: direction and abbreviations for exits.
   /// </remarks>
-  private static List<GameObject> MatchNameOrAlias(string normName, List<GameObject> candidates)
+  private static List<dynamic> MatchNameOrAlias(string normName, List<GameObject> candidates)
   {
     string lowerName = normName.ToLowerInvariant();
-    var results = new List<GameObject>();
+    var results = new List<dynamic>();
     foreach (var obj in candidates)
     {
       // Name match (case-insensitive)
@@ -287,7 +287,7 @@ public static class ObjectResolver
 
   private static GameObject? GetSystemObject()
   {
-    var allObjects = DbProvider.Instance.FindAll<GameObject>("gameobjects");
+    var allObjects = ObjectManager.GetAllObjects();
     var systemObject = allObjects.FirstOrDefault(obj =>
         (obj.Properties.ContainsKey("name") && obj.Properties["name"].AsString == "system") ||
         (obj.Properties.ContainsKey("isSystemObject") && obj.Properties["isSystemObject"].AsBoolean == true));

@@ -146,7 +146,7 @@ public class ScriptHelpers
                 // Check if it's a DBREF (starts with # followed by digits)
                 if (objectName.StartsWith("#") && int.TryParse(objectName.Substring(1), out int dbref))
                 {
-                    var obj = DbProvider.Instance.FindOne<GameObject>("gameobjects", o => o.DbRef == dbref);
+                    var obj = ObjectManager.GetObjectByDbRef(dbref);
                     result = obj?.Id;
                     Logger.Debug($"DBREF lookup #{dbref} -> {result ?? "not found"}");
                 }
@@ -236,8 +236,8 @@ public class ScriptHelpers
         }
         
         // Finally, search globally (for admin/building purposes)
-        var allObjects = DbProvider.Instance.FindAll<GameObject>("gameobjects");
-        var globalMatch = allObjects.FirstOrDefault(obj =>
+        var allObjects = ObjectManager.GetAllObjects();
+        var globalMatch = allObjects.OfType<GameObject>().FirstOrDefault(obj =>
         {
             var objName = ObjectManager.GetProperty(obj, "name")?.AsString?.ToLower();
             var shortDesc = ObjectManager.GetProperty(obj, "shortDescription")?.AsString?.ToLower();
@@ -284,9 +284,9 @@ public class ScriptHelpers
     /// </summary>
     public string? GetSystemObjectId()
     {
-        // Get all objects and filter in memory (LiteDB doesn't support ContainsKey in expressions)
-        var allObjects = DbProvider.Instance.FindAll<GameObject>("gameobjects");
-        var systemObj = allObjects.FirstOrDefault(obj => 
+        // Get all objects from ObjectManager cache
+        var allObjects = ObjectManager.GetAllObjects();
+        var systemObj = allObjects.OfType<GameObject>().FirstOrDefault(obj => 
             (obj.Properties.ContainsKey("name") && obj.Properties["name"].AsString == "system") ||
             (obj.Properties.ContainsKey("isSystemObject") && obj.Properties["isSystemObject"].AsBoolean == true));
         

@@ -93,7 +93,7 @@ public class HttpServer
                     else if (lessProperty.IsArray)
                     {
                         // Convert BsonArray to List<string>
-                        var lessLines = lessProperty.AsArray.Select(bv => bv.AsString).ToList();
+                        var lessLines = ((IEnumerable<dynamic>)lessProperty.AsArray).Select((Func<dynamic, string>)(bv => bv.AsString)).ToList();
                         less = string.Join("\n", lessLines);
                     }
                 }

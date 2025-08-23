@@ -42,6 +42,11 @@ public static class Builtins
         return ObjectManager.GetProperty(obj, propertyName);
     }
 
+    public static string[] GetAllPropertyNames(GameObject obj)
+    {
+        return ObjectManager.GetPropertyNames(obj);
+    }
+
   
     
     /// <summary>
@@ -152,19 +157,12 @@ public static class Builtins
     /// </summary>
     public static dynamic? FindPlayer(string playerName)
     {
-        if (string.IsNullOrEmpty(playerName)) return null;
-        return DbProvider.Instance.FindOne<Player>("players", p =>
-            p.Name.Equals(playerName, StringComparison.OrdinalIgnoreCase));
+            return ObjectManager.GetAllObjects()
+            .OfType<Player>()
+            .FirstOrDefault(p => p.Name.Contains(playerName, StringComparison.OrdinalIgnoreCase));
+       
     }
     
-    /// <summary>
-    /// Find a player by partial name match
-    /// </summary>
-    public static dynamic? FindPlayerByPartialName(string partialName)
-    {
-        return DbProvider.Instance.FindOne<Player>("players", p => 
-            p.Name.StartsWith(partialName, StringComparison.OrdinalIgnoreCase));
-    }
     
     /// <summary>
     /// Find a player by ID
@@ -187,7 +185,10 @@ public static class Builtins
     /// </summary>
     public static List<dynamic> GetAllPlayers()
     {
-        return DbProvider.Instance.FindAll<Player>("players").ToList<dynamic>();
+        return ObjectManager.GetAllObjects()
+            .OfType<Player>()
+            .Cast<dynamic>()
+            .ToList();
     }
     
     /// <summary>
@@ -195,7 +196,10 @@ public static class Builtins
     /// </summary>
     public static List<dynamic> GetAllObjects()
     {
-        return DbProvider.Instance.FindAll<GameObject>("gameobjects").ToList<dynamic>();
+        return ObjectManager.GetAllObjects()
+            .OfType<GameObject>()
+            .Cast<dynamic>()
+            .ToList();
     }
     
     /// <summary>
@@ -203,15 +207,14 @@ public static class Builtins
     /// </summary>
     public static List<dynamic> GetAllObjectClasses()
     {
-        return DbProvider.Instance.FindAll<ObjectClass>("objectclasses").ToList<dynamic>();
+        return ObjectManager.GetAllObjectClasses().Cast<dynamic>().ToList();
     }
 
     public static List<dynamic> GetObjectsByClass(string className)
     {
         if (string.IsNullOrEmpty(className)) return new List<dynamic>();
         
-        var objectClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c =>
-            c.Name.Equals(className, StringComparison.OrdinalIgnoreCase));
+        var objectClass = ObjectManager.GetClassByName(className);
         
         if (objectClass == null) return new List<dynamic>();
         
@@ -437,7 +440,7 @@ public static class Builtins
                 return currentPlayer.Location?.Id;
             case "system":
                 // Find the system object
-                var allObjects = DbProvider.Instance.FindAll<GameObject>("gameobjects");
+                var allObjects = ObjectManager.GetAllObjects();
                 var systemObj = allObjects.FirstOrDefault(obj =>
                     (obj.Properties.ContainsKey("name") && obj.Properties["name"].AsString == "system") ||
                     (obj.Properties.ContainsKey("isSystemObject") && obj.Properties["isSystemObject"].AsBoolean == true));
@@ -447,7 +450,7 @@ public static class Builtins
         // Check if it's a DBREF (starts with # followed by digits)
         if (objectName.StartsWith("#") && int.TryParse(objectName.Substring(1), out int dbref))
         {
-            var obj = DbProvider.Instance.FindOne<GameObject>("gameobjects", o => o.DbRef == dbref);
+            var obj = ObjectManager.FindByDbRef(dbref);
             return obj?.Id;
         }
 
@@ -455,28 +458,26 @@ public static class Builtins
         if (objectName.StartsWith("class:", StringComparison.OrdinalIgnoreCase))
         {
             var className = objectName.Substring(6); // Remove "class:" prefix
-            var objectClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c =>
-                c.Name.Equals(className, StringComparison.OrdinalIgnoreCase));
+            var objectClass = ObjectManager.GetClassByName(className);
             return objectClass?.Id;
         }
         
         if (objectName.EndsWith(".class", StringComparison.OrdinalIgnoreCase))
         {
             var className = objectName.Substring(0, objectName.Length - 6); // Remove ".class" suffix
-            var objectClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => 
-                c.Name.Equals(className, StringComparison.OrdinalIgnoreCase));
+            var objectClass = ObjectManager.GetClassByName(className);
             return objectClass?.Id;
         }
 
         // Check if it's a direct class ID (like "Room", "Exit", etc.)
-        var classById = DbProvider.Instance.FindById<ObjectClass>("objectclasses", objectName);
+        var classById = ObjectManager.GetClass(objectName);
         if (classById != null)
         {
             return classById.Id;
         }
         
         // Try to find a player first
-        var player = FindPlayerByPartialName(objectName);
+        var player = FindPlayer(objectName);
         if (player != null)
         {
             return player.Id;
@@ -518,16 +519,15 @@ public static class Builtins
         }
         
         // If not found as an object, try as a class name
-        var directClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => 
-            c.Name.Equals(objectName, StringComparison.OrdinalIgnoreCase));
-        
+        var directClass = ObjectManager.GetClassByName(objectName);
+
         if (directClass != null)
         {
             return directClass.Id;
         }
 
         // Finally, search globally for any object with a matching name
-        var globalObjects = DbProvider.Instance.FindAll<GameObject>("gameobjects");
+        var globalObjects = ObjectManager.GetAllObjects();
         var globalObject = globalObjects.FirstOrDefault(obj =>
         {
             var objName = GetObjectName(obj);
@@ -748,7 +748,7 @@ public static class Builtins
     {
         if (obj != null && !string.IsNullOrEmpty(obj.ClassId))
         {
-            return DbProvider.Instance.FindById<ObjectClass>("objectclasses", obj.ClassId);
+            return ObjectManager.GetClass(obj.ClassId);
         }
         return null;
     }
@@ -838,8 +838,8 @@ public static class Builtins
             }
 
             // Show objects
-            var exitClassId = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "Exit")?.Id;
-            var playerClassId = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "Player")?.Id;
+            var exitClassId = ObjectManager.GetClassByName("Exit")?.Id;
+            var playerClassId = ObjectManager.GetClassByName("Player")?.Id;
             var objects = ((IEnumerable<dynamic>)GetObjectsInLocation(currentPlayer.Location.Id))
                 .Where(obj => {
                     var gameObject = obj.GameObject as GameObject;

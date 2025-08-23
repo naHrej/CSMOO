@@ -464,8 +464,8 @@ public class CommandProcessor
             Logger.Debug($"Login banner CSS sent to player {_player?.Name}\n<style type='text/css'>{css}</style><hr/>");
 
             // Find the system object first
-            var allObjects = DbProvider.Instance.FindAll<GameObject>("gameobjects").ToList();
-            var systemObj = allObjects.FirstOrDefault(obj => 
+            var allObjects = ObjectManager.GetAllObjects();
+            var systemObj = allObjects.OfType<GameObject>().FirstOrDefault(obj => 
                 (obj.Properties.ContainsKey("name") && obj.Properties["name"].AsString == "system") ||
                 (obj.Properties.ContainsKey("isSystemObject") && obj.Properties["isSystemObject"].AsBoolean == true));
             

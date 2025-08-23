@@ -202,6 +202,17 @@ public class GameObject : DynamicObject
             // Handle special GameObject properties first
             switch (propertyName.ToLower())
             {
+                case "properties":
+                    if (Builtins.UnifiedContext?.This?.Properties.ContainsKey("isSystemObject"))
+                    {
+                        result = ObjectManager.GetAllPropertyNames(this);
+                        return true;
+                    }
+                    else
+                    {
+                        throw new InvalidOperationException("Cannot access 'Properties' directly. Use ObjectManager.GetProperty() for individual properties.");
+                    }
+
                 case "id":
                     result = Id;
                     return true;
@@ -253,7 +264,7 @@ public class GameObject : DynamicObject
                 // Try to resolve as a GameObject if it's a Guid string
                 if (rawValue is string strValue && Guid.TryParse(strValue, out var guid))
                 {
-                    var obj = ObjectManager.GetObject( strValue);
+                    var obj = ObjectManager.GetObject(strValue);
                     if (obj != null)
                     {
                         result = obj as dynamic;
@@ -288,7 +299,7 @@ public class GameObject : DynamicObject
     {
         var propertyName = binder.Name;
 
-        if(!PermissionCheck())
+        if (!PermissionCheck())
         {
             throw new PrivateAccessException($"Cannot set property '{propertyName}' on object {Name}(#{DbRef})");
         }
@@ -305,6 +316,10 @@ public class GameObject : DynamicObject
             // Prevent setting read-only GameObject properties
             switch (propertyName.ToLower())
             {
+                case "properties":
+
+                    throw new InvalidOperationException("Cannot access 'Properties' directly. Use ObjectManager.GetProperty() for individual properties.");
+
                 case "id":
                 case "dbref":
                 case "classid":
@@ -351,7 +366,7 @@ public class GameObject : DynamicObject
                 _ => new BsonValue(value.ToString() ?? "")
             };
             Properties[propertyName] = bsonValue;
-            ObjectManager.SetProperty(this, propertyName, bsonValue);
+            ObjectManager.SetProperty(this, propertyName, value is BsonValue bson ? bson : new BsonValue(value));
             return true;
         }
         catch (Exception ex)
@@ -484,7 +499,11 @@ public class GameObject : DynamicObject
 
     private bool PermissionCheck()
     {
-        return this.Id == Builtins.UnifiedContext?.This?.Id;
+        if (this.Id == Builtins.UnifiedContext?.This?.Id || Builtins.UnifiedContext?.Player?.Properties.ContainsKey("isSystemObject"))
+        {
+            return true;
+        }
+        return false;
     }
 
     /// <summary>

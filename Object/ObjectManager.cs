@@ -1,6 +1,7 @@
 using LiteDB;
 using CSMOO.Logging;
 using CSMOO.Database;
+using CSMOO.Verbs;
 
 namespace CSMOO.Object;
 /// <summary>
@@ -17,6 +18,7 @@ public static class ObjectManager
     /// <summary>
     /// Loads all GameObjects from the database into the singleton cache at startup.
     /// </summary>
+
     public static void LoadAllObjectsToCache()
     {
         var allObjects = DbProvider.Instance.FindAll<GameObject>("gameobjects");
@@ -160,7 +162,7 @@ public static class ObjectManager
     /// Finds an object by its DbRef number
     /// </summary>
     public static GameObject? FindByDbRef(int dbRef)
-        => InstanceManager.FindByDbRef(dbRef);
+        => GetObjectByDbRef(dbRef);
 
     /// <summary>
     /// Gets basic statistics about objects in the database
@@ -205,6 +207,23 @@ public static class ObjectManager
         return obj;
     }
 
+    /// <summary>
+    /// Gets a GameObject by DbRef number
+    /// </summary>
+    public static GameObject? GetObjectByDbRef(int dbRef)
+    {
+        // First check cache
+        var cached = _objectCache.Values.FirstOrDefault(obj => obj.DbRef == dbRef);
+        if (cached != null)
+            return cached;
+
+        // Fallback to database
+        var obj = DbProvider.Instance.FindOne<GameObject>("gameobjects", o => o.DbRef == dbRef);
+        if (obj != null)
+            _objectCache[obj.Id] = obj;
+        return obj;
+    }
+
     public static ObjectClass? GetClass(string classId)
     {
         if (string.IsNullOrEmpty(classId)) return null;
@@ -230,20 +249,20 @@ public static class ObjectManager
     }
     #endregion
 
-        #region Property Management (delegated to PropertyManager)
+    #region Property Management (delegated to PropertyManager)
 
-        /// <summary>
-        /// Gets a property value from an object, checking inheritance chain if not found on instance
-        /// </summary>
+    /// <summary>
+    /// Gets a property value from an object, checking inheritance chain if not found on instance
+    /// </summary>
     public static BsonValue? GetProperty(GameObject gameObject, string propertyName)
         => PropertyManager.GetProperty(gameObject, propertyName);
 
     // <summary>
     /// Get all objects in the cache
     /// </summary>
-    public static List<GameObject> GetAllObjects()
+    public static List<dynamic> GetAllObjects()
     {
-        return _objectCache.Values.ToList();
+        return _objectCache.Values.ToList().ConvertAll(obj => (dynamic)obj);
     }
 
     /// <summary>
@@ -287,6 +306,14 @@ public static class ObjectManager
         if (!_objectCache.ContainsKey(gameObject.Id))
             _objectCache[gameObject.Id] = gameObject;
         return PropertyManager.RemoveProperty(gameObject, propertyName);
+    }
+
+    public static string[] GetPropertyNames(GameObject gameObject)
+    {
+        // Update the cache with the latest instance
+        if (!_objectCache.ContainsKey(gameObject.Id))
+            _objectCache[gameObject.Id] = gameObject;
+        return PropertyManager.GetAllPropertyNames(gameObject);
     }
     /// <summary>
     /// Forces a reload of a GameObject from the database, replacing the cached instance.

@@ -15,7 +15,7 @@ public class ScriptPlayerManager
 
     public string? GetPlayerLocation(string playerName)
     {
-        var player = DbProvider.Instance.FindOne<Player>("players", p => p.Name == playerName);
+        var player = ObjectManager.GetAllObjects().FirstOrDefault(p => p.Name == playerName && p is Player);
         return player?.Location?.Id;
     }
 }

@@ -86,19 +86,22 @@ public class ScriptEngine
             {
                 Logger.Warning($"ExecuteVerb: playerObject is null for ID '{player.Id}' (verb: {verb.Name})");
             }
+            // check if thisObject has an admin flag
+            var isAdmin = (thisObject?.Permissions.Contains("admin") == true);
 
-            var globals = new ScriptGlobals
-            {
-                Player = player, // Always the Database.Player
-                This = thisObject,
-                Caller = previousContext?.This ?? playerObject, // The object that called this verb (or Player if no previous context)
-                CallDepth = (previousContext?.CallDepth ?? 0) + 1, // Track call depth
-                CommandProcessor = commandProcessor,
-                Input = input,
-                Args = ParseArguments(input),
-                Verb = verb.Name,
-                Variables = variables ?? new Dictionary<string, string>()
-            };
+            var globals = isAdmin ? new AdminScriptGlobals() : new ScriptGlobals();
+
+
+            globals.Player = player; // Always the Database.Player
+            globals.This = thisObject;
+            globals.Caller = previousContext?.This ?? playerObject; // The object that called this verb (or Player if no previous context)
+            globals.CallDepth = (previousContext?.CallDepth ?? 0) + 1; // Track call depth
+            globals.CommandProcessor = commandProcessor;
+            globals.Input = input;
+            globals.Args = ParseArguments(input);
+            globals.Verb = verb.Name;
+            globals.Variables = variables ?? new Dictionary<string, string>();
+
 
             // Check for maximum call depth
             if (globals.CallDepth > Config.Instance.Scripting.MaxCallDepth)

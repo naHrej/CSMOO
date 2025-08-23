@@ -50,8 +50,8 @@ public static class WorldInitializer
     public static void PrintWorldStatistics()
     {
         var classCount = DbProvider.Instance.FindAll<ObjectClass>("objectclasses").Count();
-        var objectCount = DbProvider.Instance.FindAll<GameObject>("gameobjects").Count();
-        var playerCount = DbProvider.Instance.FindAll<Player>("players").Count();
+        var objectCount = ObjectManager.GetAllObjects().Count();
+        var playerCount = PlayerManager.GetAllPlayers().Count();
         var roomStats = RoomManager.GetRoomStatistics();
 
         Logger.Game("\n=== World Statistics ===");
