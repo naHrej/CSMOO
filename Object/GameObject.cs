@@ -2,9 +2,9 @@ using System.Dynamic;
 using LiteDB;
 using CSMOO.Functions;
 using CSMOO.Database;
-using CSMOO.Scripting;
 using CSMOO.Exceptions;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using CSMOO.Core;
 
 namespace CSMOO.Object;
 
@@ -521,16 +521,16 @@ public class GameObject : DynamicObject
         Player? currentPlayer = null;
         Commands.CommandProcessor? commandProcessor = null;
 
-        if (Scripting.Builtins.UnifiedContext != null)
+        if (Builtins.UnifiedContext != null)
         {
             // Extract player from the unified context
-            var playerObj = Scripting.Builtins.UnifiedContext.Player;
+            var playerObj = Builtins.UnifiedContext.Player;
             if (playerObj is GameObject playerGameObj)
             {
                 currentPlayer = ObjectManager.GetObject<Player>(playerGameObj.Id);
             }
 
-            commandProcessor = Scripting.Builtins.UnifiedContext.CommandProcessor;
+            commandProcessor = Builtins.UnifiedContext.CommandProcessor;
         }
 
         if (currentPlayer == null)

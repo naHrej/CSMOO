@@ -47,9 +47,8 @@ public class Room
                 desc.Append("</ul>");
             }
         }
-        catch (Exception ex)
+        catch (ScriptExecutionException ex)
         {
-
         }
         return desc.ToString();
     }

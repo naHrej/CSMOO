@@ -4,7 +4,7 @@ using CSMOO.Logging;
 using CSMOO.Object;
 using System.Linq;
 
-namespace CSMOO.Core;
+namespace CSMOO.Init;
 
 /// <summary>
 /// Handles server initialization and startup procedures

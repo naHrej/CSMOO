@@ -2,7 +2,7 @@ using System.Reflection;
 using CSMOO.Logging;
 using CSMOO.Object;
 
-namespace CSMOO.Core;
+namespace CSMOO.Init;
 
 /// <summary>
 /// Enhanced hot reload manager that supports .NET application code hot reload

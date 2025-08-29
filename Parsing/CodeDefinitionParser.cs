@@ -6,7 +6,6 @@ using CSMOO.Verbs;
 using CSMOO.Object;
 using CSMOO.Logging;
 using dotless.Core.Parser;
-using CSMOO.Scripting;
 
 namespace CSMOO.Parsing;
 

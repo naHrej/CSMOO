@@ -2,7 +2,6 @@ using LiteDB;
 using CSMOO.Logging;
 using CSMOO.Database;
 using CSMOO.Parsing;
-using CSMOO.Scripting;
 
 namespace CSMOO.Object;
 

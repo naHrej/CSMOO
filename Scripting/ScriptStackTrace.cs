@@ -1,7 +1,6 @@
 using System.Text;
 using CSMOO.Object;
 using CSMOO.Functions;
-using CSMOO.Verbs;
 using CSMOO.Exceptions;
 using CSMOO.Logging;
 

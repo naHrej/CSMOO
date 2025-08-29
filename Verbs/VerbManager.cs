@@ -1,6 +1,7 @@
 using LiteDB;
 using CSMOO.Database;
 using CSMOO.Logging;
+using CSMOO.Object;
 
 namespace CSMOO.Verbs;
 

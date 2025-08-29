@@ -2,7 +2,7 @@ using System.Text.RegularExpressions;
 using HtmlAgilityPack;
 using dotless.Core;
 
-namespace CSMOO.Scripting;
+namespace CSMOO.Core;
 
 /// <summary>
 /// Simplified HTML generation utilities for verb scripts

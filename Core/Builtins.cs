@@ -4,8 +4,9 @@ using CSMOO.Verbs;
 using CSMOO.Functions;
 using LiteDB;
 using CSMOO.Object;
+using CSMOO.Scripting;
 
-namespace CSMOO.Scripting;
+namespace CSMOO.Core;
 
 /// <summary>
 /// Built-in functions for verb scripts - provides clean, consistent API without casting or long namespaces
@@ -17,10 +18,12 @@ public static class Builtins
     /// </summary>
     public static ScriptGlobals? CurrentContext { get; set; }
     
-    /// <summary>
-    /// Unified script context - set by the UnifiedScriptEngine before execution
-    /// </summary>
-    public static ScriptGlobals? UnifiedContext { get; set; }
+    private static readonly System.Threading.AsyncLocal<ScriptGlobals?> _unified = new();
+    public static ScriptGlobals? UnifiedContext
+    {
+        get => _unified.Value;
+        set => _unified.Value = value;
+    }
 
     #region Object Management
 
@@ -587,15 +590,15 @@ public static class Builtins
     /// <summary>
     /// Get all verbs on an object
     /// </summary>
-    public static List<Verb> GetVerbsOnObject(string objectId)
+    public static List<(Verb verb, string source)> GetVerbsOnObject(string objectId)
     {
-        return VerbManager.GetVerbsOnObject(objectId);
+        return VerbResolver.GetAllVerbsOnObject(objectId);
     }
 
     /// <summary>
     /// Get all verbs on an object (GameObject overload)
     /// </summary>
-    public static List<Verb> GetVerbsOnObject(GameObject obj)
+    public static List<(Verb verb, string source)> GetVerbsOnObject(GameObject obj)
     {
         return GetVerbsOnObject(obj.Id);
     }
@@ -603,15 +606,16 @@ public static class Builtins
     /// <summary>
     /// Get all functions on an object
     /// </summary>
-    public static List<Function> GetFunctionsOnObject(string objectId)
+    public static List<(Function function, string source)> GetFunctionsOnObject(string objectId)
     {
-        return FunctionResolver.GetFunctionsForObject(objectId, true);
+        
+        return FunctionResolver.GetAllFunctionsOnObject(objectId);
     }
 
     /// <summary>
     /// Get all functions on an object (GameObject overload)
     /// </summary>
-    public static List<Function> GetFunctionsOnObject(GameObject obj)
+    public static List<(Function function, string source)> GetFunctionsOnObject(GameObject obj)
     {
         return GetFunctionsOnObject(obj.Id);
     }

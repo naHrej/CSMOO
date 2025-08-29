@@ -1,7 +1,6 @@
 using System.Dynamic;
 using CSMOO.Database;
 using CSMOO.Commands;
-using CSMOO.Verbs;
 using CSMOO.Functions;
 using CSMOO.Logging;
 using CSMOO.Exceptions;

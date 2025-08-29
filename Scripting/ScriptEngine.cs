@@ -8,9 +8,9 @@ using CSMOO.Configuration;
 using LiteDB;
 using CSMOO.Object;
 using CSMOO.Functions;
-using CSMOO.Verbs;
 using System.Runtime.CompilerServices;
 using CSMOO.Exceptions;
+using CSMOO.Core;
 
 namespace CSMOO.Scripting;
 
@@ -36,20 +36,13 @@ public class ScriptEngine
                 Assembly.GetExecutingAssembly()             // Current assembly
             )
             .WithImports(
-                "System",
+                "CSMOO.Core",
                 "System.Dynamic",
                 "System.Linq",
                 "System.Collections.Generic",
                 "System.Text",
-                "System.Threading.Tasks",
-                "CSMOO.Exceptions",
-                "CSMOO.Database",
-                "CSMOO.Commands",
                 "CSMOO.Object",
-                "CSMOO.Scripting",
-                "CSMOO.Core",
-                "CSMOO.Verbs",
-                "CSMOO.Functions",
+                "CSMOO.Exceptions",
                 "HtmlAgilityPack"
             );
     }

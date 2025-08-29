@@ -1,4 +1,3 @@
-using CSMOO.Scripting;
 using LiteDB;
 
 namespace CSMOO.Object;

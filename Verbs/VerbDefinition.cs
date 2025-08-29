@@ -1,5 +1,5 @@
 using System.Text.Json.Serialization;
-using CSMOO.Scripting;
+using CSMOO.Object;
 
 namespace CSMOO.Verbs;
 

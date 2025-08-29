@@ -1,4 +1,4 @@
-namespace CSMOO.Scripting;
+namespace CSMOO.Object;
 
 public enum Keyword
 {

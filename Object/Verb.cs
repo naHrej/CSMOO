@@ -1,6 +1,6 @@
 using LiteDB;
 
-namespace CSMOO.Verbs;
+namespace CSMOO.Object;
 
 /// <summary>
 /// Represents a verb (command) that can be executed on an object

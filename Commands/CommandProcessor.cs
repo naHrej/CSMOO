@@ -11,6 +11,7 @@ using CSMOO.Functions;
 using LiteDB;
 using CSMOO.Object;
 using CSMOO.Exceptions;
+using CSMOO.Core;
 
 namespace CSMOO.Commands;
 

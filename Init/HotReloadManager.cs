@@ -3,7 +3,7 @@ using CSMOO.Logging;
 using CSMOO.Object;
 using CSMOO.Verbs;
 
-namespace CSMOO.Core;
+namespace CSMOO.Init;
 
 /// <summary>
 /// Manages hot reloading of server components without requiring a restart

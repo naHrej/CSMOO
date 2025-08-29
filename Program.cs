@@ -1,8 +1,8 @@
-﻿using CSMOO.Core;
-using CSMOO.Configuration;
+﻿using CSMOO.Configuration;
 using CSMOO.Logging;
 using CSMOO.Network;
 using System.Threading.Tasks;
+using CSMOO.Init;
 
 namespace CSMOO;
 
