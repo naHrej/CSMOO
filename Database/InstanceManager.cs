@@ -64,7 +64,6 @@ public static class InstanceManager
         gameObject.DbRef = GetNextDbRef();
 
         DbProvider.Instance.Insert("gameobjects", gameObject);
-        Logger.Debug($"Created instance of {objectClass.Name} with ID {gameObject.Id} (#{gameObject.DbRef})");
         return gameObject;
     }
 
@@ -86,7 +85,6 @@ public static class InstanceManager
 
         // Remove from database
         DbProvider.Instance.Delete<GameObject>("gameobjects", objectId);
-        Logger.Debug($"Destroyed object #{gameObject.DbRef} ({objectId})");
         return true;
     }
 
@@ -196,7 +194,6 @@ public static class InstanceManager
         
         if (!objectsWithoutDbRef.Any())
         {
-            Logger.Debug("All objects already have DbRefs");
             return;
         }
 

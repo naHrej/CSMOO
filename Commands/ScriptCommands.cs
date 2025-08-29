@@ -75,7 +75,6 @@ namespace CSMOO.Commands;
             {
                 // Execute the script
                 var code = _currentCode.ToString();
-                Logger.Debug($"Executing multi-line script. Code length: {code.Length}");
                 
                 try
                 {

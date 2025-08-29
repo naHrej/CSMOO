@@ -285,14 +285,12 @@ public static class ObjectManager
         {
             PropertyManager.SetProperty(cached, propertyName, value);
             DbProvider.Instance.Update("gameobjects", cached);
-            Logger.Debug($"[ObjectManager] Property '{propertyName}' set on object {cached.Id} (cached instance) and persisted.");
         }
         else
         {
             PropertyManager.SetProperty(gameObject, propertyName, value);
             _objectCache[gameObject.Id] = gameObject;
             DbProvider.Instance.Update("gameobjects", gameObject);
-            Logger.Debug($"[ObjectManager] Property '{propertyName}' set on object {gameObject.Id} (new cache) and persisted.");
         }
     }
 

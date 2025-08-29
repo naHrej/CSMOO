@@ -57,7 +57,6 @@ public static class CodeDefinitionParser
                     };
                     
                     functions.Add(function);
-                    Logger.Debug($"Parsed function: {function.Name} with return type {function.ReturnType}");
                 }
             }
             
@@ -111,7 +110,6 @@ public static class CodeDefinitionParser
                     };
                     
                     verbs.Add(verb);
-                    Logger.Debug($"Parsed verb: {verb.Name} for class {verb.TargetClass}");
                 }
             }
             
@@ -207,7 +205,6 @@ public static class CodeDefinitionParser
                         };
 
                         properties.Add(property);
-                        Logger.Debug($"Parsed property: {property.Name} for class {property.TargetClass}");
                     }
                 }
             }
@@ -334,7 +331,6 @@ public static class CodeDefinitionParser
                         if (firstArg.Expression is LiteralExpressionSyntax literal)
                         {
                             var aliasText = literal.Token.ValueText;
-                            Logger.Debug($"Extracted alias text: '{aliasText}' from attribute");
                             aliases.AddRange(aliasText.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries)
                                            .Select(a => a.Trim())
                                            .Where(a => !string.IsNullOrEmpty(a)));
@@ -390,7 +386,6 @@ public static class CodeDefinitionParser
                         if (firstArg.Expression is LiteralExpressionSyntax literal)
                         {
                             var patternText = literal.Token.ValueText;
-                            Logger.Debug($"Extracted pattern text: '{patternText}' from attribute");
                             return patternText;
                         }
                     }

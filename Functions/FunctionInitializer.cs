@@ -21,7 +21,6 @@ public static class FunctionInitializer
     {
         var workingDirectory = Directory.GetCurrentDirectory();
         var resourcesPath = Path.Combine(workingDirectory, "Resources");
-        Logger.Debug($"Resources path: {resourcesPath}");
         return resourcesPath;
     }
 
@@ -51,7 +50,6 @@ public static class FunctionInitializer
         var inGameFunctions = allFunctions.Where(f => f.CreatedBy != "system").ToList();
         
         var countBefore = allFunctions.Count;
-        Logger.Debug($"Found {countBefore} total functions before deletion ({systemFunctions.Count} system, {inGameFunctions.Count} in-game)");
         
         // Only delete system/resource functions
         foreach (var f in systemFunctions) 
@@ -60,7 +58,6 @@ public static class FunctionInitializer
         }
         
         var countAfterDelete = DbProvider.Instance.FindAll<Function>("functions").Count();
-        Logger.Debug($"Cleared {systemFunctions.Count} system function definitions - {countAfterDelete} functions remaining (preserving {inGameFunctions.Count} in-game functions)");
 
         // Reload all functions from C# files
         var stats = LoadFunctions();
@@ -81,10 +78,8 @@ public static class FunctionInitializer
         // Clear ALL function definitions from database
         var allFunctions = DbProvider.Instance.FindAll<Function>("functions").ToList();
         var countBefore = allFunctions.Count;
-        Logger.Debug($"Found {countBefore} functions before deletion");
         foreach (var f in allFunctions) DbProvider.Instance.Delete<Function>("functions", f.Id);
         var countAfterDelete = DbProvider.Instance.FindAll<Function>("functions").Count();
-        Logger.Debug($"Cleared ALL function definitions - {countAfterDelete} functions remaining");
 
         // Reload all functions from C# files
         var stats = LoadFunctions();
@@ -102,26 +97,21 @@ public static class FunctionInitializer
         int loaded = 0;
         int skipped = 0;
 
-        Logger.Debug($"Looking for functions in: {ResourcesPath}");
         
         if (!Directory.Exists(ResourcesPath))
         {
-            Logger.Debug($"Resources directory not found: {ResourcesPath}");
             return (loaded, skipped);
         }
 
         var csFiles = Directory.GetFiles(ResourcesPath, "*.cs", SearchOption.AllDirectories);
-        Logger.Debug($"Found {csFiles.Length} C# files in Resources directory");
 
         foreach (var filePath in csFiles)
         {
-            Logger.Debug($"Processing functions file: {filePath}");
             var (loadedCount, skippedCount) = LoadFunctionsFromFile(filePath);
             loaded += loadedCount;
             skipped += skippedCount;
         }
 
-        Logger.Debug($"Functions - Loaded: {loaded}, Skipped: {skipped}");
         return (loaded, skipped);
     }
 
@@ -211,12 +201,10 @@ public static class FunctionInitializer
                 function.Description = functionDef.Description;
                 DbProvider.Instance.Update("functions", function);
             }
-            Logger.Debug($"Created class function '{functionDef.Name}' on {functionDef.TargetClass}");
             return (1, 0);
         }
         else
         {
-            Logger.Debug($"Class function '{functionDef.Name}' on {functionDef.TargetClass} already exists, skipping");
             return (0, 1);
         }
     }
@@ -252,12 +240,10 @@ public static class FunctionInitializer
                 function.Description = functionDef.Description;
                 DbProvider.Instance.Update("functions", function);
             }
-            Logger.Debug($"Created system function '{functionDef.Name}'");
             return (1, 0);
         }
         else
         {
-            Logger.Debug($"System function '{functionDef.Name}' already exists, skipping");
             return (0, 1);
         }
     }
@@ -299,7 +285,6 @@ public static class FunctionInitializer
             };
             
             DbProvider.Instance.Insert("gameobjects", systemObject);
-            Logger.Debug("Created system object for global functions");
             return systemObject.Id;
         }
         catch (Exception ex)
@@ -325,7 +310,6 @@ public static class FunctionInitializer
         var exactMatch = Path.ChangeExtension(jsonFile, ".cs");
         if (File.Exists(exactMatch))
         {
-            Logger.Debug($"Found exact match: {exactMatch}");
             return exactMatch;
         }
 
@@ -342,7 +326,6 @@ public static class FunctionInitializer
         {
             if (File.Exists(possibleFile))
             {
-                Logger.Debug($"Found case variation: {possibleFile}");
                 return possibleFile;
             }
         }
@@ -356,7 +339,6 @@ public static class FunctionInitializer
             
             if (matchingFile != null)
             {
-                Logger.Debug($"Found by directory scan: {matchingFile}");
                 return matchingFile;
             }
         }
@@ -365,7 +347,6 @@ public static class FunctionInitializer
             Logger.Warning($"Error scanning directory for .cs files: {ex.Message}");
         }
 
-        Logger.Debug($"No .cs file found for {jsonFile}");
         return null;
     }
 }

@@ -518,11 +518,6 @@ public class ScriptEngine
             return $"GetObjectById(\"{objectId}\").{member} =";
         });
 
-        if (result != originalCode)
-        {
-            Logger.Debug($"DBref/ID preprocessing transformed:\n{originalCode}\ninto:\n{result}");
-        }
-
         return result;
     }
 
@@ -551,7 +546,6 @@ public class ScriptEngine
                 .Replace("\t", "\\t");   // Escape tabs
 
             scriptBuilder.AppendLine($"string {kvp.Key} = \"{escapedValue}\";");
-            Logger.Debug($"Auto-declared variable: {kvp.Key} = \"{escapedValue}\"");
         }
         scriptBuilder.AppendLine();
 

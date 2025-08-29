@@ -1227,14 +1227,12 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
                         if (objectClass != null)
                         {
                             result = objectClass.Id;
-                            Logger.Debug($"Found class '{objectName}' -> {result}");
                         }
                     }
                 }
                 break;
         }
         
-        Logger.Debug($"Resolved '{objectName}' to: {result ?? "null"}");
         return result;
     }
 
@@ -1258,7 +1256,6 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
             
             if (localMatch != null)
             {
-                Logger.Debug($"Found '{name}' locally: #{localMatch.DbRef} ({ObjectManager.GetProperty(localMatch, "name")?.AsString})");
                 return localMatch.Id;
             }
         }
@@ -1271,7 +1268,6 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
             var playerObj = ObjectManager.GetObject(playerMatch.Id);
             if (playerObj != null)
             {
-                Logger.Debug($"Found player '{name}': #{playerObj.DbRef} ({playerMatch.Name})");
                 return playerMatch.Id;
             }
         }
@@ -1287,11 +1283,9 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
         
         if (globalMatch != null)
         {
-            Logger.Debug($"Found '{name}' globally: #{globalMatch.DbRef} ({ObjectManager.GetProperty(globalMatch, "name")?.AsString})");
             return globalMatch.Id;
         }
         
-        Logger.Debug($"Object '{name}' not found anywhere");
         return null;
     }
 
@@ -1307,8 +1301,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
         
         if (systemObj == null)
         {
-            // System object doesn't exist, create it
-            Logger.Debug("System object not found, creating it...");
+
             // Use Container class instead of abstract Object class
             var containerClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "Container");
             if (containerClass != null)
@@ -1319,7 +1312,6 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
                 ObjectManager.SetProperty(systemObj, "longDescription", "This is the system object that holds global verbs and functions.");
                 ObjectManager.SetProperty(systemObj, "isSystemObject", true);
                 ObjectManager.SetProperty(systemObj, "gettable", false); // Don't allow players to pick up the system
-                Logger.Debug($"Created system object with ID: {systemObj.Id}");
             }
             else
             {
@@ -1328,7 +1320,6 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
             }
         }
         
-        Logger.Debug($"Resolved 'system' to object ID: {systemObj?.Id}");
         return systemObj?.Id;
     }
 

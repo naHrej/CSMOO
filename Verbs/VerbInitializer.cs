@@ -29,7 +29,6 @@ public static class VerbInitializer
     {
         var workingDirectory = Directory.GetCurrentDirectory();
         var resourcesPath = Path.Combine(workingDirectory, "Resources");
-        Logger.Debug($"Resources path: {resourcesPath}");
         return resourcesPath;
     }
 
@@ -59,7 +58,6 @@ public static class VerbInitializer
         var inGameVerbs = allVerbs.Where(v => v.CreatedBy != "system").ToList();
         
         var countBefore = allVerbs.Count;
-        Logger.Debug($"Found {countBefore} total verbs before deletion ({systemVerbs.Count} system, {inGameVerbs.Count} in-game)");
         
         // Only delete system/resource verbs
         foreach (var v in systemVerbs) 
@@ -68,7 +66,6 @@ public static class VerbInitializer
         }
         
         var countAfterDelete = DbProvider.Instance.FindAll<Verb>("verbs").Count();
-        Logger.Debug($"Cleared {systemVerbs.Count} system verb definitions - {countAfterDelete} verbs remaining (preserving {inGameVerbs.Count} in-game verbs)");
 
         // Reload all verbs from C# files
         var stats = LoadVerbs();
@@ -89,10 +86,8 @@ public static class VerbInitializer
         // Clear ALL verb definitions from database
         var allVerbs = DbProvider.Instance.FindAll<Verb>("verbs").ToList();
         var countBefore = allVerbs.Count;
-        Logger.Debug($"Found {countBefore} verbs before deletion");
         foreach (var v in allVerbs) DbProvider.Instance.Delete<Verb>("verbs", v.Id);
         var countAfterDelete = DbProvider.Instance.FindAll<Verb>("verbs").Count();
-        Logger.Debug($"Cleared ALL verb definitions - {countAfterDelete} verbs remaining");
 
         // Reload all verbs from C# files
         var stats = LoadVerbs();
@@ -111,13 +106,11 @@ public static class VerbInitializer
         
         if (!Directory.Exists(ResourcesPath))
         {
-            Logger.Debug($"Resources directory not found: {ResourcesPath}");
             return stats;
         }
 
         // Get all .cs files recursively from Resources directory
         var csFiles = Directory.GetFiles(ResourcesPath, "*.cs", SearchOption.AllDirectories);
-        Logger.Debug($"Found {csFiles.Length} C# files in Resources directory");
 
         foreach (var file in csFiles)
         {
@@ -203,12 +196,10 @@ public static class VerbInitializer
                 verb.Description = verbDef.Description;
                 DbProvider.Instance.Update("verbs", verb);
             }
-            Logger.Debug($"Created class verb '{verbDef.Name}' on {verbDef.TargetClass}");
             stats.Loaded = 1;
         }
         else
         {
-            Logger.Debug($"Class verb '{verbDef.Name}' on {verbDef.TargetClass} already exists, skipping");
             stats.Skipped = 1;
         }
         
@@ -244,12 +235,10 @@ public static class VerbInitializer
                 verb.Description = verbDef.Description;
                 DbProvider.Instance.Update("verbs", verb);
             }
-            Logger.Debug($"Created system verb '{verbDef.Name}'");
             stats.Loaded = 1;
         }
         else
         {
-            Logger.Debug($"System verb '{verbDef.Name}' already exists, skipping");
             stats.Skipped = 1;
         }
         
@@ -269,7 +258,7 @@ public static class VerbInitializer
         if (systemObj == null)
         {
             // System object doesn't exist, create it
-            Logger.Debug("System object not found, creating it...");
+            Logger.Warning("System object not found, creating it...");
             // Use Container class instead of abstract Object class
             var containerClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "Container");
             if (containerClass != null)
@@ -280,7 +269,7 @@ public static class VerbInitializer
                 ObjectManager.SetProperty(systemObj, "longDescription", "This is the system object that holds global verbs and functions.");
                 ObjectManager.SetProperty(systemObj, "isSystemObject", true);
                 ObjectManager.SetProperty(systemObj, "gettable", false); // Don't allow players to pick up the system
-                Logger.Debug($"Created system object with ID: {systemObj.Id}");
+                Logger.Info($"Created system object with ID: {systemObj.Id}");
             }
             else
             {
@@ -289,7 +278,6 @@ public static class VerbInitializer
             }
         }
         
-        Logger.Debug($"System object ID: {systemObj?.Id}");
         return systemObj?.Id;
     }
 
@@ -309,7 +297,6 @@ public static class VerbInitializer
         var exactMatch = Path.ChangeExtension(jsonFile, ".cs");
         if (File.Exists(exactMatch))
         {
-            Logger.Debug($"Found exact match: {exactMatch}");
             return exactMatch;
         }
 
@@ -326,7 +313,6 @@ public static class VerbInitializer
         {
             if (File.Exists(possibleFile))
             {
-                Logger.Debug($"Found case variation: {possibleFile}");
                 return possibleFile;
             }
         }
@@ -340,7 +326,6 @@ public static class VerbInitializer
             
             if (matchingFile != null)
             {
-                Logger.Debug($"Found by directory scan: {matchingFile}");
                 return matchingFile;
             }
         }
@@ -349,7 +334,6 @@ public static class VerbInitializer
             Logger.Warning($"Error scanning directory for .cs files: {ex.Message}");
         }
 
-        Logger.Debug($"No .cs file found for {jsonFile}");
         return null;
     }
 }

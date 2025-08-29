@@ -17,7 +17,6 @@ public static class RoomManager
         var existingStartingRoom = FindStartingRoom();
         if (existingStartingRoom != null)
         {
-            Logger.Debug("Starting room already exists, skipping creation");
             return;
         }
 
@@ -93,7 +92,6 @@ public static class RoomManager
         ObjectManager.SetProperty(forwardExit, "location", fromRoom.Id);
         ObjectManager.SetProperty(returnExit, "location", toRoom.Id);
 
-        Logger.Debug($"Created bidirectional exit: {direction} from #{fromRoom.Id} to #{toRoom.Id}");
     }
 
     /// <summary>
@@ -111,7 +109,6 @@ public static class RoomManager
         ObjectManager.SetProperty(item, "longDescription", longDesc);
         ObjectManager.SetProperty(item, "location", locationId);
 
-        Logger.Debug($"Created item '{name}' in location #{locationId}");
         return item;
     }
 

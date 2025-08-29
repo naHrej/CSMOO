@@ -199,7 +199,6 @@ public static class ScriptStackTrace
     /// </summary>
     private static int GetFrameLineNumber(ScriptStackFrame frame, bool isErrorFrame)
     {
-        Logger.Debug(frame.Name);
         // For error frames, use existing line number if available and correct
         if (isErrorFrame && frame.LineNumber > 0)
         {

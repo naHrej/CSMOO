@@ -289,24 +289,16 @@ public class CommandProcessor
     /// </summary>
 private bool TryExecuteGoCommand(string input)
 {
-    Logger.Debug($"TryExecuteGoCommand called with input: '{input}'");
+
     if (_player == null) return false;
 
-    try
-    {
         var goCommand = $"go {input}";
-        Logger.Debug($"About to call VerbResolver.TryExecuteVerb with: '{goCommand}'"); // Add this
+
         
         var result = VerbResolver.TryExecuteVerb(goCommand, _player, this);
-        
-        Logger.Debug($"VerbResolver.TryExecuteVerb returned: {result}"); // Add this
+
         return result;
-    }
-    catch (Exception ex)
-    {
-        Logger.Debug($"Error in TryExecuteGoCommand: {ex.Message}");
-        return false;
-    }
+
 }
 
     private void HandleScript(string input)
@@ -463,9 +455,8 @@ private bool TryExecuteGoCommand(string input)
             {
                 css = "/* No CSS available */";
             }
-            Logger.Debug($"Sending login banner CSS to player {_player?.Name}: {css}");
             SendToPlayer($"<style type='text/css'>{css}</style><hr/>");
-            Logger.Debug($"Login banner CSS sent to player {_player?.Name}\n<style type='text/css'>{css}</style><hr/>");
+
 
             // Find the system object first
             var allObjects = ObjectManager.GetAllObjects();

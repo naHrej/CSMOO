@@ -22,7 +22,6 @@ public static class ObjectResolver
       GameObject? location = null,
       string? objectType = null)
   {
-    Logging.Logger.Debug($"Resolving objects for '{name}' as seen by {looker.Name} (ID: {looker.Id}) in location {location?.Name ?? "none"} with type filter '{objectType}'");
 
     if (string.IsNullOrWhiteSpace(name) || looker == null)
       return new List<dynamic>();

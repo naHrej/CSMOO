@@ -19,7 +19,6 @@ public static class PropertyInitializer
     {
         var workingDirectory = Directory.GetCurrentDirectory();
         var resourcesPath = Path.Combine(workingDirectory, "Resources");
-        Logger.Debug($"Resources path: {resourcesPath}");
         return resourcesPath;
     }
 
@@ -58,27 +57,24 @@ public static class PropertyInitializer
         int loaded = 0;
         int skipped = 0;
 
-        Logger.Debug($"Looking for properties in: {ResourcesPath}");
         
         if (!Directory.Exists(ResourcesPath))
         {
-            Logger.Debug($"Resources directory not found: {ResourcesPath}");
+            Logger.Warning($"Resources directory not found: {ResourcesPath}");
             return (loaded, skipped);
         }
 
         // Load from C# files
         var csFiles = Directory.GetFiles(ResourcesPath, "*.cs", SearchOption.AllDirectories);
-        Logger.Debug($"Found {csFiles.Length} C# files in Resources directory");
 
         foreach (var filePath in csFiles)
         {
-            Logger.Debug($"Processing properties C# file: {filePath}");
             var (loadedCount, skippedCount) = LoadPropertiesFromCsFile(filePath);
             loaded += loadedCount;
             skipped += skippedCount;
         }
 
-        Logger.Debug($"Properties - Loaded: {loaded}, Skipped: {skipped}");
+        Logger.Info($"Properties - Loaded: {loaded}, Skipped: {skipped}");
         return (loaded, skipped);
     }
 
@@ -161,7 +157,6 @@ public static class PropertyInitializer
         // Never delete properties, only add or overwrite if explicitly requested
         if (systemObject.Properties.ContainsKey(propDef.Name) && !propDef.Overwrite)
         {
-            Logger.Debug($"System property '{propDef.Name}' already exists, skipping (overwrite=false)");
             return (0, 1);
         }
 
@@ -180,8 +175,7 @@ public static class PropertyInitializer
             {
                 ObjectManager.SetProperty(systemObject, propDef.Name, new BsonValue(value));
             }
-            
-            Logger.Debug($"Set system property '{propDef.Name}' = {value}");
+
             return (1, 0);
         }
         catch (Exception ex)
@@ -206,7 +200,6 @@ public static class PropertyInitializer
         // Never delete properties, only add or overwrite if explicitly requested
         if (targetClass.Properties.ContainsKey(propDef.Name) && !propDef.Overwrite)
         {
-            Logger.Debug($"Class property '{propDef.Name}' on {propDef.TargetClass} already exists, skipping (overwrite=false)");
             return (0, 1);
         }
 
@@ -225,7 +218,6 @@ public static class PropertyInitializer
             }
             
             DbProvider.Instance.Update("objectclasses", targetClass);
-            Logger.Debug($"Set class property '{propDef.Name}' on {propDef.TargetClass} = {value}");
             return (1, 0);
         }
         catch (Exception ex)
@@ -251,7 +243,6 @@ public static class PropertyInitializer
         // Never delete properties, only add or overwrite if explicitly requested
         if (targetObject.Properties.ContainsKey(propDef.Name) && !propDef.Overwrite)
         {
-            Logger.Debug($"Instance property '{propDef.Name}' on {propDef.TargetObject} already exists, skipping (overwrite=false)");
             return (0, 1);
         }
 
@@ -269,7 +260,6 @@ public static class PropertyInitializer
                 ObjectManager.SetProperty(targetObject, propDef.Name, new BsonValue(value));
             }
             
-            Logger.Debug($"Set instance property '{propDef.Name}' on {propDef.TargetObject} = {value}");
             return (1, 0);
         }
         catch (Exception ex)
@@ -320,7 +310,7 @@ public static class PropertyInitializer
         if (systemObj == null)
         {
             // System object doesn't exist, create it
-            Logger.Debug("System object not found, creating it...");
+            Logger.Warning("System object not found, creating it...");
             // Use Container class instead of abstract Object class
             var containerClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "Container");
             if (containerClass != null)
@@ -331,7 +321,6 @@ public static class PropertyInitializer
                 ObjectManager.SetProperty(systemObj, "longDescription", "This is the system object that holds global verbs and functions.");
                 ObjectManager.SetProperty(systemObj, "isSystemObject", true);
                 ObjectManager.SetProperty(systemObj, "gettable", false); // Don't allow players to pick up the system
-                Logger.Debug($"Created system object with ID: {systemObj.Id}");
             }
             else
             {
@@ -339,8 +328,6 @@ public static class PropertyInitializer
                 return null;
             }
         }
-        
-        Logger.Debug($"System object ID: {systemObj?.Id}");
         return systemObj?.Id;
     }
 }

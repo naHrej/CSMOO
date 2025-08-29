@@ -90,7 +90,6 @@ public class WebSocketServer
             // Add to global session handler
             SessionHandler.AddSession(sessionId, connection);
 
-            Logger.Debug($"WebSocket client connected: {sessionId} (Channel: {channelType})");
 
             // Send welcome message based on channel type
             await SendWelcomeMessage(session);
@@ -165,7 +164,7 @@ public class WebSocketServer
         }
         catch (WebSocketException ex)
         {
-            Logger.Debug($"WebSocket disconnected: {ex.Message}");
+            Logger.Error($"WebSocket disconnected: {ex.Message}");
         }
         catch (Exception ex)
         {
@@ -180,8 +179,6 @@ public class WebSocketServer
             
             // Clean up session from SessionHandler if it exists
             SessionHandler.RemoveSession(session.SessionId);
-            
-            Logger.Debug($"WebSocket session ended: {session.SessionId}");
         }
     }
 

@@ -28,7 +28,6 @@ public static class VerbManager
 
         DbProvider.Instance.Insert("verbs", verb);
         
-        Logger.Debug($"Created verb '{name}' on object {objectId} by {createdBy}");
         return verb;
     }
 
@@ -39,11 +38,6 @@ public static class VerbManager
     {
         verb.ModifiedAt = DateTime.UtcNow;
         var result = DbProvider.Instance.Update("verbs", verb);
-        
-        if (result)
-        {
-            Logger.Debug($"Updated verb '{verb.Name}' on object {verb.ObjectId}");
-        }
         
         return result;
     }
@@ -56,10 +50,7 @@ public static class VerbManager
         var verb = DbProvider.Instance.FindById<Verb>("verbs", verbId);
         if (verb == null) return false;
         var result = DbProvider.Instance.Delete<Verb>("verbs", verbId);
-        if (result)
-        {
-            Logger.Debug($"Deleted verb '{verb.Name}' from object {verb.ObjectId}");
-        }
+
         return result;
     }
 
@@ -75,10 +66,7 @@ public static class VerbManager
             if (DbProvider.Instance.Delete<Verb>("verbs", verb.Id))
                 deletedCount++;
         }
-        if (deletedCount > 0)
-        {
-            Logger.Debug($"Deleted {deletedCount} verbs from object {objectId}");
-        }
+
         return deletedCount;
     }
 
@@ -138,7 +126,6 @@ public static class VerbManager
 
         DbProvider.Instance.Insert("verbs", newVerb);
         
-        Logger.Debug($"Copied verb '{sourceVerb.Name}' from {sourceVerb.ObjectId} to {targetObjectId}");
         return newVerb;
     }
 
@@ -155,11 +142,7 @@ public static class VerbManager
         verb.ModifiedAt = DateTime.UtcNow;
         
         var result = UpdateVerb(verb);
-        if (result)
-        {
-            Logger.Debug($"Moved verb '{verb.Name}' from {oldObjectId} to {newObjectId}");
-        }
-        
+
         return result;
     }
 
@@ -294,10 +277,7 @@ public static class VerbManager
         verb.Code = code;
         verb.ModifiedAt = DateTime.UtcNow;
         var result = DbProvider.Instance.Update("verbs", verb);
-        if (result)
-        {
-            Logger.Debug($"Updated code for verb '{verb.Name}' (ID: {verbId})");
-        }
+
         return result;
     }
 }

@@ -32,7 +32,6 @@ public static class FunctionManager
         var functionCollection = GameDatabase.Instance.GetCollection<Function>("functions");
         functionCollection.Insert(function);
 
-        Logger.Debug($"Created function '{name}' on object {obj.Id} by {createdBy}");
         return function;
     }
     /// <summary>
@@ -43,11 +42,6 @@ public static class FunctionManager
         function.ModifiedAt = DateTime.UtcNow;
         var functionCollection = GameDatabase.Instance.GetCollection<Function>("functions");
         var result = functionCollection.Update(function);
-        
-        if (result)
-        {
-            Logger.Debug($"Updated function '{function.Name}' on object {function.ObjectId}");
-        }
         
         return result;
     }
@@ -63,10 +57,6 @@ public static class FunctionManager
         if (function == null) return false;
         
         var result = functionCollection.Delete(functionId);
-        if (result)
-        {
-            Logger.Debug($"Deleted function '{function.Name}' from object {function.ObjectId}");
-        }
         
         return result;
     }
@@ -84,7 +74,6 @@ public static class FunctionManager
             functionCollection.Delete(function.Id);
         }
         
-        Logger.Debug($"Deleted {functions.Count} functions from object {objectId}");
         return functions.Count;
     }
 

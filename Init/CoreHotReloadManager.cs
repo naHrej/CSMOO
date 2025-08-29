@@ -1,4 +1,5 @@
 using System.Reflection;
+using CSMOO.Core;
 using CSMOO.Logging;
 using CSMOO.Object;
 
@@ -86,7 +87,6 @@ public static class CoreHotReloadManager
                 watcher.Created += OnCoreCodeChanged;
                 watcher.EnableRaisingEvents = true;
 
-                Logger.Debug($"Watching core code changes in: {Path.GetFullPath(path)}");
             }
 
             _isWatchingCoreCode = true;
@@ -106,12 +106,11 @@ public static class CoreHotReloadManager
         {
             // Try to hook into .NET's hot reload events if available
             // This uses reflection to access internal APIs safely
-            
+
             var hotReloadType = Type.GetType("System.Reflection.Metadata.MetadataUpdater, System.Private.CoreLib");
             if (hotReloadType != null)
             {
-                Logger.Debug("Found .NET Hot Reload APIs - setting up event handlers");
-                
+
                 // Look for hot reload events
                 var beforeUpdateEvent = hotReloadType.GetEvent("BeforeUpdate", BindingFlags.Static | BindingFlags.Public);
                 var afterUpdateEvent = hotReloadType.GetEvent("AfterUpdate", BindingFlags.Static | BindingFlags.Public);
@@ -120,24 +119,19 @@ public static class CoreHotReloadManager
                 {
                     var handler = new Action<Type[]>(OnBeforeHotReload);
                     beforeUpdateEvent.AddEventHandler(null, handler);
-                    Logger.Debug("Registered BeforeUpdate hot reload handler");
                 }
 
                 if (afterUpdateEvent != null)
                 {
                     var handler = new Action<Type[]>(OnAfterHotReload);
                     afterUpdateEvent.AddEventHandler(null, handler);
-                    Logger.Debug("Registered AfterUpdate hot reload handler");
                 }
             }
-            else
-            {
-                Logger.Debug(".NET Hot Reload APIs not available - using file watching only");
-            }
+
         }
         catch (Exception ex)
         {
-            Logger.Debug($"Could not setup hot reload event handlers: {ex.Message}");
+            Logger.Error($"Failed to setup .NET Hot Reload handlers: {ex.Message}");
         }
     }
 
@@ -158,8 +152,6 @@ public static class CoreHotReloadManager
         {
             return;
         }
-
-        Logger.Debug($"Core code file changed: {fileName} ({e.ChangeType})");
 
         ScheduleCoreReload(() =>
         {
@@ -203,7 +195,7 @@ public static class CoreHotReloadManager
         }
         catch (Exception ex)
         {
-            Logger.Debug($"Failed to notify admins of hot reload: {ex.Message}");
+            Logger.Error($"Failed to notify admins of hot reload: {ex.Message}");
         }
     }
 
@@ -253,7 +245,7 @@ public static class CoreHotReloadManager
         }
         catch (Exception ex)
         {
-            Logger.Debug($"Failed to notify admins of code change: {ex.Message}");
+            Logger.Error($"Failed to notify admins of code change: {ex.Message}");
         }
     }
 
@@ -271,20 +263,14 @@ public static class CoreHotReloadManager
             {
                 if (admin.SessionGuid != null)
                 {
-                    // Send notification to admin
-                    Logger.Debug($"Notifying admin {admin.Name} of hot reload");
-                    // SessionManager.SendToPlayer(admin.SessionGuid, $"[SYSTEM] {message}");
+                    Builtins.Notify(admin, message);
                 }
             }
             
-            if (adminPlayers.Any())
-            {
-                Logger.Debug($"Notified {adminPlayers.Count()} online admin(s) of changes");
-            }
         }
         catch (Exception ex)
         {
-            Logger.Debug($"Failed to notify admins: {ex.Message}");
+            Logger.Error($"Failed to notify admins: {ex.Message}");
         }
     }
 

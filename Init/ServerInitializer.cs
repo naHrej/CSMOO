@@ -75,9 +75,7 @@ public static class ServerInitializer
             }
 
             // If we reach here, it means we need to assign an owner
-                Logger.Debug($"Setting owner for object {obj.Name} ({obj.Id}) to {adminPlayer.Name} player.");
             obj.Owner = adminPlayer;
-            //ObjectManager.UpdateObject(obj);
             updatedCount++;
         }
         

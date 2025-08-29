@@ -46,7 +46,6 @@ public static class PermissionManager
         // Check if granting player has permission to grant this flag
         if (!CanGrantFlag(grantingPlayer, flag))
         {
-            Logger.Debug($"Player {grantingPlayer?.Name} attempted to grant {flag} flag but lacks permission");
             return false;
         }
 
@@ -85,7 +84,6 @@ public static class PermissionManager
         // Check if removing player has permission to remove this flag
         if (!CanRemoveFlag(removingPlayer, flag))
         {
-            Logger.Debug($"Player {removingPlayer?.Name} attempted to remove {flag} flag but lacks permission");
             return false;
         }
 

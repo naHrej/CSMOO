@@ -38,7 +38,6 @@ public static class PropertyManager
     {
         gameObject.Properties[propertyName] = value;
         DbProvider.Instance.Update("gameobjects", gameObject);
-        Logger.Debug($"Set property '{propertyName}' on object #{gameObject.DbRef}");
     }
 
     /// <summary>
@@ -63,7 +62,6 @@ public static class PropertyManager
 
         gameObject.Properties.Remove(propertyName);
         DbProvider.Instance.Update("gameobjects", gameObject);
-        Logger.Debug($"Removed property '{propertyName}' from object #{gameObject.DbRef}");
         return true;
     }
 
@@ -137,7 +135,6 @@ public static class PropertyManager
         }
 
         DbProvider.Instance.Update("gameobjects", target);
-        Logger.Debug($"Copied properties from object #{source.DbRef} to #{target.DbRef}");
     }
 
     /// <summary>

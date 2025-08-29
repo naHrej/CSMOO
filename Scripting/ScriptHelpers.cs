@@ -126,7 +126,6 @@ public class ScriptHelpers
     /// </summary>
     public string? ResolveObject(string objectName)
     {
-        Logger.Debug($"ScriptHelpers: Resolving object name: '{objectName}'");
         
         string? result = null;
         
@@ -148,7 +147,6 @@ public class ScriptHelpers
                 {
                     var obj = ObjectManager.GetObjectByDbRef(dbref);
                     result = obj?.Id;
-                    Logger.Debug($"DBREF lookup #{dbref} -> {result ?? "not found"}");
                 }
                 // Check if it's a class reference (starts with "class:" or ends with ".class")
                 else if (objectName.StartsWith("class:", StringComparison.OrdinalIgnoreCase))
@@ -157,7 +155,6 @@ public class ScriptHelpers
                     var objectClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => 
                         c.Name.Equals(className, StringComparison.OrdinalIgnoreCase));
                     result = objectClass?.Id;
-                    Logger.Debug($"Class lookup '{className}' -> {result ?? "not found"}");
                 }
                 else if (objectName.EndsWith(".class", StringComparison.OrdinalIgnoreCase))
                 {
@@ -165,13 +162,11 @@ public class ScriptHelpers
                     var objectClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => 
                         c.Name.Equals(className, StringComparison.OrdinalIgnoreCase));
                     result = objectClass?.Id;
-                    Logger.Debug($"Class lookup '{className}' -> {result ?? "not found"}");
                 }
                 // Check if it's a direct class ID (like "Room", "Exit", etc.)
                 else if (DbProvider.Instance.FindById<ObjectClass>("objectclasses", objectName) != null)
                 {
                     result = objectName; // The objectName itself is the class ID
-                    Logger.Debug($"Direct class ID lookup '{objectName}' -> {result}");
                 }
                 else
                 {
@@ -186,14 +181,12 @@ public class ScriptHelpers
                         if (objectClass != null)
                         {
                             result = objectClass.Id;
-                            Logger.Debug($"Found class '{objectName}' -> {result}");
                         }
                     }
                 }
                 break;
         }
         
-        Logger.Debug($"Resolved '{objectName}' to: {result ?? "null"}");
         return result;
     }
 
@@ -217,7 +210,6 @@ public class ScriptHelpers
             
             if (localMatch != null)
             {
-                Logger.Debug($"Found '{name}' locally: #{localMatch.DbRef} ({ObjectManager.GetProperty(localMatch, "name")?.AsString})");
                 return localMatch.Id;
             }
         }
@@ -230,7 +222,6 @@ public class ScriptHelpers
             var playerObj = ObjectManager.GetObject(playerMatch.Id);
             if (playerObj != null)
             {
-                Logger.Debug($"Found player '{name}': #{playerObj.DbRef} ({playerMatch.Name})");
                 return playerMatch.Id;
             }
         }
@@ -246,11 +237,8 @@ public class ScriptHelpers
         
         if (globalMatch != null)
         {
-            Logger.Debug($"Found '{name}' globally: #{globalMatch.DbRef} ({ObjectManager.GetProperty(globalMatch, "name")?.AsString})");
             return globalMatch.Id;
         }
-        
-        Logger.Debug($"Object '{name}' not found anywhere");
         return null;
     }
 
@@ -293,7 +281,7 @@ public class ScriptHelpers
         if (systemObj == null)
         {
             // System object doesn't exist, create it
-            Logger.Debug("System object not found, creating it...");
+            Logger.Warning("System object not found, creating it...");
             // Use Container class instead of abstract Object class
             var containerClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "Container");
             if (containerClass != null)
@@ -304,7 +292,7 @@ public class ScriptHelpers
                 ObjectManager.SetProperty(systemObj, "longDescription", "This is the system object that holds global verbs and functions.");
                 ObjectManager.SetProperty(systemObj, "isSystemObject", true);
                 ObjectManager.SetProperty(systemObj, "gettable", false); // Don't allow players to pick up the system
-                Logger.Debug($"Created system object with ID: {systemObj.Id}");
+                Logger.Info($"Created system object with ID: {systemObj.Id}");
             }
             else
             {
@@ -312,8 +300,6 @@ public class ScriptHelpers
                 return null;
             }
         }
-        
-        Logger.Debug($"Resolved 'system' to object ID: {systemObj?.Id}");
         return systemObj?.Id;
     }
 
@@ -340,7 +326,6 @@ public class ScriptHelpers
                 // Also update the in-memory object
                 property.SetValue(player, value);
                 
-                Logger.Debug($"Updated player {player.Id} property '{propertyName}' to '{value}'");
             }
             else
             {

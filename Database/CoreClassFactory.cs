@@ -17,7 +17,6 @@ public static class CoreClassFactory
         // Check if core classes already exist
         if (DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "GameObject") != null)
         {
-            Logger.Debug("Core classes already exist, skipping creation");
             return;
         }
 
@@ -42,7 +41,6 @@ public static class CoreClassFactory
         var existingGameObjectClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "GameObject");
         if (existingGameObjectClass != null)
         {
-            Logger.Debug("GameObject class already exists, skipping creation");
             return existingGameObjectClass;
         }
 
@@ -65,7 +63,6 @@ public static class CoreClassFactory
         };
         
         DbProvider.Instance.Insert("objectclasses", baseObjectClass);
-        Logger.Debug("Created base Object class");
         return baseObjectClass;
     }
 
@@ -78,7 +75,6 @@ public static class CoreClassFactory
         var existingRoomClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "Room");
         if (existingRoomClass != null)
         {
-            Logger.Debug("Room class already exists, skipping creation");
             return existingRoomClass;
         }
 
@@ -102,7 +98,6 @@ public static class CoreClassFactory
         };
         
         DbProvider.Instance.Insert("objectclasses", roomClass);
-        Logger.Debug("Created Room class");
         return roomClass;
     }
 
@@ -115,7 +110,6 @@ public static class CoreClassFactory
         var existingExitClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "Exit");
         if (existingExitClass != null)
         {
-            Logger.Debug("Exit class already exists, skipping creation");
             return existingExitClass;
         }
 
@@ -142,7 +136,6 @@ public static class CoreClassFactory
         };
         
         DbProvider.Instance.Insert("objectclasses", exitClass);
-        Logger.Debug("Created Exit class");
         return exitClass;
     }
 
@@ -155,7 +148,6 @@ public static class CoreClassFactory
         var existingContainerClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "Container");
         if (existingContainerClass != null)
         {
-            Logger.Debug("Container class already exists, skipping creation");
             return existingContainerClass;
         }
 
@@ -181,7 +173,6 @@ public static class CoreClassFactory
         };
         
         DbProvider.Instance.Insert("objectclasses", containerClass);
-        Logger.Debug("Created Container class");
         return containerClass;
     }
 
@@ -194,7 +185,6 @@ public static class CoreClassFactory
         var existingItemClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "Item");
         if (existingItemClass != null)
         {
-            Logger.Debug("Item class already exists, skipping creation");
             return existingItemClass;
         }
 
@@ -218,7 +208,6 @@ public static class CoreClassFactory
         };
         
         DbProvider.Instance.Insert("objectclasses", itemClass);
-        Logger.Debug("Created Item class");
         return itemClass;
     }
 
@@ -231,7 +220,6 @@ public static class CoreClassFactory
         var existingPlayerClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "Player");
         if (existingPlayerClass != null)
         {
-            Logger.Debug("Player class already exists, skipping creation");
             return existingPlayerClass;
         }
 
@@ -261,7 +249,6 @@ public static class CoreClassFactory
         };
         
         DbProvider.Instance.Insert("objectclasses", playerClass);
-        Logger.Debug("Created Player class");
         return playerClass;
     }
 

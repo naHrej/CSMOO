@@ -46,7 +46,6 @@ public class HttpServer
         while (_listener.IsListening)
         {
             var context = await _listener.GetContextAsync();
-            Logger.Debug($"Received request: {context.Request.HttpMethod} {context.Request.Url}");
 
             try
             {

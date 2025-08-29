@@ -1,3 +1,4 @@
+using CSMOO.Core;
 using CSMOO.Functions;
 using CSMOO.Logging;
 using CSMOO.Object;
@@ -127,7 +128,6 @@ public static class HotReloadManager
         verbWatcher.EnableRaisingEvents = true;
         _watchers.Add(verbWatcher);
 
-        Logger.Debug($"Watching for verb changes in: {Path.GetFullPath(verbsPath)}");
     }
 
     /// <summary>
@@ -138,7 +138,6 @@ public static class HotReloadManager
         var scriptsPath = "Scripts";
         if (!Directory.Exists(scriptsPath))
         {
-            Logger.Debug($"Scripts directory not found: {scriptsPath} (this is optional)");
             return;
         }
 
@@ -156,7 +155,6 @@ public static class HotReloadManager
         scriptWatcher.EnableRaisingEvents = true;
         _watchers.Add(scriptWatcher);
 
-        Logger.Debug($"Watching for script changes in: {Path.GetFullPath(scriptsPath)}");
     }
 
     /// <summary>
@@ -218,7 +216,6 @@ public static class HotReloadManager
         resourceWatcher.EnableRaisingEvents = true;
         _watchers.Add(resourceWatcher);
 
-        Logger.Debug($"Watching for resource changes in: {Path.GetFullPath(resourcesPath)}");
     }
 
     /// <summary>
@@ -229,7 +226,6 @@ public static class HotReloadManager
         if (!_isEnabled) return;
 
         var fileName = Path.GetFileName(e.FullPath);
-        Logger.Debug($"Verb file changed: {fileName} ({e.ChangeType})");
 
         ScheduleReload("verbs", () =>
         {
@@ -247,7 +243,6 @@ public static class HotReloadManager
 
         var oldName = Path.GetFileName(e.OldFullPath);
         var newName = Path.GetFileName(e.FullPath);
-        Logger.Debug($"Verb file renamed: {oldName} -> {newName}");
 
         ScheduleReload("verbs", () =>
         {
@@ -264,7 +259,6 @@ public static class HotReloadManager
         if (!_isEnabled) return;
 
         var fileName = Path.GetFileName(e.FullPath);
-        Logger.Debug($"Script file changed: {fileName} ({e.ChangeType})");
 
         ScheduleReload("scripts", () =>
         {
@@ -281,7 +275,6 @@ public static class HotReloadManager
         if (!_isEnabled) return;
 
         var fileName = Path.GetFileName(e.FullPath);
-        Logger.Debug($"Resource file changed: {fileName} ({e.ChangeType})");
 
         // You can customize this to reload functions, classes, etc.
         ScheduleReload("functions", () =>
@@ -300,7 +293,6 @@ public static class HotReloadManager
 
         var oldName = Path.GetFileName(e.OldFullPath);
         var newName = Path.GetFileName(e.FullPath);
-        Logger.Debug($"Resource file renamed: {oldName} -> {newName}");
 
         ScheduleReload("functions", () =>
         {
@@ -456,14 +448,13 @@ public static class HotReloadManager
             {
                 if (player.SessionGuid != null)
                 {
-                    // Send notification to player (you'd need to implement this based on your session system)
-                    Logger.Debug($"Notifying player {player.Name} of hot reload");
+                        Builtins.Notify(player, message);
                 }
             }
             
             if (onlinePlayers.Any())
             {
-                Logger.Debug($"Notified {onlinePlayers.Count()} online players of hot reload");
+                Logger.Info($"Notified {onlinePlayers.Count()} online players of hot reload");
             }
         }
         catch (Exception ex)

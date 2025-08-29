@@ -34,7 +34,6 @@ internal class TelnetServer
     
     private async void HandleClient(TcpClient client)
     {
-        Logger.Debug("Client connected.");
         
         var clientGuid = Guid.NewGuid();
         SessionHandler.AddSession(clientGuid, client);
@@ -90,13 +89,12 @@ internal class TelnetServer
         }
         catch (Exception ex)
         {
-            Logger.Debug($"Client disconnected with error: {ex.Message}");
+            Logger.Error($"Client disconnected with error: {ex.Message}");
         }
         finally
         {
             SessionHandler.RemoveSession(clientGuid);
             client.Close();
-            Logger.Debug("Client disconnected.");
         }
     }
     
