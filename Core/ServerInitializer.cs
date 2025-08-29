@@ -39,9 +39,6 @@ public static class ServerInitializer
             // Create a test admin player if none exists
             CreateDefaultAdminIfNeeded();
 
-            // Set owners for all created objects
-            SetObjectOwners();
-
             // Initialize hot reload functionality
             HotReloadManager.Initialize();
             CoreHotReloadManager.Initialize();
@@ -56,11 +53,10 @@ public static class ServerInitializer
         }
     }
 
-        private static void SetObjectOwners()
+    private static void SetObjectOwners(Player adminPlayer)
     {
         Logger.Info("Setting object owners...");
         var allObjects = ObjectManager.GetAllObjects();
-        var adminPlayer = PlayerManager.GetAllPlayers().FirstOrDefault(p => p.Name.Equals("Admin", StringComparison.OrdinalIgnoreCase));
         if (adminPlayer == null)
         {
             Logger.Error("No admin player found to assign as owner. Skipping owner assignment.");
@@ -118,6 +114,8 @@ public static class ServerInitializer
             "The all-powerful administrator of this realm. They have the ability to create and modify the world itself.");
 
         Logger.Info("Default admin player created (username: admin, password: password)");
+
+        SetObjectOwners(admin);
     }
 
     /// <summary>

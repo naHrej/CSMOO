@@ -273,6 +273,9 @@ public class GameObject : DynamicObject
             case "owner":
                 result = Owner;
                 return true;
+            case "ownerId":
+                result = Owner?.Id;
+                return true;
             default:
                 result = null;
                 return false; // Not a built-in property

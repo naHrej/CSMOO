@@ -417,7 +417,7 @@ public class System
             else
             {
                 // Administrative info for object instances
-                output.AppendLine($"Owner: {target.Owner}(#{target.Owner})");
+                output.AppendLine($"Owner: {target.Owner}(#{target.DbRef})");
                 output.AppendLine($"Object ID: {target.Id}");
                 output.AppendLine($"DB Reference: #{target.DbRef}");
                 output.AppendLine($"Created: {target.CreatedAt}");
