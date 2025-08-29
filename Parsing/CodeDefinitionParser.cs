@@ -6,6 +6,7 @@ using CSMOO.Verbs;
 using CSMOO.Object;
 using CSMOO.Logging;
 using dotless.Core.Parser;
+using CSMOO.Scripting;
 
 namespace CSMOO.Parsing;
 
@@ -51,7 +52,9 @@ public static class CodeDefinitionParser
                         Parameters = ExtractParameterTypes(method).ToArray(),
                         ParameterNames = ExtractParameterNames(method).ToArray(),
                         ReturnType = returnType,
-                        Description = ExtractDocumentation(method) ?? $"Function {method.Identifier.ValueText} for {className}"
+                        Description = ExtractDocumentation(method) ?? $"Function {method.Identifier.ValueText} for {className}",
+                        Accessors = ExtractAccessors(method)
+                        
                     };
                     
                     functions.Add(function);
@@ -121,37 +124,55 @@ public static class CodeDefinitionParser
             return new List<VerbDefinition>();
         }
     }
-    
-    private static string ExtractPropertyAccessor(FieldDeclarationSyntax field)
-{
-    var accessors = "";
 
-    // Check for public/private/internal/protected
-    foreach (var mod in field.Modifiers)
+
+        private static List<Keyword> ExtractAccessors(MemberDeclarationSyntax member)
     {
-        var modText = mod.Text.ToLowerInvariant();
-        if (modText is "public" or "private" or "internal" or "protected")
-            accessors += modText + " ";
-    }
+        var accessors = new List<Keyword>();
 
-    // Check for readonly
-    if (field.Modifiers.Any(m => m.IsKind(SyntaxKind.ReadOnlyKeyword)))
-        accessors += "readonly ";
+        // collect modifiers (e.g. "public", "readonly")
+        var modifiers = member.Modifiers.Select(m => m.Text.ToLowerInvariant()).ToList();
 
-    // Check for custom attributes like [AdminOnly]
-    foreach (var attributeList in field.AttributeLists)
-    {
-        foreach (var attribute in attributeList.Attributes)
+        // collect attribute names (e.g. "ReadOnly", "MyNs.ReadOnlyAttribute")
+        var attributes = member.AttributeLists
+            .SelectMany(attr => attr.Attributes.Select(a => a.Name.ToString().ToLowerInvariant()));
+
+        modifiers.AddRange(attributes);
+
+        foreach (var mod in modifiers)
         {
-            var attrName = attribute.Name.ToString().ToLowerInvariant();
-            if (attrName is "adminonly" or "constant" or "writeonly")
-                accessors += attrName + " ";
+            switch (mod)
+            {
+                case "public":
+                    accessors.Add(Keyword.Public);
+                    break;
+                case "private":
+                    accessors.Add(Keyword.Private);
+                    break;
+                case "internal":
+                    accessors.Add(Keyword.Internal);
+                    break;
+                case "protected":
+                    accessors.Add(Keyword.Protected);
+                    break;
+                case "readonly":
+                    accessors.Add(Keyword.ReadOnly);
+                    break;
+                case "writeonly":
+                    accessors.Add(Keyword.WriteOnly);
+                    break;
+                case "hidden":
+                    accessors.Add(Keyword.Hidden);
+                    break;
+                case "adminonly":
+                    accessors.Add(Keyword.AdminOnly);
+                    break;
+            }
         }
+
+        return accessors;
     }
 
-    return accessors;
-}
-    
     /// <summary>
     /// Parse a C# file and extract property definitions
     /// </summary>
@@ -183,7 +204,7 @@ public static class CodeDefinitionParser
                             Type = DeterminePropertyType(field.Declaration.Type),
                             Value = ExtractPropertyValue(variable),
                             Description = ExtractDocumentation(field) ?? $"Property {variable.Identifier.ValueText} for {className}",
-                            Accessor = ExtractPropertyAccessor(field)
+                            Accessors = ExtractAccessors(field)
                         };
 
                         properties.Add(property);

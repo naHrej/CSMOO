@@ -1,3 +1,4 @@
+using CSMOO.Scripting;
 using LiteDB;
 
 namespace CSMOO.Functions;
@@ -43,7 +44,7 @@ public class Function
     /// <summary>
     /// Who can call this function (public, owner, wizard)
     /// </summary>
-    public string AccessModifier { get; set; } = "public";
+    public List<Keyword> AccessModifiers { get; set; } = new List<Keyword> { Keyword.Public };
     
     /// <summary>
     /// Description of what this function does

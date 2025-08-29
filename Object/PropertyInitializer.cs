@@ -2,6 +2,7 @@ using LiteDB;
 using CSMOO.Logging;
 using CSMOO.Database;
 using CSMOO.Parsing;
+using CSMOO.Scripting;
 
 namespace CSMOO.Object;
 
@@ -130,7 +131,7 @@ public static class PropertyInitializer
                         
                         if (systemObject != null)
                         {
-                            systemObject.PropAccessors[propDef.Name] = propDef.Accessor;
+                            systemObject.PropAccessors[propDef.Name] = propDef.Accessors ?? new List<Keyword> { Keyword.Public};
                             var (loadedCount, skippedCount) = SetSystemProperty(systemObject, propDef, baseDirectory);
                             loaded += loadedCount;
                             skipped += skippedCount;
@@ -168,7 +169,8 @@ public static class PropertyInitializer
         try
         {
             var value = propDef.GetTypedValue(baseDirectory);
-            systemObject.PropAccessors[propDef.Name] = propDef.Accessor;
+            systemObject.PropAccessors[propDef.Name] = propDef.Accessors ?? new List<Keyword> { Keyword.Public};
+             // persist the change so the system object is saved to the DB
             if (value is string[] lines)
             {
                 // Handle multiline properties as BsonArray
@@ -211,7 +213,7 @@ public static class PropertyInitializer
 
         try
         {
-            targetClass.PropAccessors[propDef.Name] = propDef.Accessor;
+            targetClass.PropAccessors[propDef.Name] = propDef.Accessors ?? new List<Keyword> { Keyword.Public };
             var value = propDef.GetTypedValue(baseDirectory);
             if (value is string[] lines)
             {

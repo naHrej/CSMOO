@@ -1231,6 +1231,11 @@ public static class Builtins
                 Code = scriptCode,
                 ObjectId = player?.Id ?? "system"
             };
+
+            if(player == null)
+            {
+                throw new ArgumentNullException(nameof(player), "Player cannot be null");
+            }
             
             return engine.ExecuteVerb(tempVerb, input ?? "", player, commandProcessor, thisObjectId);
         }

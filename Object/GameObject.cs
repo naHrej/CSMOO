@@ -4,6 +4,7 @@ using CSMOO.Functions;
 using CSMOO.Database;
 using CSMOO.Scripting;
 using CSMOO.Exceptions;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace CSMOO.Object;
 
@@ -64,7 +65,7 @@ public class GameObject : DynamicObject
     /// <summary>
     /// Instance-specific accessors for dynamic properties
     /// </summary>
-    public BsonDocument PropAccessors { get; set; } = new BsonDocument();
+    public Dictionary<string, List<Keyword>> PropAccessors { get; set; } = new Dictionary<string, List<Keyword>>();
 
     /// <summary>
     /// Location of this object (ID of the room/container it's in)
@@ -593,47 +594,119 @@ public class GameObject : DynamicObject
             _ => null
         };
     }
+    
+        // Typed helpers to work with PropAccessors as AccessorFlags (or a list)
 
-    private bool PermissionCheck(string propertyName, bool set = false)
+
+
+        private bool PermissionCheck(string propertyName, bool set = false)
     {
-        // If no accessor is defined, assume public access
-        if (!PropAccessors.ContainsKey(propertyName))
-            return true;
+        // case-insensitive lookup for PropAccessors entries
+        var key = PropAccessors.Keys
+            .FirstOrDefault(k => string.Equals(k, propertyName, StringComparison.OrdinalIgnoreCase));
+        var accessors = key != null ? PropAccessors[key] : new List<Keyword> { Keyword.Public };
 
-        var accessor = PropAccessors[propertyName].AsString.ToLowerInvariant();
-        var currentContext = Builtins.UnifiedContext?.This;
+        if (accessors == null || accessors.Count == 0)
+            accessors = new List<Keyword> { Keyword.Public };
 
-        // Check for read-only constraint on write operations
-        if (set && accessor.Contains("readonly"))
-            throw new PropertyAccessException($"Property '{propertyName}' is read-only");
+        var ctx = Builtins.UnifiedContext?.This;
+        if(ctx == null)
+            throw new ContextException("No current context available for permission check");
+        var isAdmin = ctx?.IsAdmin == true;
+        var isSelf = ctx?.Id != null && ctx?.Id == this.Id;
+        var isOwner = ctx?.Id != null && this.Owner?.Id != null && ctx?.Id == this?.Owner?.Id;
 
-        // Check for constant constraint (no access allowed)
-        if (accessor.Contains("constant"))
-            throw new PropertyAccessException($"Property '{propertyName}' is constant");
+                var allowRead = false;
+        var allowWrite = false;
+        var readForbidden = false;
+        var writeForbidden = false;
 
-        // Ensure we have a valid context for permission checks
-        if (currentContext == null)
-            throw new ContextException("Current context is null, cannot check property permissions");
-
-        // Check private access: only the object itself can access
-        if (accessor.StartsWith("private") && currentContext.Id != this.Id)
-            throw new PrivateAccessException($"Cannot access property '{propertyName}' on object {Name}(#{DbRef})");
-
-        // Check internal access: only the object itself or its owner can access
-        if (accessor.StartsWith("internal"))
+        foreach (var accessor in accessors.Distinct())
         {
-            bool isSelfAccess = currentContext.Id == this.Id;
-            bool isOwnerAccess = currentContext.Id == this.Owner?.Id;
-            
-            if (!isSelfAccess && !isOwnerAccess)
-                throw new PermissionException($"Cannot access internal property '{propertyName}' on object {Name}(#{DbRef})");
+            switch (accessor)
+            {
+                case Keyword.Public:
+                    allowRead = true;
+                    allowWrite = true;
+                    break;
+
+                case Keyword.ReadOnly:
+                    allowRead = true;
+                    writeForbidden = true; // forbids writes unless admin
+                    break;
+
+                case Keyword.WriteOnly:
+                    allowWrite = true;
+                    readForbidden = true; // forbids reads unless admin
+                    break;
+
+                case Keyword.Private:
+                    if (isSelf || isOwner)
+                    {
+                        allowRead = true;
+                        allowWrite = true;
+                    }
+                    else
+                    {
+                        readForbidden = true;
+                        writeForbidden = true;
+                    }
+                    break;
+
+                case Keyword.Internal:
+                    if (isSelf || isOwner || (ctx?.OwnerId != null && ctx?.Owner.Id == this?.Owner?.Id))
+                    {
+                        allowRead = true;
+                        allowWrite = true;
+                    }
+                    else
+                    {
+                        readForbidden = true;
+                        writeForbidden = true;
+                    }
+                    break;
+
+                case Keyword.AdminOnly:
+                    if (isAdmin)
+                    {
+                        allowRead = true;
+                        allowWrite = true;
+                    }
+                    else
+                    {
+                        readForbidden = true;
+                        writeForbidden = true;
+                    }
+                    break;
+            }
         }
 
-        // Check admin-only access: only admin users can access
-        if (accessor.Contains("adminonly") && !currentContext.IsAdmin)
-            throw new PermissionException($"Property '{propertyName}' is admin-only");
+        // Admin bypass: admins ignore forbids
+        if (isAdmin)
+        {
+            allowRead = true;
+            allowWrite = true;
+            readForbidden = false;
+            writeForbidden = false;
+        }
+        else
+        {
+            if (readForbidden) allowRead = false;
+            if (writeForbidden) allowWrite = false;
+        }
 
-        return true;
+        var effectiveWrite = allowWrite;
+
+        if (!set)
+        {
+            if (allowRead) return true;
+            throw new PropertyAccessException($"Permission denied to get property '{propertyName}' on object {Name}(#{DbRef})");
+        }
+        else
+        {
+            if (effectiveWrite) return true;
+            throw new PermissionException($"Permission denied to set property '{propertyName}' on object {Name}(#{DbRef})");
+        }
     }
 
     /// <summary>

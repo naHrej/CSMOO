@@ -1,3 +1,4 @@
+using CSMOO.Scripting;
 using LiteDB;
 
 namespace CSMOO.Object;
@@ -27,7 +28,7 @@ public class ObjectClass
     /// </summary>
     public BsonDocument Properties { get; set; } = new BsonDocument();
 
-    public BsonDocument PropAccessors { get; set; } = new BsonDocument();
+    public Dictionary<string, List<Keyword>> PropAccessors { get; set; } = new Dictionary<string, List<Keyword>>();
     
     /// <summary>
     /// Methods/functions defined on this class (stored as code strings)

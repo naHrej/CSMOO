@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using CSMOO.Scripting;
 
 namespace CSMOO.Functions;
 
@@ -48,6 +49,9 @@ public class FunctionDefinition
     /// </summary>
     [JsonPropertyName("targetClass")]
     public string? TargetClass { get; set; }
+
+    [JsonPropertyName("accessors")]
+    public List<Keyword> Accessors { get; set; } = new List<Keyword> { Keyword.Public };
 
     /// <summary>
     /// Get the code as a single string

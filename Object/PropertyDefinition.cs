@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using CSMOO.Scripting;
 
 namespace CSMOO.Object;
 
@@ -61,7 +62,7 @@ public class PropertyDefinition
     [JsonPropertyName("filename")]
     public string? Filename { get; set; }
 
-    public string? Accessor { get; set; } = "public";
+    public List<Keyword>? Accessors { get; set; } = new List<Keyword> { Keyword.Public };
 
     /// <summary>
     /// Gets the property value as the appropriate type

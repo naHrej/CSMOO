@@ -673,7 +673,7 @@ public class ProgrammingCommands
         _commandProcessor.SendToPlayer($"{progDataPrefix}{GetObjectName(function.ObjectId)}.{function.Name}()");
 _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{function.Name}()");
         _commandProcessor.SendToPlayer($"{progDataPrefix}Signature: {function.ReturnType} {function.Name}({paramString})");
-        _commandProcessor.SendToPlayer($"{progDataPrefix}Permissions: {function.AccessModifier}");
+        _commandProcessor.SendToPlayer($"{progDataPrefix}Permissions: {function.AccessModifiers.ToString()}");
         if (!string.IsNullOrEmpty(function.Description))
             _commandProcessor.SendToPlayer($"{progDataPrefix}Description: {function.Description}");
         _commandProcessor.SendToPlayer($"{progDataPrefix}Created by: {function.CreatedBy} on {function.CreatedAt:yyyy-MM-dd HH:mm}");
@@ -871,10 +871,10 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
                 
                 if (!string.IsNullOrEmpty(function.Description))
                     info += $" - {function.Description}";
-                
-                if (function.AccessModifier != "public")
-                    info += $" [{function.AccessModifier}]";
-                
+
+                if (!function.AccessModifiers.Contains(Keyword.Public))
+                    info += $" [{function.AccessModifiers.ToString()}]";
+
                 // Show where the function comes from
                 if (source != "instance")
                     info += $" (from {source})";
@@ -1012,7 +1012,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
         foreach (var function in functions.OrderBy(f => f.Name))
         {
             var progInfo = $"<b>{function.Name} - {function.Id}</b><br/>";
-            var signature = $"• {function.AccessModifier} {HtmlEncode(function.ReturnType)} {function.Name}({string.Join(", ", function.ParameterTypes.Select(HtmlEncode))})";
+            var signature = $"• {string.Join(", ", function.AccessModifiers.Select(k => k.ToString()))} {HtmlEncode(function.ReturnType)} {function.Name}({string.Join(", ", function.ParameterTypes.Select(HtmlEncode))})";
             var info = $"{(isProg ? progInfo : "")} {signature}";
             
             if (!string.IsNullOrEmpty(function.Description))
@@ -1943,16 +1943,16 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
 
         // Parse the command - handle optional public/private modifier
         var commandText = string.Join(" ", parts.Skip(1));
-        
-        string permissions = "public"; // Default to public
+
+        List<Keyword> permissions = new List<Keyword>();
         if (commandText.StartsWith("public "))
         {
-            permissions = "public";
+            permissions.Add(Keyword.Public);
             commandText = commandText.Substring(7);
         }
         else if (commandText.StartsWith("private "))
         {
-            permissions = "private";
+            permissions.Add(Keyword.Private);
             commandText = commandText.Substring(8);
         }
 
@@ -2049,7 +2049,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
             existingFunction.ReturnType = returnType;
             existingFunction.ParameterTypes = parameterTypes.ToArray();
             existingFunction.ParameterNames = parameterNames.ToArray();
-            existingFunction.AccessModifier = permissions;
+            existingFunction.AccessModifiers = permissions;
             existingFunction.ModifiedAt = DateTime.UtcNow;
 
             var functionsCollection = GameDatabase.Instance.GetCollection<Function>("functions");
@@ -2073,7 +2073,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
         var function = FunctionManager.CreateFunction(gameObject, functionName, parameterTypes.ToArray(), parameterNames.ToArray(), returnType, "", _player.Name);
 
         // Set visibility
-        function.AccessModifier = permissions;
+        function.AccessModifiers = permissions;
         var functions = GameDatabase.Instance.GetCollection<Function>("functions");
         functions.Update(function);
 

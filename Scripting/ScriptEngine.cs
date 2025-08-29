@@ -57,7 +57,7 @@ public class ScriptEngine
     /// <summary>
     /// Execute a verb with unified script globals
     /// </summary>
-    public string ExecuteVerb(Verb verb, string input, Player player, 
+    public string ExecuteVerb(Verb verb, string input, Player player,
         CommandProcessor commandProcessor, string? thisObjectId = null, Dictionary<string, string>? variables = null)
     {
         var result = ExecuteVerbWithResult(verb, input, player, commandProcessor, thisObjectId, variables);
@@ -67,7 +67,7 @@ public class ScriptEngine
     /// <summary>
     /// Execute a verb with unified script globals and return both success status and result
     /// </summary>
-    public (bool success, string result) ExecuteVerbWithResult(Verb verb, string input, Player player, 
+    public (bool success, string result) ExecuteVerbWithResult(Verb verb, string input, Player player,
         CommandProcessor commandProcessor, string? thisObjectId = null, Dictionary<string, string>? variables = null)
     {
         var previousContext = Builtins.UnifiedContext; // Store previous context
@@ -131,32 +131,32 @@ public class ScriptEngine
 
             // Set Builtins context for script execution
             Builtins.UnifiedContext = globals;
-            
+
             // Push this verb onto the script call stack
             ScriptStackTrace.PushVerbFrame(verb, thisObject);
-            
+
             // Create script with timeout protection
             var script = CSharpScript.Create(completeScript, _scriptOptions, typeof(ScriptGlobals));
-            
+
             // Execute with timeout
             using var cts = new CancellationTokenSource(Config.Instance.Scripting.MaxExecutionTimeMs);
             try
             {
                 var scriptResult = script.RunAsync(globals, cts.Token).Result;
                 var returnValue = scriptResult.ReturnValue;
-                
+
                 // Check if the verb returns a boolean to indicate success/failure
                 if (returnValue is bool boolResult)
                 {
                     return (boolResult, "");
                 }
-                
+
                 // If not a boolean, assume success and return the string representation
                 var stringResult = returnValue?.ToString() ?? "";
-                
+
                 // Don't clear the stack trace here - let the top-level caller handle it
                 // ScriptStackTrace.Clear();
-                
+
                 return (true, stringResult);
             }
             catch (AggregateException ex) when (ex.InnerException is OperationCanceledException)
@@ -168,7 +168,7 @@ public class ScriptEngine
             {
                 // Unwrap AggregateException to get the real exception
                 ScriptStackTrace.UpdateCurrentFrame(ex.InnerException, verb.Code);
-                
+
                 // If the inner exception is already a ScriptExecutionException, just re-throw it
                 if (ex.InnerException is ScriptExecutionException)
                 {
@@ -187,7 +187,7 @@ public class ScriptEngine
             catch (Exception ex)
             {
                 ScriptStackTrace.UpdateCurrentFrame(ex, verb.Code);
-                
+
                 // If it's already a ScriptExecutionException, preserve the original stack frames
                 if (ex is ScriptExecutionException scriptEx)
                 {
@@ -209,7 +209,7 @@ public class ScriptEngine
         {
             // Pop the verb frame from the script call stack
             ScriptStackTrace.PopFrame();
-            
+
             // Restore previous Builtins context to support nested function calls
             Builtins.UnifiedContext = previousContext;
         }
@@ -218,7 +218,7 @@ public class ScriptEngine
     /// <summary>
     /// Execute a function with unified script globals and type checking
     /// </summary>
-    public object? ExecuteFunction(Function function, object?[] parameters, Player player, 
+    public object? ExecuteFunction(Function function, object?[] parameters, Player player,
         CommandProcessor? commandProcessor = null, string? thisObjectId = null)
     {
 
@@ -226,40 +226,21 @@ public class ScriptEngine
         var previousContext = Builtins.UnifiedContext; // Store previous context
         var thisObject = ObjectManager.GetObject(actualThisObjectId);
         var playerObject = ObjectManager.GetObject(player.Id);
-        switch (function.AccessModifier)
-        {
-            case "private":
-                {
-                    if (actualThisObjectId == previousContext?.This?.Id ?? playerObject?.Id)
-                    {
-                        break;
-                    }
-                    else
-                    {
 
-                        throw new ScriptExecutionException($"Function '{function.Name}' is private to {thisObject?.Name}({thisObject?.Id}).");
-                    }
-                }
-            case "internal":
-                {
-                    if (thisObject?.Owner?.Id == previousContext?.This?.Owner.Id)
-                    {
-                        break;
-                    }
-                    else
-                    {
-                        throw new ScriptExecutionException($"Function '{function.Name}' is internal to {thisObject?.Owner?.Name}({thisObject?.Owner?.Id}).");
-                    }
-                }
-            case "public":
-                {
-                    break;
-                }
-            default:
-                {
-                    throw new ScriptExecutionException($"Unknown function permission: {function.AccessModifier}");
-                }
+        if (function.AccessModifiers.Contains(Keyword.Private) && actualThisObjectId != previousContext?.This?.Id ?? playerObject?.Id)
+        {
+
+            throw new ScriptExecutionException($"Function '{function.Name}' is private to {thisObject?.Name}({thisObject?.Id}).");
+
         }
+        if (function.AccessModifiers.Contains(Keyword.Internal) && thisObject?.Owner?.Id != previousContext?.This?.Owner.Id)
+        {
+
+            throw new ScriptExecutionException($"Function '{function.Name}' is internal to {thisObject?.Owner?.Name}({thisObject?.Owner?.Id}).");
+
+        }
+
+
         try
         {
             // Validate parameter count
@@ -277,7 +258,7 @@ public class ScriptEngine
                 }
             }
 
-            
+
 
 
             // Debug logging to identify null objects
@@ -356,7 +337,7 @@ public class ScriptEngine
 
             // Set Builtins context for script execution
             Builtins.UnifiedContext = globals;
-            
+
             // Push this function onto the script call stack
             ScriptStackTrace.PushFunctionFrame(function, thisObject);
 
@@ -379,7 +360,7 @@ public class ScriptEngine
             {
                 // Unwrap AggregateException to get the real exception
                 ScriptStackTrace.UpdateCurrentFrame(ex.InnerException, function.Code);
-                
+
                 // If the inner exception is already a ScriptExecutionException, just re-throw it
                 if (ex.InnerException is ScriptExecutionException)
                 {
@@ -398,7 +379,7 @@ public class ScriptEngine
             catch (Exception ex)
             {
                 ScriptStackTrace.UpdateCurrentFrame(ex, function.Code);
-                
+
                 // If it's already a ScriptExecutionException, preserve the original stack frames
                 if (ex is ScriptExecutionException scriptEx)
                 {
@@ -432,7 +413,7 @@ public class ScriptEngine
         {
             // Pop the function frame from the script call stack
             ScriptStackTrace.PopFrame();
-            
+
             // Restore previous Builtins context to support nested function calls
             Builtins.UnifiedContext = previousContext;
         }
@@ -461,11 +442,11 @@ public class ScriptEngine
             CreatedAt = DateTime.UtcNow,
             ModifiedAt = DateTime.UtcNow
         };
-        
+
         // Add a special property to indicate this is a null object
         nullGameObject.Properties["_isNullObject"] = true;
         nullGameObject.Properties["name"] = $"<missing object {objectId}>";
-        
+
         return nullGameObject;
     }
 
@@ -486,7 +467,7 @@ public class ScriptEngine
             var dbref = match.Groups[1].Value;
             var member = match.Groups[2].Value;
             var methodCall = match.Groups[3].Value; // Will be empty for properties, contains (...) for methods
-            
+
             if (!string.IsNullOrEmpty(methodCall))
             {
                 // This is a method call: #4.methodName(args) -> GetObjectByDbRef(4).methodName(args)
@@ -505,7 +486,7 @@ public class ScriptEngine
         {
             var dbref = match.Groups[1].Value;
             var member = match.Groups[2].Value;
-            
+
             return $"GetObjectByDbRef({dbref}).{member} =";
         });
 
@@ -516,7 +497,7 @@ public class ScriptEngine
             var objectId = match.Groups[1].Value;
             var member = match.Groups[2].Value;
             var methodCall = match.Groups[3].Value; // Will be empty for properties, contains (...) for methods
-            
+
             if (!string.IsNullOrEmpty(methodCall))
             {
                 // This is a method call: $objectId.methodName(args) -> GetObjectById("objectId").methodName(args)
@@ -535,7 +516,7 @@ public class ScriptEngine
         {
             var objectId = match.Groups[1].Value;
             var member = match.Groups[2].Value;
-            
+
             return $"GetObjectById(\"{objectId}\").{member} =";
         });
 
@@ -558,7 +539,7 @@ public class ScriptEngine
         }
 
         var scriptBuilder = new StringBuilder();
-        
+
         // Add variable declarations at the beginning
         scriptBuilder.AppendLine("// Auto-generated variable declarations from pattern matching");
         foreach (var kvp in variables)
@@ -570,18 +551,18 @@ public class ScriptEngine
                 .Replace("\r", "\\r")    // Escape carriage returns
                 .Replace("\n", "\\n")    // Escape newlines
                 .Replace("\t", "\\t");   // Escape tabs
-                
+
             scriptBuilder.AppendLine($"string {kvp.Key} = \"{escapedValue}\";");
             Logger.Debug($"Auto-declared variable: {kvp.Key} = \"{escapedValue}\"");
         }
         scriptBuilder.AppendLine();
-        
+
         // Add the original verb code
         scriptBuilder.AppendLine("// Original script code:");
         scriptBuilder.AppendLine(originalCode);
-        
+
         var completeScript = scriptBuilder.ToString();
-        
+
         return completeScript;
     }
 

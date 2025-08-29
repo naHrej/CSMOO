@@ -2,6 +2,7 @@ using LiteDB;
 using CSMOO.Database;
 using CSMOO.Logging;
 using CSMOO.Object;
+using CSMOO.Scripting;
 
 namespace CSMOO.Functions;
 
@@ -219,12 +220,12 @@ public static class FunctionManager
     /// <summary>
     /// Sets function permissions
     /// </summary>
-    public static bool SetFunctionPermissions(string functionId, string permissions)
+    public static bool SetFunctionPermissions(string functionId, List<Keyword> permissions)
     {
         var function = GetFunction(functionId);
         if (function == null) return false;
 
-        function.AccessModifier = permissions;
+        function.AccessModifiers = permissions;
         return UpdateFunction(function);
     }
 }
