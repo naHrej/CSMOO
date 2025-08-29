@@ -297,6 +297,17 @@ public static class ObjectManager
     }
 
 
+    public static bool UpdateObject(GameObject gameObject)
+    {
+        if (gameObject == null || string.IsNullOrEmpty(gameObject.Id))
+            return false;
+
+        // Update the cache
+        _objectCache[gameObject.Id] = gameObject;
+
+        // Persist to database
+        return DbProvider.Instance.Update("gameobjects", gameObject);
+    }
     /// <summary>
     /// Removes a property from an object instance
     /// </summary>

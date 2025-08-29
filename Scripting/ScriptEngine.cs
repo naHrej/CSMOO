@@ -227,13 +227,18 @@ public class ScriptEngine
         var thisObject = ObjectManager.GetObject(actualThisObjectId);
         var playerObject = ObjectManager.GetObject(player.Id);
 
+        if(thisObject?.Owner == null)
+        {
+            throw new ScriptExecutionException($"Function '{function.Name}' cannot be executed because its object ({thisObject?.Name} - {thisObject?.Id}) has no owner.");
+        }
+
         if (function.AccessModifiers.Contains(Keyword.Private) && actualThisObjectId != previousContext?.This?.Id ?? playerObject?.Id)
         {
 
             throw new ScriptExecutionException($"Function '{function.Name}' is private to {thisObject?.Name}({thisObject?.Id}).");
 
         }
-        if (function.AccessModifiers.Contains(Keyword.Internal) && thisObject?.Owner?.Id != previousContext?.This?.Owner.Id)
+        if (function.AccessModifiers.Contains(Keyword.Internal) && thisObject?.Owner?.Id != previousContext.This.Owner.Id ?? playerObject?.Id)
         {
 
             throw new ScriptExecutionException($"Function '{function.Name}' is internal to {thisObject?.Owner?.Name}({thisObject?.Owner?.Id}).");

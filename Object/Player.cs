@@ -53,6 +53,13 @@ public class Player : GameObject
         set => Properties["isonline"] = new BsonValue(value);
     }
 
+    [BsonIgnore]
+    public new GameObject Owner
+    {
+        get => this;
+        set { /* Players own themselves; do nothing */ }
+    }
+
 
     /// <summary>
     /// Ensures legacy fields are synced to Properties after deserialization

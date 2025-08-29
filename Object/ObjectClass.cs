@@ -51,7 +51,22 @@ public class ObjectClass
     /// Creation timestamp
     /// </summary>
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+    // We don't want to store this
+    [BsonIgnore]
+    public GameObject? Owner
+    {
+        get
+        {
+            return ObjectManager.GetObject<GameObject>(_owner);
+        }
+        set
+        {
+            _owner = value?.Id;
+        }
+    }
     
+    private string? _owner = "system";
     /// <summary>
     /// Last modification timestamp
     /// </summary>

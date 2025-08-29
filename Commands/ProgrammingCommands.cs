@@ -1945,22 +1945,27 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
         var commandText = string.Join(" ", parts.Skip(1));
 
         List<Keyword> permissions = new List<Keyword>();
-        if (commandText.StartsWith("public "))
+        if (commandText.StartsWith("public ", StringComparison.InvariantCultureIgnoreCase))
         {
             permissions.Add(Keyword.Public);
             commandText = commandText.Substring(7);
         }
-        else if (commandText.StartsWith("private "))
+        else if (commandText.StartsWith("private ", StringComparison.InvariantCultureIgnoreCase))
         {
             permissions.Add(Keyword.Private);
             commandText = commandText.Substring(8);
+        }
+        else if (commandText.StartsWith("internal ", StringComparison.InvariantCultureIgnoreCase))
+        {
+            permissions.Add(Keyword.Internal);
+            commandText = commandText.Substring(9).TrimStart();
         }
 
         // Parse return type, object:function signature
         var signatureParts = commandText.Split(' ', 2);
         if (signatureParts.Length < 2)
         {
-            _commandProcessor.SendToPlayer("Usage: @func [public|private] <returnType> <object:functionName>(<type> <name>, ...)");
+            _commandProcessor.SendToPlayer("Usage: @func [public|private|internal] <returnType> <object:functionName>(<type> <name>, ...)");
             return true;
         }
 

@@ -102,10 +102,11 @@ public class GameObject : DynamicObject
         set => Properties["createdat"] = new BsonValue(value);
     }
 
+    [BsonIgnore]
     public GameObject? Owner
     {
-        get => Properties.ContainsKey("owner") ? ObjectManager.GetObject(Properties["owner"].AsString) : null;
-        set => Properties["owner"] = value != null ? new BsonValue(value.Id) : BsonValue.Null;
+        get => Properties.ContainsKey("ownerId") ? ObjectManager.GetObject(Properties["ownerId"].AsString) : null;
+        set => Properties["ownerId"] = value != null ? new BsonValue(value.Id) : BsonValue.Null;
     }
 
     /// <summary>
