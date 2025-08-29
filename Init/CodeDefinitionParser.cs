@@ -7,7 +7,7 @@ using CSMOO.Object;
 using CSMOO.Logging;
 using dotless.Core.Parser;
 
-namespace CSMOO.Parsing;
+namespace CSMOO.Init;
 
 /// <summary>
 /// Parses C# class definitions to extract function and verb definitions

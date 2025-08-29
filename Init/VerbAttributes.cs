@@ -1,4 +1,4 @@
-namespace CSMOO.Parsing;
+namespace CSMOO.Init;
 
 /// <summary>
 /// Attribute to specify aliases for a verb

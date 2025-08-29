@@ -259,7 +259,7 @@ public class System
     /// </summary>
     public verb Examine(string targetName)
     {
-// First, try to resolve as a class name
+        // First, try to resolve as a class name
         var classTarget = Builtins.GetClassByName(targetName);
         var isExaminingClass = classTarget != null;
         dynamic target = null;
@@ -470,7 +470,7 @@ public class System
             else
             {
                 // Get all verbs with source information
-                var allVerbsWithSource = VerbResolver.GetAllVerbsOnObject(targetId);
+                var allVerbsWithSource = Builtins.GetVerbsOnObject(targetId);
                 var instanceVerbs = allVerbsWithSource.Where(v => v.source == "instance").ToList();
                 var inheritedVerbs = allVerbsWithSource.Where(v => v.source != "instance").ToList();
                 // Show instance-specific verbs
@@ -545,7 +545,7 @@ public class System
             else
             {
                 // Get all functions with source information
-                var allFunctionsWithSource = FunctionResolver.GetAllFunctionsOnObject(targetId);
+                var allFunctionsWithSource = Builtins.GetFunctionsOnObject(targetId);
                 var instanceFunctions = allFunctionsWithSource.Where(f => f.source == "instance").ToList();
                 var inheritedFunctions = allFunctionsWithSource.Where(f => f.source != "instance").ToList();
                 // Show instance-specific functions
@@ -634,13 +634,14 @@ public class System
                         {
                             value = value.Substring(0, 47) + "...";
                         }
-                        if(target.PropAccessors.ContainsKey(prop.Key))
+                        if (target.PropAccessors.ContainsKey(prop.Key))
                         {
-                        List<Keyword> accList = target.PropAccessors[prop.Key];
-                        string accessor = string.Join(" ", accList.Select(k => k.ToString()));
-                        accessor = accessor.TrimEnd();
-                        output.AppendLine($"  {prop.Key} [{accessor}]: {value}");
-                        } else
+                            List<Keyword> accList = target.PropAccessors[prop.Key];
+                            string accessor = string.Join(" ", accList.Select(k => k.ToString()));
+                            accessor = accessor.TrimEnd();
+                            output.AppendLine($"  {prop.Key} [{accessor}]: {value}");
+                        }
+                        else
                         {
                             output.AppendLine($"  {prop.Key} [{"Public"}]: {value}");
                         }
@@ -671,6 +672,7 @@ public class System
             }
         }
         notify(Player, output.ToString().TrimEnd());
+
 
 
     }
