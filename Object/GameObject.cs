@@ -598,119 +598,47 @@ public class GameObject : DynamicObject
             _ => null
         };
     }
-    
-        // Typed helpers to work with PropAccessors as AccessorFlags (or a list)
+
+    // Typed helpers to work with PropAccessors as AccessorFlags (or a list)
 
 
 
-        private bool PermissionCheck(string propertyName, bool set = false)
+    private bool PermissionCheck(string propertyName, bool set = false)
     {
         // case-insensitive lookup for PropAccessors entries
         var key = PropAccessors.Keys
             .FirstOrDefault(k => string.Equals(k, propertyName, StringComparison.OrdinalIgnoreCase));
         var accessors = key != null ? PropAccessors[key] : new List<Keyword> { Keyword.Public };
 
+
+
+
         if (accessors == null || accessors.Count == 0)
-            accessors = new List<Keyword> { Keyword.Public };
+        {
+            PropAccessors[propertyName] = [Keyword.Public];
+            return true; // Default to public if no accessors defined
+        }
+        if (accessors.Contains(Keyword.Public) && accessors.Count == 1)
+            return true; // Public access, no further checks needed
 
-        var ctx = Builtins.UnifiedContext?.This;
-        if(ctx == null)
-            throw new ContextException("No current context available for permission check");
-        var isAdmin = ctx?.IsAdmin == true;
+        var ctx = (Builtins.UnifiedContext?.This) ?? throw new ContextException("No current context available for permission check");
+        var isAdmin = this?.IsAdmin == true;
         var isSelf = ctx?.Id != null && ctx?.Id == this.Id;
-        var isOwner = ctx?.Id != null && this.Owner?.Id != null && ctx?.Id == this?.Owner?.Id;
 
-                var allowRead = false;
-        var allowWrite = false;
-        var readForbidden = false;
-        var writeForbidden = false;
+        if (accessors.Contains(Keyword.AdminOnly) && !isAdmin)
+            throw new PermissionException($"Access denied to {(set ? "set" : "get")} property '{propertyName}': admin only.");
+        if (accessors.Contains(Keyword.Private) && !isSelf)
+            throw new PermissionException($"Access to property '{propertyName}' is restricted to {this.Name}(#{this.DbRef}) by the private keyword.");
+        if (accessors.Contains(Keyword.Internal) && (this.Owner?.Id != ctx?.Owner.Id))
+            throw new PermissionException($"Access to property '{propertyName}' is restricted to {this.Owner?.Name}(#{this.Owner?.DbRef}) owned objects by the internal keyword.");
+        if (accessors.Contains(Keyword.Protected) && (this.ClassId != ctx?.ClassId))
+            throw new PermissionException($"Access to property '{propertyName}' is restricted to objects of class {this.ClassId} by the protected keyword.");
+        if (accessors.Contains(Keyword.ReadOnly) && !isAdmin && set)
+            throw new PermissionException($"Access to property '{propertyName}' is read only.");
+        if (accessors.Contains(Keyword.WriteOnly) && !isAdmin && !set)
+            throw new PermissionException($"Access to property '{propertyName}' is write only.");
 
-        foreach (var accessor in accessors.Distinct())
-        {
-            switch (accessor)
-            {
-                case Keyword.Public:
-                    allowRead = true;
-                    allowWrite = true;
-                    break;
-
-                case Keyword.ReadOnly:
-                    allowRead = true;
-                    writeForbidden = true; // forbids writes unless admin
-                    break;
-
-                case Keyword.WriteOnly:
-                    allowWrite = true;
-                    readForbidden = true; // forbids reads unless admin
-                    break;
-
-                case Keyword.Private:
-                    if (isSelf || isOwner)
-                    {
-                        allowRead = true;
-                        allowWrite = true;
-                    }
-                    else
-                    {
-                        readForbidden = true;
-                        writeForbidden = true;
-                    }
-                    break;
-
-                case Keyword.Internal:
-                    if (isSelf || isOwner || (ctx?.OwnerId != null && ctx?.Owner.Id == this?.Owner?.Id))
-                    {
-                        allowRead = true;
-                        allowWrite = true;
-                    }
-                    else
-                    {
-                        readForbidden = true;
-                        writeForbidden = true;
-                    }
-                    break;
-
-                case Keyword.AdminOnly:
-                    if (isAdmin)
-                    {
-                        allowRead = true;
-                        allowWrite = true;
-                    }
-                    else
-                    {
-                        readForbidden = true;
-                        writeForbidden = true;
-                    }
-                    break;
-            }
-        }
-
-        // Admin bypass: admins ignore forbids
-        if (isAdmin)
-        {
-            allowRead = true;
-            allowWrite = true;
-            readForbidden = false;
-            writeForbidden = false;
-        }
-        else
-        {
-            if (readForbidden) allowRead = false;
-            if (writeForbidden) allowWrite = false;
-        }
-
-        var effectiveWrite = allowWrite;
-
-        if (!set)
-        {
-            if (allowRead) return true;
-            throw new PropertyAccessException($"Permission denied to get property '{propertyName}' on object {Name}(#{DbRef})");
-        }
-        else
-        {
-            if (effectiveWrite) return true;
-            throw new PermissionException($"Permission denied to set property '{propertyName}' on object {Name}(#{DbRef})");
-        }
+        return true;
     }
 
     /// <summary>

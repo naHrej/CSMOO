@@ -220,24 +220,21 @@ public class ScriptEngine
         var thisObject = ObjectManager.GetObject(actualThisObjectId);
         var playerObject = ObjectManager.GetObject(player.Id);
 
-        if(thisObject?.Owner == null)
-        {
-            throw new ScriptExecutionException($"Function '{function.Name}' cannot be executed because its object ({thisObject?.Name} - {thisObject?.Id}) has no owner.");
-        }
+        // Context validation
+        if (thisObject == null)
+            throw new ScriptExecutionException($"{function.Name} cannot be invoked due to a ScriptEngine context error");
 
+        if (thisObject?.Owner == null)
+                throw new ScriptExecutionException($"Function '{function.Name}' cannot be executed because its object ({thisObject?.Name}(#{thisObject?.DbRef}) has no owner.");
+
+        // Keyword logic
         if (function.AccessModifiers.Contains(Keyword.Private) && actualThisObjectId != previousContext?.This?.Id ?? playerObject?.Id)
-        {
-
             throw new ScriptExecutionException($"Function '{function.Name}' is private to {thisObject?.Name}({thisObject?.Id}).");
-
-        }
-        if (function.AccessModifiers.Contains(Keyword.Internal) && thisObject?.Owner?.Id != previousContext.This.Owner.Id ?? playerObject?.Id)
-        {
-
-            throw new ScriptExecutionException($"Function '{function.Name}' is internal to {thisObject?.Owner?.Name}({thisObject?.Owner?.Id}).");
-
-        }
-
+        if (function.AccessModifiers.Contains(Keyword.Internal) && thisObject?.Owner?.Id != previousContext?.This?.Owner.Id ?? playerObject?.Id)
+             throw new ScriptExecutionException($"Function '{function.Name}' is internal to {thisObject?.Owner?.Name}({thisObject?.Owner?.Id}).");
+        if (function.AccessModifiers.Contains(Keyword.Protected) && thisObject?.ClassId != previousContext?.This?.ClassId)
+            throw new ScriptExecutionException($"Function '{function.Name}' is protected and {previousContext?.This?.Name}(#{previousContext?.This?.Dbref}) has a different class to {thisObject?.Name}(#{thisObject?.DbRef})");
+        
 
         try
         {
