@@ -57,6 +57,9 @@ public class ObjectClass
     {
         get
         {
+            if (string.IsNullOrEmpty(_owner))
+                return null;
+
             return ObjectManager.GetObject<GameObject>(_owner);
         }
         set

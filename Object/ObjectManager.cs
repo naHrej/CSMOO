@@ -152,11 +152,6 @@ public static class ObjectManager
     public static List<GameObject> FindObjectsByClass(string classId, bool includeSubclasses = true)
         => InstanceManager.FindObjectsByClass(classId, includeSubclasses);
 
-    /// <summary>
-    /// Migrates objects to have DbRefs if they don't already have them
-    /// </summary>
-    public static void MigrateDbRefs()
-        => InstanceManager.MigrateDbRefs();
 
     /// <summary>
     /// Finds an object by its DbRef number

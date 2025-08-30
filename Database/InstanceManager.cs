@@ -186,30 +186,6 @@ public static class InstanceManager
     }
 
     /// <summary>
-    /// Migrates objects to have DbRefs if they don't already have them
-    /// </summary>
-    public static void MigrateDbRefs()
-    {
-        var objectsWithoutDbRef = DbProvider.Instance.Find<GameObject>("gameobjects", obj => obj.DbRef == 0).ToList();
-        
-        if (!objectsWithoutDbRef.Any())
-        {
-            return;
-        }
-
-        Logger.Info($"Migrating {objectsWithoutDbRef.Count} objects to have DbRefs...");
-        
-        var nextDbRef = GetNextDbRef();
-        foreach (var obj in objectsWithoutDbRef)
-        {
-            obj.DbRef = nextDbRef++;
-            DbProvider.Instance.Update("gameobjects", obj);
-        }
-        
-        Logger.Info("DbRef migration completed");
-    }
-
-    /// <summary>
     /// Finds an object by its DbRef number
     /// </summary>
     public static GameObject? FindByDbRef(int dbRef)

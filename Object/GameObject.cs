@@ -105,8 +105,12 @@ public class GameObject : DynamicObject
     [BsonIgnore]
     public GameObject? Owner
     {
-        get => Properties.ContainsKey("ownerId") ? ObjectManager.GetObject(Properties["ownerId"].AsString) : null;
-        set => Properties["ownerId"] = value != null ? new BsonValue(value.Id) : BsonValue.Null;
+        get
+        {
+            var loc = Properties.ContainsKey("owner") ? Properties["owner"].AsString : null;
+            return loc != null ? ObjectManager.GetObject(loc) : null;
+        }
+        set => Properties["owner"] = value?.Id != null ? new BsonValue(value.Id) : BsonValue.Null;
     }
 
     /// <summary>
@@ -273,9 +277,6 @@ public class GameObject : DynamicObject
             case "owner":
                 result = Owner;
                 return true;
-            case "ownerId":
-                result = Owner?.Id;
-                return true;
             default:
                 result = null;
                 return false; // Not a built-in property
@@ -437,7 +438,7 @@ public class GameObject : DynamicObject
             BsonType.DateTime => bsonValue.AsDateTime,
             BsonType.Array => bsonValue.AsArray.Select(ConvertFromBsonValue).ToList(),
             BsonType.Document => bsonValue.AsDocument.ToDictionary(
-                kvp => kvp.Key, 
+                kvp => kvp.Key,
                 kvp => ConvertFromBsonValue(kvp.Value)
             ),
             _ => bsonValue.RawValue // Fallback to raw value for unsupported types

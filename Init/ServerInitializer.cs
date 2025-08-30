@@ -28,10 +28,6 @@ public static class ServerInitializer
             // Initialize the world structure
             Logger.Info("Initializing world...");
             WorldInitializer.InitializeWorld();
-            
-
-            // Migrate existing objects to have DBREFs
-            ObjectManager.MigrateDbRefs();
 
             // Load all GameObjects into the singleton cache
             ObjectManager.LoadAllObjectsToCache();
@@ -71,11 +67,13 @@ public static class ServerInitializer
             if (obj is Player)
             {
                 obj.Owner = obj; // Players own themselves
+                DbProvider.Instance.Update("gameobjects", obj);
                 continue;
             }
 
             // If we reach here, it means we need to assign an owner
             obj.Owner = adminPlayer;
+            ObjectManager.UpdateObject(obj);
             updatedCount++;
         }
         

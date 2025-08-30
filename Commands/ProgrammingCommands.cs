@@ -1,4 +1,3 @@
-using System.Text;
 using CSMOO.Database;
 using CSMOO.Logging;
 using CSMOO.Verbs;
