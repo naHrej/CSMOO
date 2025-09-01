@@ -309,9 +309,6 @@ public class GameObject : DynamicObject
         }
     }
 
-    /// <summary>
-    /// Handles property setting: gameObject.propertyName = "value"
-    /// </summary>
     public override bool TrySetMember(SetMemberBinder binder, object? value)
     {
         var propertyName = binder.Name;
@@ -404,6 +401,18 @@ public class GameObject : DynamicObject
 
     private BsonValue ConvertToBsonValue(object? value)
     {
+        if (value is string str)
+        {
+            GameObject? go = ObjectResolver.ResolveObject(str, Builtins.UnifiedContext?.This);
+            if (go is GameObject gameObject)
+            {
+                if (go == null)
+                    return new BsonValue(str);
+                return new BsonValue(go.Id);
+            }
+        }
+            
+        
         return value switch
         {
             null => BsonValue.Null,
