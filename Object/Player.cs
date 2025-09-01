@@ -54,12 +54,7 @@ public class Player : GameObject
     }
 
     [BsonIgnore]
-    public new GameObject Owner
-    {
-        get => this;
-        set { /* Players own themselves; do nothing */ }
-    }
-
+    public new readonly GameObject Owner;
 
     /// <summary>
     /// Ensures legacy fields are synced to Properties after deserialization
@@ -71,6 +66,11 @@ public class Player : GameObject
         {
             Properties["passwordhash"] = new BsonValue(_passwordHash);
         }
+    }
+
+    public Player()
+    {
+        this.Owner = this;
     }
 }
 

@@ -23,7 +23,8 @@ public class GameDatabase : IDisposable
         var gameObjects = _database.GetCollection<GameObject>("gameobjects");
         gameObjects.EnsureIndex(x => x.Id);
         gameObjects.EnsureIndex(x => x.ClassId);
-        gameObjects.EnsureIndex(x => x.Location);
+        gameObjects.EnsureIndex("Properties.location");
+        gameObjects.EnsureIndex("Properties.owner");
         
         var players = _database.GetCollection<Player>("players");
         players.EnsureIndex(x => x.Id);

@@ -10,6 +10,8 @@ using CSMOO.Functions;
 using System.Runtime.CompilerServices;
 using CSMOO.Exceptions;
 using CSMOO.Core;
+using System.Text;
+using System.Text.RegularExpressions;
 
 namespace CSMOO.Scripting;
 
@@ -309,7 +311,7 @@ public class ScriptEngine
             globals.InitializeObjectFactory();
 
             // Build script code that declares the parameters as variables
-            var scriptCode = new StringBuilder();
+            var scriptCode = new System.Text.StringBuilder();
 
             // Declare each parameter as a local variable
             for (int i = 0; i < function.ParameterNames.Length && i < parameters.Length; i++)
@@ -521,38 +523,331 @@ public class ScriptEngine
     /// </summary>
     private string BuildScriptWithVariables(string originalCode, Dictionary<string, string>? variables)
     {
-        if (variables == null || variables.Count == 0)
+        var scriptBuilder = new System.Text.StringBuilder();
+
+        // Add variable declarations from pattern matching
+        if (variables != null && variables.Count > 0)
         {
-            return originalCode;
+            scriptBuilder.AppendLine("// Auto-generated variable declarations from pattern matching");
+            foreach (var kvp in variables)
+            {
+                // Use simple string escaping for C# string literals
+                var escapedValue = kvp.Value
+                    .Replace("\\", "\\\\")   // Escape backslashes
+                    .Replace("\"", "\\\"")   // Escape double quotes
+                    .Replace("\r", "\\r")    // Escape carriage returns
+                    .Replace("\n", "\\n")    // Escape newlines
+                    .Replace("\t", "\\t");   // Escape tabs
+
+                scriptBuilder.AppendLine($"string {kvp.Key} = \"{escapedValue}\";");
+            }
+            scriptBuilder.AppendLine();
         }
 
-        var scriptBuilder = new StringBuilder();
-
-        // Add variable declarations at the beginning
-        scriptBuilder.AppendLine("// Auto-generated variable declarations from pattern matching");
-        foreach (var kvp in variables)
+        // Add automatic object resolution variables
+        var objectVariables = ExtractPotentialObjectReferences(originalCode);
+        if (objectVariables.Count > 0)
         {
-            // Use simple string escaping for C# string literals
-            var escapedValue = kvp.Value
-                .Replace("\\", "\\\\")   // Escape backslashes
-                .Replace("\"", "\\\"")   // Escape double quotes
-                .Replace("\r", "\\r")    // Escape carriage returns
-                .Replace("\n", "\\n")    // Escape newlines
-                .Replace("\t", "\\t");   // Escape tabs
-
-            scriptBuilder.AppendLine($"string {kvp.Key} = \"{escapedValue}\";");
+            scriptBuilder.AppendLine("// Auto-resolved object variables");
+            foreach (var objectVar in objectVariables)
+            {
+                scriptBuilder.AppendLine($"dynamic {objectVar} = ObjectResolver.ResolveObject(\"{objectVar}\", This) ?? throw new ScriptExecutionException(\"Object '{objectVar}' not found\");");
+            }
+            scriptBuilder.AppendLine();
         }
-        scriptBuilder.AppendLine();
 
         // Add the original verb code
         scriptBuilder.AppendLine("// Original script code:");
         scriptBuilder.AppendLine(originalCode);
 
-        var completeScript = scriptBuilder.ToString();
-
-        return completeScript;
+        return scriptBuilder.ToString();
     }
 
+    /// <summary>
+    /// Extracts potential object references from script code that could be resolved by ObjectResolver
+    /// </summary>
+    private HashSet<string> ExtractPotentialObjectReferences(string code)
+    {
+        var potentialObjects = new HashSet<string>();
+        
+        if (string.IsNullOrEmpty(code))
+            return potentialObjects;
+
+        // Remove comments from the code before processing
+        var codeWithoutComments = RemoveComments(code);
+        
+        // Remove string literals to avoid matching content inside strings
+        var codeWithoutStrings = RemoveStringLiterals(codeWithoutComments);
+
+        // Look for patterns like: identifier.something (property access or method call)
+        // But not string endings like "word." or punctuation
+        var objectAccessPattern = @"\b([a-zA-Z_][a-zA-Z0-9_]*)\s*\.\s*[a-zA-Z_]";
+        var matches = Regex.Matches(codeWithoutStrings, objectAccessPattern);
+
+        // Collect all unique identifiers first
+        var candidateIdentifiers = new HashSet<string>();
+        foreach (Match match in matches)
+        {
+            candidateIdentifiers.Add(match.Groups[1].Value);
+        }
+
+        // Also check for variable declarations in the user's code to avoid conflicts
+        var declaredInUserCode = FindVariableDeclaredInCode(codeWithoutStrings);
+        
+        // Then check each unique identifier only once
+        foreach (var identifier in candidateIdentifiers)
+        {
+            // Skip if already declared in user's code
+            if (declaredInUserCode.Contains(identifier))
+                continue;
+                
+            // Check if this identifier is already defined/available
+            if (!IsIdentifierAlreadyDefined(identifier))
+            {
+                potentialObjects.Add(identifier);
+            }
+        }
+
+        return potentialObjects;
+    }
+
+    /// <summary>
+    /// Checks if an identifier is already defined in the script context
+    /// </summary>
+    private bool IsIdentifierAlreadyDefined(string identifier)
+    {
+        // Create a simple test script to see if the identifier resolves
+        var testScript = $"var test = {identifier};";
+        
+        try
+        {
+            // Try to create a script with the identifier - if it compiles, it's already defined
+            var script = CSharpScript.Create(testScript, _scriptOptions, typeof(ScriptGlobals));
+            // We don't need to run it, just check if it compiles successfully
+            var compilation = script.GetCompilation();
+            var diagnostics = compilation.GetDiagnostics();
+            
+            // If there are no errors about undefined variables, it's already defined
+            return !diagnostics.Any(d => d.Id == "CS0103"); // CS0103 = "The name 'X' does not exist in the current context"
+        }
+        catch
+        {
+            // If compilation fails for any reason, assume it's not defined
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Removes single-line (//) and multi-line (/* */) comments from C# code
+    /// </summary>
+    private string RemoveComments(string code)
+    {
+        if (string.IsNullOrEmpty(code))
+            return code;
+
+        var result = new System.Text.StringBuilder();
+        var lines = code.Split('\n');
+        bool inMultiLineComment = false;
+
+        foreach (var line in lines)
+        {
+            var processedLine = new System.Text.StringBuilder();
+            bool inString = false;
+            char? stringChar = null;
+            
+            for (int i = 0; i < line.Length; i++)
+            {
+                char c = line[i];
+                char? next = i + 1 < line.Length ? line[i + 1] : null;
+
+                // Handle string literals - don't remove comments inside strings
+                if (!inMultiLineComment && (c == '"' || c == '\''))
+                {
+                    if (!inString)
+                    {
+                        inString = true;
+                        stringChar = c;
+                        processedLine.Append(c);
+                    }
+                    else if (c == stringChar)
+                    {
+                        // Check if it's escaped
+                        int backslashCount = 0;
+                        int j = i - 1;
+                        while (j >= 0 && line[j] == '\\')
+                        {
+                            backslashCount++;
+                            j--;
+                        }
+                        if (backslashCount % 2 == 0) // Even number of backslashes means not escaped
+                        {
+                            inString = false;
+                            stringChar = null;
+                        }
+                        processedLine.Append(c);
+                    }
+                    else
+                    {
+                        processedLine.Append(c);
+                    }
+                    continue;
+                }
+
+                if (inString)
+                {
+                    processedLine.Append(c);
+                    continue;
+                }
+
+                // Handle multi-line comments
+                if (inMultiLineComment)
+                {
+                    if (c == '*' && next == '/')
+                    {
+                        inMultiLineComment = false;
+                        i++; // Skip the '/'
+                    }
+                    continue;
+                }
+
+                // Check for start of multi-line comment
+                if (c == '/' && next == '*')
+                {
+                    inMultiLineComment = true;
+                    i++; // Skip the '*'
+                    continue;
+                }
+
+                // Check for single-line comment
+                if (c == '/' && next == '/')
+                {
+                    break; // Rest of line is a comment
+                }
+
+                processedLine.Append(c);
+            }
+
+            if (!inMultiLineComment)
+            {
+                result.AppendLine(processedLine.ToString());
+            }
+            else
+            {
+                result.AppendLine(); // Preserve line structure for error reporting
+            }
+        }
+
+        return result.ToString();
+    }
+
+    /// <summary>
+    /// Removes string literals from C# code to avoid matching content inside strings
+    /// </summary>
+    private string RemoveStringLiterals(string code)
+    {
+        if (string.IsNullOrEmpty(code))
+            return code;
+
+        var result = new System.Text.StringBuilder();
+        bool inString = false;
+        char? stringChar = null;
+        
+        for (int i = 0; i < code.Length; i++)
+        {
+            char c = code[i];
+
+            // Handle string literals - replace content with spaces to preserve positions
+            if (c == '"' || c == '\'')
+            {
+                if (!inString)
+                {
+                    inString = true;
+                    stringChar = c;
+                    result.Append(c); // Keep the opening quote
+                }
+                else if (c == stringChar)
+                {
+                    // Check if it's escaped
+                    int backslashCount = 0;
+                    int j = i - 1;
+                    while (j >= 0 && code[j] == '\\')
+                    {
+                        backslashCount++;
+                        j--;
+                    }
+                    if (backslashCount % 2 == 0) // Even number of backslashes means not escaped
+                    {
+                        inString = false;
+                        stringChar = null;
+                        result.Append(c); // Keep the closing quote
+                    }
+                    else
+                    {
+                        result.Append(' '); // Replace escaped quote with space
+                    }
+                }
+                else
+                {
+                    result.Append(' '); // Replace string content with space
+                }
+            }
+            else if (inString)
+            {
+                result.Append(' '); // Replace string content with spaces
+            }
+            else
+            {
+                result.Append(c); // Keep non-string content
+            }
+        }
+
+        return result.ToString();
+    }
+
+    /// <summary>
+    /// Finds variable names that are declared or assigned in the user's code
+    /// </summary>
+    private HashSet<string> FindVariableDeclaredInCode(string code)
+    {
+        var declaredVariables = new HashSet<string>();
+        
+        if (string.IsNullOrEmpty(code))
+            return declaredVariables;
+
+        // Look for variable declarations: TYPE name; or TYPE name = ...;
+        var variableDeclarationPattern = @"\b(var|dynamic|string|int|bool|float|double|decimal|object|Player|GameObject)\s+([a-zA-Z_][a-zA-Z0-9_]*)\b";
+        var matches = Regex.Matches(code, variableDeclarationPattern);
+
+        foreach (Match match in matches)
+        {
+            var variableName = match.Groups[2].Value;
+            declaredVariables.Add(variableName);
+        }
+
+        // Look for assignments: name = ...;
+        var assignmentPattern = @"\b([a-zA-Z_][a-zA-Z0-9_]*)\s*=(?!=)";
+        var assignmentMatches = Regex.Matches(code, assignmentPattern);
+
+        foreach (Match match in assignmentMatches)
+        {
+            var variableName = match.Groups[1].Value;
+            declaredVariables.Add(variableName);
+        }
+
+        // Also look for foreach variable declarations: foreach (var item in ...)
+        var foreachPattern = @"\bforeach\s*\(\s*(var|dynamic|string|int|bool|float|double|decimal|object|Player|GameObject)\s+([a-zA-Z_][a-zA-Z0-9_]*)\s+in\b";
+        var foreachMatches = Regex.Matches(code, foreachPattern);
+        
+        foreach (Match match in foreachMatches)
+        {
+            var variableName = match.Groups[2].Value;
+            declaredVariables.Add(variableName);
+        }
+
+        return declaredVariables;
+    }
+
+ 
     /// <summary>
     /// Validates that a parameter matches the expected type
     /// </summary>
