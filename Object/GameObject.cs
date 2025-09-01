@@ -411,7 +411,51 @@ public class GameObject : DynamicObject
                 return new BsonValue(go.Id);
             }
         }
-            
+        
+        // Handle collections of GameObjects
+        if (value is IEnumerable<GameObject> gameObjectCollection)
+        {
+            var idArray = new BsonArray();
+            foreach (var gameObj in gameObjectCollection)
+            {
+                idArray.Add(new BsonValue(gameObj.Id));
+            }
+            return idArray;
+        }
+        
+        // Handle Dictionary<string, GameObject>
+        if (value is IDictionary<string, GameObject> gameObjectDict)
+        {
+            var bsonDoc = new BsonDocument();
+            foreach (var kvp in gameObjectDict)
+            {
+                bsonDoc[kvp.Key] = new BsonValue(kvp.Value.Id);
+            }
+            return bsonDoc;
+        }
+        
+        // Handle generic collections that might contain GameObjects
+        if (value is System.Collections.IEnumerable enumerable && !(value is string))
+        {
+            var array = new BsonArray();
+            foreach (var item in enumerable)
+            {
+                array.Add(ConvertToBsonValue(item));
+            }
+            return array;
+        }
+        
+        // Handle generic dictionaries
+        if (value is System.Collections.IDictionary dictionary)
+        {
+            var bsonDoc = new BsonDocument();
+            foreach (System.Collections.DictionaryEntry entry in dictionary)
+            {
+                var key = entry.Key?.ToString() ?? "";
+                bsonDoc[key] = ConvertToBsonValue(entry.Value);
+            }
+            return bsonDoc;
+        }
         
         return value switch
         {
@@ -445,13 +489,54 @@ public class GameObject : DynamicObject
             BsonType.Double => bsonValue.AsDouble,
             BsonType.Boolean => bsonValue.AsBoolean,
             BsonType.DateTime => bsonValue.AsDateTime,
-            BsonType.Array => bsonValue.AsArray.Select(ConvertFromBsonValue).ToList(),
-            BsonType.Document => bsonValue.AsDocument.ToDictionary(
-                kvp => kvp.Key,
-                kvp => ConvertFromBsonValue(kvp.Value)
-            ),
+            BsonType.Array => ConvertBsonArrayToCollection(bsonValue.AsArray),
+            BsonType.Document => ConvertBsonDocumentToCollection(bsonValue.AsDocument),
             _ => bsonValue.RawValue // Fallback to raw value for unsupported types
         };
+    }
+
+    /// <summary>
+    /// Converts a BsonArray to a collection, handling GameObject ID strings
+    /// </summary>
+    private object ConvertBsonArrayToCollection(BsonArray bsonArray)
+    {
+        var result = new List<object?>();
+        
+        foreach (var item in bsonArray)
+        {
+            var convertedItem = ConvertFromBsonValue(item);
+            result.Add(convertedItem);
+        }
+        
+        // Check if all items are GameObjects (converted from ID strings)
+        if (result.All(item => item is GameObject))
+        {
+            return result.Cast<GameObject>().ToList();
+        }
+        
+        return result;
+    }
+
+    /// <summary>
+    /// Converts a BsonDocument to a dictionary, handling GameObject ID strings
+    /// </summary>
+    private object ConvertBsonDocumentToCollection(BsonDocument bsonDocument)
+    {
+        var result = new Dictionary<string, object?>();
+        
+        foreach (var kvp in bsonDocument)
+        {
+            var convertedValue = ConvertFromBsonValue(kvp.Value);
+            result[kvp.Key] = convertedValue;
+        }
+        
+        // Check if all values are GameObjects (converted from ID strings)
+        if (result.Values.All(value => value is GameObject))
+        {
+            return result.ToDictionary(kvp => kvp.Key, kvp => (GameObject)kvp.Value!);
+        }
+        
+        return result;
     }
 
     private object HandleStringBsonValue(BsonValue bsonValue)

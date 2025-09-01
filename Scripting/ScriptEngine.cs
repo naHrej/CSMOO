@@ -120,7 +120,8 @@ public class ScriptEngine
 
             // Build the complete script with automatic variable declarations and DBref/ID preprocessing
             var preprocessedCode = PreprocessObjectReferenceSyntax(verb.Code);
-            var completeScript = BuildScriptWithVariables(preprocessedCode, variables);
+            var collectionFixedCode = PreprocessCollectionExpressions(preprocessedCode);
+            var completeScript = BuildScriptWithVariables(collectionFixedCode, variables);
 
             // Set Builtins context for script execution
             Builtins.UnifiedContext = globals;
@@ -326,7 +327,8 @@ public class ScriptEngine
 
             // Add the actual function code with DBref/ID preprocessing
             var preprocessedFunctionCode = PreprocessObjectReferenceSyntax(function.Code);
-            scriptCode.AppendLine(preprocessedFunctionCode);
+            var collectionFixedFunctionCode = PreprocessCollectionExpressions(preprocessedFunctionCode);
+            scriptCode.AppendLine(collectionFixedFunctionCode);
 
             var finalCode = scriptCode.ToString();
 
@@ -443,6 +445,53 @@ public class ScriptEngine
         nullGameObject.Properties["name"] = $"<missing object {objectId}>";
 
         return nullGameObject;
+    }
+
+    /// <summary>
+    /// Preprocesses script code to fix collection expression syntax issues with dynamic types
+    /// </summary>
+    private string PreprocessCollectionExpressions(string originalCode)
+    {
+        if (string.IsNullOrEmpty(originalCode))
+            return originalCode;
+
+        var result = originalCode;
+
+        // Fix dynamic variable assignments with collection expressions
+        // Pattern: dynamic varName = []; -> dynamic varName = new List<object>();
+        var dynamicArrayPattern = @"(dynamic\s+\w+\s*=\s*)\[\s*\]";
+        result = System.Text.RegularExpressions.Regex.Replace(result, dynamicArrayPattern, 
+            match => match.Groups[1].Value + "new List<object>()");
+
+        // Pattern: dynamic varName = {}; -> dynamic varName = new Dictionary<string, object>();
+        var dynamicDictPattern = @"(dynamic\s+\w+\s*=\s*)\{\s*\}";
+        result = System.Text.RegularExpressions.Regex.Replace(result, dynamicDictPattern, 
+            match => match.Groups[1].Value + "new Dictionary<string, object>()");
+
+        // Fix dynamic variable assignments with collection initializers
+        // Pattern: dynamic varName = [item1, item2, ...]; -> dynamic varName = new List<object> { item1, item2, ... };
+        var dynamicArrayWithItemsPattern = @"(dynamic\s+\w+\s*=\s*)\[([^\]]+)\]";
+        result = System.Text.RegularExpressions.Regex.Replace(result, dynamicArrayWithItemsPattern, 
+            match => match.Groups[1].Value + "new List<object> { " + match.Groups[2].Value + " }");
+
+        // Fix dynamic property assignments with collection expressions
+        // Pattern: someVar.property = []; -> someVar.property = new List<object>();
+        var propertyArrayPattern = @"(\w+\.\w+\s*=\s*)\[\s*\]";
+        result = System.Text.RegularExpressions.Regex.Replace(result, propertyArrayPattern, 
+            match => match.Groups[1].Value + "new List<object>()");
+
+        // Pattern: someVar.property = {}; -> someVar.property = new Dictionary<string, object>();
+        var propertyDictPattern = @"(\w+\.\w+\s*=\s*)\{\s*\}";
+        result = System.Text.RegularExpressions.Regex.Replace(result, propertyDictPattern, 
+            match => match.Groups[1].Value + "new Dictionary<string, object>()");
+
+        // Fix property assignments with collection initializers
+        // Pattern: someVar.property = [item1, item2, ...]; -> someVar.property = new List<object> { item1, item2, ... };
+        var propertyArrayWithItemsPattern = @"(\w+\.\w+\s*=\s*)\[([^\]]+)\]";
+        result = System.Text.RegularExpressions.Regex.Replace(result, propertyArrayWithItemsPattern, 
+            match => match.Groups[1].Value + "new List<object> { " + match.Groups[2].Value + " }");
+
+        return result;
     }
 
     /// <summary>
