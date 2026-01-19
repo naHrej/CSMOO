@@ -2,46 +2,33 @@ using CSMOO.Functions;
 using CSMOO.Logging;
 using CSMOO.Object;
 using CSMOO.Verbs;
+using CSMOO.Configuration;
 
 namespace CSMOO.Database;
 
 /// <summary>
-/// Main coordinator for world initialization and management
+/// Static wrapper for WorldInitializer (backward compatibility)
+/// Delegates to WorldInitializerInstance for dependency injection support
 /// </summary>
 public static class WorldInitializer
 {
+    private static IWorldInitializer? _instance;
+    
+    /// <summary>
+    /// Sets the world initializer instance for static methods to delegate to
+    /// </summary>
+    public static void SetInstance(IWorldInitializer instance)
+    {
+        _instance = instance;
+    }
+    
+    private static IWorldInitializer Instance => _instance ?? throw new InvalidOperationException("WorldInitializer instance not set. Call WorldInitializer.SetInstance() first. Static access is no longer supported - use dependency injection.");
     /// <summary>
     /// Initializes the basic world structure with core classes
     /// </summary>
     public static void InitializeWorld()
     {
-        Logger.DisplaySectionHeader("WORLD INITIALIZATION");
-        Logger.Info("Initializing game world...");
-
-        try
-        {
-            // Create fundamental object classes
-            CoreClassFactory.CreateCoreClasses();
-            
-            // Load and create verbs from C# class definitions
-            VerbInitializer.LoadAndCreateVerbs();
-            
-            // Load and create functions from C# class definitions
-            FunctionInitializer.LoadAndCreateFunctions();
-            
-            // Load and set properties from C# class definitions
-            PropertyInitializer.LoadAndSetProperties();
-            
-            // Create the starting room and basic world areas
-            RoomManager.CreateStartingRoom();
-
-            Logger.Info("World initialization completed successfully!");
-        }
-        catch (Exception ex)
-        {
-            Logger.Error("World initialization failed", ex);
-            throw;
-        }
+        Instance.InitializeWorld();
     }
 
     /// <summary>
@@ -49,20 +36,7 @@ public static class WorldInitializer
     /// </summary>
     public static void PrintWorldStatistics()
     {
-        var classCount = DbProvider.Instance.FindAll<ObjectClass>("objectclasses").Count();
-        var objectCount = ObjectManager.GetAllObjects().Count();
-        var playerCount = PlayerManager.GetAllPlayers().Count();
-        var roomStats = RoomManager.GetRoomStatistics();
-
-        Logger.Game("\n=== World Statistics ===");
-        Logger.Game($"Object Classes: {classCount}");
-        Logger.Game($"Game Objects: {objectCount}");
-        Logger.Game($"Players: {playerCount}");
-        Logger.Game($"Rooms: {roomStats["TotalRooms"]}");
-        Logger.Game($"Rooms with Items: {roomStats["RoomsWithItems"]}");
-        Logger.Game($"Rooms with Players: {roomStats["RoomsWithPlayers"]}");
-        Logger.Game($"Total Exits: {roomStats["TotalExits"]}");
-        Logger.Game("========================\n");
+        Instance.PrintWorldStatistics();
     }
 }
 

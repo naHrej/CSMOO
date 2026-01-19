@@ -3,6 +3,8 @@ using CSMOO.Database;
 using CSMOO.Functions;
 using CSMOO.Object;
 using CSMOO.Verbs;
+using CSMOO.Configuration;
+using CSMOO.Logging;
 using LiteDB;
 
 namespace CSMOO.Scripting;
@@ -12,6 +14,66 @@ namespace CSMOO.Scripting;
 /// </summary>
 public class ScriptGlobals
 {
+    private readonly IObjectManager _objectManager;
+    private readonly IVerbResolver _verbResolver;
+    private readonly IFunctionResolver _functionResolver;
+    private readonly IDbProvider _dbProvider;
+
+    // Primary constructor with DI dependencies
+    public ScriptGlobals(
+        IObjectManager objectManager,
+        IVerbResolver verbResolver,
+        IFunctionResolver functionResolver,
+        IDbProvider dbProvider)
+    {
+        _objectManager = objectManager ?? throw new ArgumentNullException(nameof(objectManager));
+        _verbResolver = verbResolver ?? throw new ArgumentNullException(nameof(verbResolver));
+        _functionResolver = functionResolver ?? throw new ArgumentNullException(nameof(functionResolver));
+        _dbProvider = dbProvider ?? throw new ArgumentNullException(nameof(dbProvider));
+        
+        // Initialize script managers with DI dependencies
+        ObjectManager = new ScriptObjectManager(_objectManager);
+        PlayerManager = new ScriptPlayerManager(
+            CreateDefaultPlayerManager(), 
+            _objectManager);
+    }
+
+    // Backward compatibility constructor
+    public ScriptGlobals()
+        : this(CreateDefaultObjectManager(), CreateDefaultVerbResolver(), CreateDefaultFunctionResolver(), CreateDefaultDbProvider())
+    {
+    }
+
+    private static IObjectManager CreateDefaultObjectManager()
+    {
+        var dbProvider = DbProvider.Instance;
+        var logger = new LoggerInstance(Config.Instance);
+        var classManager = new ClassManagerInstance(dbProvider, logger);
+        return new ObjectManagerInstance(dbProvider, classManager);
+    }
+
+    private static IVerbResolver CreateDefaultVerbResolver()
+    {
+        var dbProvider = DbProvider.Instance;
+        var logger = new LoggerInstance(Config.Instance);
+        var classManager = new ClassManagerInstance(dbProvider, logger);
+        var objectManager = new ObjectManagerInstance(dbProvider, classManager);
+        return new VerbResolverInstance(dbProvider, objectManager, logger);
+    }
+
+    private static IFunctionResolver CreateDefaultFunctionResolver()
+    {
+        var dbProvider = DbProvider.Instance;
+        var logger = new LoggerInstance(Config.Instance);
+        var classManager = new ClassManagerInstance(dbProvider, logger);
+        var objectManager = new ObjectManagerInstance(dbProvider, classManager);
+        return new FunctionResolverInstance(dbProvider, objectManager);
+    }
+
+    private static IPlayerManager CreateDefaultPlayerManager()
+    {
+        return new PlayerManagerInstance(DbProvider.Instance);
+    }
 
     // EnhancedScriptGlobals logic
     private ScriptObjectFactory? _objectFactory;
@@ -21,8 +83,19 @@ public class ScriptGlobals
         Player? dbPlayer = Player;
         if (dbPlayer != null && CommandProcessor != null && helpers != null)
         {
-            _objectFactory = new ScriptObjectFactory(dbPlayer, CommandProcessor, helpers);
+            _objectFactory = new ScriptObjectFactory(
+                dbPlayer, 
+                CommandProcessor, 
+                helpers,
+                _objectManager,
+                _functionResolver,
+                _dbProvider);
         }
+    }
+
+    private static IDbProvider CreateDefaultDbProvider()
+    {
+        return DbProvider.Instance;
     }
     public dynamic? obj(string objectReference)
     {
@@ -61,11 +134,22 @@ public class ScriptGlobals
     /// </summary>
     public Player? Player { get; set; }
     public CommandProcessor? CommandProcessor { get; set; }
-    public ScriptObjectManager ObjectManager { get; set; } = new ScriptObjectManager();
+    public ScriptObjectManager ObjectManager { get; set; }
     public ScriptWorldManager WorldManager { get; set; } = new ScriptWorldManager();
-    public ScriptPlayerManager PlayerManager { get; set; } = new ScriptPlayerManager();
+    public ScriptPlayerManager PlayerManager { get; set; }
     public ScriptHelpers? Helpers { get; set; }
-    public dynamic? This { get; set; }
+    private GameObject? _this;
+    
+    /// <summary>
+    /// The current object (This) - returns as dynamic to allow access to subtype-specific methods and properties
+    /// Internally stored as GameObject? with correct subtype after conversion
+    /// </summary>
+    public dynamic? This 
+    { 
+        get => _this; 
+        set => _this = value as GameObject; 
+    }
+    
     public dynamic? ThisObject { get => This; set => This = value; }
     public dynamic? Caller { get; set; }
     public int CallDepth { get; set; } = 0;
@@ -103,7 +187,7 @@ public class ScriptGlobals
     /// </summary>
     public dynamic? GetObjectByDbRef(int dbRef)
     {
-        var obj = CSMOO.Object.ObjectManager.FindByDbRef(dbRef);
+        var obj = _objectManager.GetObjectByDbRef(dbRef);
         return obj;
     }
 
@@ -112,7 +196,7 @@ public class ScriptGlobals
     /// </summary>
     public dynamic? GetObjectById(string objectId)
     {
-        var obj = CSMOO.Object.ObjectManager.GetObject(objectId);
+        var obj = _objectManager.GetObject(objectId);
         return obj;
     }
 
@@ -177,7 +261,7 @@ public class ScriptGlobals
     {
         var thisGameObject = GetThisGameObject();
         if (thisGameObject == null) return null;
-        return CSMOO.Object.ObjectManager.GetProperty(thisGameObject, propertyName)?.RawValue;
+        return _objectManager.GetProperty(thisGameObject, propertyName)?.RawValue;
     }
 
     /// <summary>
@@ -203,7 +287,7 @@ public class ScriptGlobals
             _ => new BsonValue(value.ToString() ?? "")
         };
 
-        CSMOO.Object.ObjectManager.SetProperty(thisGameObject, propertyName, bsonValue);
+        _objectManager.SetProperty(thisGameObject, propertyName, bsonValue);
     }
 
     /// <summary>
@@ -212,7 +296,7 @@ public class ScriptGlobals
     public void notify(GameObject targetPlayer, string message)
     {
         var dbPlayer = targetPlayer as Player ?? 
-                      CSMOO.Object.ObjectManager.GetObject<Player>(targetPlayer.Id);
+                      _objectManager.GetObject<Player>(targetPlayer.Id);
 
         if (dbPlayer != null)
         {
@@ -226,16 +310,16 @@ public class ScriptGlobals
     public GameObject? GetPlayer(string nameOrId)
     {
         // Try by name first
-        var player = CSMOO.Object.ObjectManager.GetAllObjects()
+        var player = _objectManager.GetAllObjects()
             .FirstOrDefault(obj => obj is Player && 
                                    (obj.Name.Equals(nameOrId, StringComparison.OrdinalIgnoreCase) || 
                                     obj.Id.Equals(nameOrId, StringComparison.OrdinalIgnoreCase)));
         
-        if (player != null) return CSMOO.Object.ObjectManager.GetObject(player.Id);
+        if (player != null) return _objectManager.GetObject(player.Id);
         
         // Try by ID
-        var playerById = CSMOO.Object.ObjectManager.GetObject<Player>(nameOrId);
-        return playerById != null ? CSMOO.Object.ObjectManager.GetObject(playerById.Id) : null;
+        var playerById = _objectManager.GetObject<Player>(nameOrId);
+        return playerById != null ? _objectManager.GetObject(playerById.Id) : null;
     }
 
     /// <summary>
@@ -267,14 +351,14 @@ public class ScriptGlobals
     private bool IsRoom(GameObject obj)
     {
         // Check if it inherits from Room class
-        var roomClass = CSMOO.Object.ObjectManager.GetAllObjectClasses().FirstOrDefault(c => c.Name == "Room");
-        if (roomClass != null && (obj.ClassId == roomClass.Id || CSMOO.Object.ObjectManager.InheritsFrom(obj.ClassId, roomClass.Id)))
+        var roomClass = _objectManager.GetAllObjectClasses().FirstOrDefault(c => c.Name == "Room");
+        if (roomClass != null && (obj.ClassId == roomClass.Id || _objectManager.InheritsFrom(obj.ClassId, roomClass.Id)))
         {
             return true;
         }
 
         // Fallback: check for explicit room properties
-        var isRoomProperty = CSMOO.Object.ObjectManager.GetProperty(obj, "isRoom")?.AsBoolean == true;
+        var isRoomProperty = _objectManager.GetProperty(obj, "isRoom")?.AsBoolean == true;
         if (isRoomProperty) return true;
 
         // Additional fallback: check if it has room-like characteristics
@@ -287,17 +371,17 @@ public class ScriptGlobals
     private bool HasRoomCharacteristics(GameObject obj)
     {
         // First check if it inherits from Room class
-        var roomClass = CSMOO.Object.ObjectManager.GetAllObjectClasses().FirstOrDefault(c => c.Name == "Room");
-        if (roomClass != null && (obj.ClassId == roomClass.Id || CSMOO.Object.ObjectManager.InheritsFrom(obj.ClassId, roomClass.Id)))
+        var roomClass = _objectManager.GetAllObjectClasses().FirstOrDefault(c => c.Name == "Room");
+        if (roomClass != null && (obj.ClassId == roomClass.Id || _objectManager.InheritsFrom(obj.ClassId, roomClass.Id)))
         {
             return true;
         }
 
         // Fallback: check if object has room-like properties
-        var hasExits = CSMOO.Object.ObjectManager.GetObjectsInLocation(obj.Id).Any(o =>
-            CSMOO.Object.ObjectManager.GetProperty(o, "isExit")?.AsBoolean == true);
-        var hasLongDesc = !string.IsNullOrEmpty(CSMOO.Object.ObjectManager.GetProperty(obj, "longDescription")?.AsString);
-        var isRoomProperty = CSMOO.Object.ObjectManager.GetProperty(obj, "isRoom")?.AsBoolean == true;
+        var hasExits = _objectManager.GetObjectsInLocation(obj.Id).Any(o =>
+            _objectManager.GetProperty(o, "isExit")?.AsBoolean == true);
+        var hasLongDesc = !string.IsNullOrEmpty(_objectManager.GetProperty(obj, "longDescription")?.AsString);
+        var isRoomProperty = _objectManager.GetProperty(obj, "isRoom")?.AsBoolean == true;
         
         return hasExits || hasLongDesc || isRoomProperty;
     }
@@ -311,11 +395,11 @@ public class ScriptGlobals
         var playerGameObject = GetPlayerGameObject();
         if (playerGameObject?.Location == null) return null;
 
-        var objects = CSMOO.Object.ObjectManager.GetObjectsInLocation(playerGameObject.Location);
+        var objects = _objectManager.GetObjectsInLocation(playerGameObject.Location);
         var targetObject = objects.FirstOrDefault(obj =>
         {
-            var objName = CSMOO.Object.ObjectManager.GetProperty(obj, "name")?.AsString?.ToLower();
-            var shortDesc = CSMOO.Object.ObjectManager.GetProperty(obj, "shortDescription")?.AsString?.ToLower();
+            var objName = _objectManager.GetProperty(obj, "name")?.AsString?.ToLower();
+            var shortDesc = _objectManager.GetProperty(obj, "shortDescription")?.AsString?.ToLower();
             name = name.ToLower();
             return objName?.Contains(name) == true || shortDesc?.Contains(name) == true;
         });
@@ -344,7 +428,7 @@ public class ScriptGlobals
             }
 
             // Find the verb on the object (with inheritance)
-            var allVerbsOnObject = VerbResolver.GetAllVerbsOnObject(objectId);
+            var allVerbsOnObject = _verbResolver.GetAllVerbsOnObject(objectId);
             var verbMatch = allVerbsOnObject.FirstOrDefault(v => 
                 v.verb.Name.Equals(verbName, StringComparison.OrdinalIgnoreCase));
 
@@ -354,7 +438,7 @@ public class ScriptGlobals
             }
 
             // Execute the verb with the provided arguments
-            var scriptEngine = new ScriptEngine();
+            var scriptEngine = ScriptEngineFactoryStatic.Create();
             
             // Build input string from arguments
             var inputArgs = args.Select(a => a?.ToString() ?? "").ToArray();
@@ -398,19 +482,19 @@ public class ScriptGlobals
         if (dbPlayer == null)
             throw new InvalidOperationException("No player context available.");
 
-        var objectId = FunctionResolver.ResolveObjectReference(objectRef, dbPlayer.Id, dbPlayer.Location?.Id ?? "");
+        var objectId = _functionResolver.ResolveObjectReference(objectRef, dbPlayer.Id, dbPlayer.Location?.Id ?? "");
         if (objectId == null)
         {
             throw new ArgumentException($"Object '{objectRef}' not found.");
         }
 
-        var function = FunctionResolver.FindFunction(objectId, functionName);
+        var function = _functionResolver.FindFunction(objectId, functionName);
         if (function == null)
         {
             throw new ArgumentException($"Function '{functionName}' not found on object '{objectRef}'.");
         }
 
-        var engine = new ScriptEngine();
+        var engine = ScriptEngineFactoryStatic.Create();
         return engine.ExecuteFunction(function, parameters, dbPlayer, CommandProcessor, objectId);
     }
 
@@ -435,7 +519,7 @@ public class ScriptGlobals
         // Check if it's a DBREF (starts with # followed by digits)
         if (objectRef.StartsWith("#") && int.TryParse(objectRef.Substring(1), out int dbref))
         {
-            var obj = CSMOO.Object.ObjectManager.FindByDbRef(dbref);
+            var obj = _objectManager.GetObjectByDbRef(dbref);
             return obj?.Id;
         }
         
@@ -443,7 +527,7 @@ public class ScriptGlobals
         if (objectRef.StartsWith("class:", StringComparison.OrdinalIgnoreCase))
         {
             var className = objectRef.Substring(6);
-            var objectClass = CSMOO.Object.ObjectManager.GetAllObjectClasses()
+            var objectClass = _objectManager.GetAllObjectClasses()
                 .FirstOrDefault(c => c.Name.Equals(className, StringComparison.OrdinalIgnoreCase));
             return objectClass?.Id;
         }
@@ -451,30 +535,28 @@ public class ScriptGlobals
         if (objectRef.EndsWith(".class", StringComparison.OrdinalIgnoreCase))
         {
             var className = objectRef.Substring(0, objectRef.Length - 6);
-            var objectClass = CSMOO.Object.ObjectManager.GetAllObjectClasses()
+            var objectClass = _objectManager.GetAllObjectClasses()
                 .FirstOrDefault(c => c.Name.Equals(className, StringComparison.OrdinalIgnoreCase));
             return objectClass?.Id;
         }
 
         // Check if it's a direct class ID
-        // var classById = GameDatabase.Instance.ObjectClasses.FindById(objectRef); // removed direct usage
-        if (CSMOO.Object.ObjectManager.GetAllObjectClasses().FirstOrDefault(c => c.Id == objectRef) is { } classByIdObj)
+        if (_objectManager.GetAllObjectClasses().FirstOrDefault(c => c.Id == objectRef) is { } classByIdObj)
         {
             return classByIdObj.Id;
         }
         
         // Try to find by name
-        // var allObjects = GameDatabase.Instance.GameObjects.FindAll(); // removed direct usage
-        var match = CSMOO.Object.ObjectManager.GetAllObjects()
+        var match = _objectManager.GetAllObjects()
             .FirstOrDefault(obj =>
             {
-                var objName = (CSMOO.Object.ObjectManager.GetProperty(obj, "name") as BsonValue)?.AsString;
+                var objName = (_objectManager.GetProperty(obj, "name") as BsonValue)?.AsString;
                 return objName?.Equals(objectRef, StringComparison.OrdinalIgnoreCase) == true;
             });
         if (match != null) return match.Id;
         
         // Try as class name
-        var objectClass2 = CSMOO.Object.ObjectManager.GetAllObjectClasses()
+        var objectClass2 = _objectManager.GetAllObjectClasses()
             .FirstOrDefault(c => 
                 c.Name.Equals(objectRef, StringComparison.OrdinalIgnoreCase));
         return objectClass2?.Id;
@@ -485,8 +567,7 @@ public class ScriptGlobals
     /// </summary>
     private string GetSystemObjectId()
     {
-        // var allObjects = GameDatabase.Instance.GameObjects.FindAll(); // removed direct usage
-        var systemObj = CSMOO.Object.ObjectManager.GetAllObjects()
+        var systemObj = _objectManager.GetAllObjects()
             .FirstOrDefault(obj => 
                 (obj.Properties.ContainsKey("name") && obj.Properties["name"].AsString == "system") ||
                 (obj.Properties.ContainsKey("isSystemObject") && obj.Properties["isSystemObject"].AsBoolean == true));

@@ -180,12 +180,51 @@ public class System
             }
             return true; // Successfully handled the command (showed help)
         }
-        var chosenDirection = direction;
+        var chosenDirection = direction.ToLowerInvariant();
         dynamic chosenExit = null;
+        
+        // Helper function to extract abbreviation (capitalized letters and numbers)
+        string ExtractAbbreviation(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return "";
+            var result = new System.Text.StringBuilder();
+            foreach (char c in text)
+            {
+                if (char.IsUpper(c) || char.IsDigit(c))
+                {
+                    result.Append(c);
+                }
+            }
+            return result.ToString().ToUpperInvariant();
+        }
+        
+        var chosenAbbreviation = ExtractAbbreviation(direction).ToUpperInvariant();
+        
         foreach (var exit in exits)
         {
-            var exitDirection = Builtins.GetProperty(exit, "direction")?.ToString().ToLowerInvariant();
-            if (exitDirection == chosenDirection || exitDirection == $"\"{chosenDirection}\"") // for some reason, property values are coming back quoted
+            var exitDirectionProp = Builtins.GetProperty(exit, "direction");
+            if (exitDirectionProp == null) continue;
+            
+            var exitDirection = exitDirectionProp.ToString();
+            // Remove quotes if present
+            if (exitDirection.StartsWith("\"") && exitDirection.EndsWith("\""))
+            {
+                exitDirection = exitDirection.Substring(1, exitDirection.Length - 2);
+            }
+            
+            var exitDirectionLower = exitDirection.ToLowerInvariant();
+            
+            // Check exact name match (case-insensitive)
+            if (exitDirectionLower == chosenDirection)
+            {
+                chosenExit = exit as dynamic;
+                break;
+            }
+            
+            // Check abbreviation match
+            var exitAbbreviation = ExtractAbbreviation(exitDirection).ToUpperInvariant();
+            if (!string.IsNullOrEmpty(exitAbbreviation) && 
+                exitAbbreviation == chosenAbbreviation)
             {
                 chosenExit = exit as dynamic;
                 break;
@@ -241,13 +280,51 @@ public class System
             // 'look something'
             target = string.Join(" ", Args);
         }
-        var resolved = (dynamic)(ObjectResolver.ResolveObject(target, Player));
+        var resolved = ObjectResolver.ResolveObject(target, Player);
         if (resolved == null)
         {
             notify(player, $"You don't see '{target}' here.");
-            return false;
+            return true; // Return true to indicate we handled the command (even if object not found)
         }
-        notify(player, resolved.Description() ?? $"<h3>{resolved.Name}</h3><p>You see nothing special about this {resolved.ClassId}.</p>");
+        
+        // Try to call Description() function, but fall back to property access if object has no owner
+        string description;
+        try
+        {
+            // Cast to dynamic to call Description() method
+            description = ((dynamic)resolved).Description();
+        }
+        catch (Exception ex)
+        {
+            // Object has no owner or Description() function failed, use property access instead
+            try
+            {
+                var name = Builtins.GetProperty(resolved, "name", "") ?? "something";
+                var longDesc = Builtins.GetProperty(resolved, "longDescription", "") ?? Builtins.GetProperty(resolved, "description", "") ?? "";
+                var shortDesc = Builtins.GetProperty(resolved, "shortDescription", "") ?? "";
+                var classId = Builtins.GetProperty(resolved, "classId", "") ?? "object";
+                
+                if (!string.IsNullOrEmpty(longDesc))
+                {
+                    description = $"<h3>{name}</h3><p>{longDesc}</p>";
+                }
+                else if (!string.IsNullOrEmpty(shortDesc))
+                {
+                    description = $"<h3>{name}</h3><p>{shortDesc}</p>";
+                }
+                else
+                {
+                    description = $"<h3>{name}</h3><p>You see nothing special about this {classId}.</p>";
+                }
+            }
+            catch
+            {
+                // If even property access fails, show a generic message
+                description = $"<p>You see something, but can't make out any details.</p>";
+            }
+        }
+        
+        notify(player, description);
         return true;
     }
 
@@ -837,10 +914,12 @@ public class System
         // Only show non-null, non-empty results
         if (!string.IsNullOrEmpty(result) && result != "null")
         {
+            Builtins.Log($"[SCRIPT RESULT] Player '{Player.Name}' (ID: {Player.Id}): Script result: {result}");
             notify(Player, $"Script result: {result}");
         }
         else
         {
+            Builtins.Log($"[SCRIPT RESULT] Player '{Player.Name}' (ID: {Player.Id}): Script executed successfully (no result)");
             notify(Player, "Script executed successfully.");
         }
     }

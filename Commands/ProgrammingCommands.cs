@@ -5,6 +5,8 @@ using CSMOO.Functions;
 using CSMOO.Object;
 using CSMOO.Init;
 using CSMOO.Core;
+using CSMOO.Configuration;
+using System.Text;
 
 namespace CSMOO.Commands;
 
@@ -15,17 +17,169 @@ public class ProgrammingCommands
 {
     private readonly CommandProcessor _commandProcessor;
     private readonly Player _player;
+    private readonly IPermissionManager _permissionManager;
+    private readonly IVerbManager _verbManager;
+    private readonly IFunctionResolver _functionResolver;
+    private readonly IObjectManager _objectManager;
+    private readonly IPlayerManager _playerManager;
+    private readonly IDbProvider _dbProvider;
+    private readonly IGameDatabase _gameDatabase;
+    private readonly ILogger _logger;
+    private readonly IRoomManager _roomManager;
+    private readonly IHotReloadManager? _hotReloadManager;
+    private readonly ICoreHotReloadManager? _coreHotReloadManager;
+    private readonly IFunctionManager _functionManager;
+    private readonly IFunctionInitializer? _functionInitializer;
+    private readonly IPropertyInitializer? _propertyInitializer;
     
     // For multi-line programming
     private bool _isInProgrammingMode = false;
-    private readonly StringBuilder _currentCode = new StringBuilder();
+    private readonly System.Text.StringBuilder _currentCode = new System.Text.StringBuilder();
     private string _currentVerbId = string.Empty;
     private string _currentFunctionId = string.Empty;
 
-    public ProgrammingCommands(CommandProcessor commandProcessor, Player player)
+    // Primary constructor with all DI dependencies
+    public ProgrammingCommands(
+        CommandProcessor commandProcessor, 
+        Player player,
+        IPermissionManager permissionManager,
+        IVerbManager verbManager,
+        IFunctionResolver functionResolver,
+        IObjectManager objectManager,
+        IPlayerManager playerManager,
+        IDbProvider dbProvider,
+        IGameDatabase gameDatabase,
+        ILogger logger,
+        IRoomManager roomManager,
+        IFunctionManager functionManager,
+        IHotReloadManager? hotReloadManager = null,
+        ICoreHotReloadManager? coreHotReloadManager = null,
+        IFunctionInitializer? functionInitializer = null,
+        IPropertyInitializer? propertyInitializer = null)
     {
         _commandProcessor = commandProcessor;
         _player = player;
+        _permissionManager = permissionManager ?? throw new ArgumentNullException(nameof(permissionManager));
+        _verbManager = verbManager ?? throw new ArgumentNullException(nameof(verbManager));
+        _functionResolver = functionResolver ?? throw new ArgumentNullException(nameof(functionResolver));
+        _objectManager = objectManager ?? throw new ArgumentNullException(nameof(objectManager));
+        _playerManager = playerManager ?? throw new ArgumentNullException(nameof(playerManager));
+        _dbProvider = dbProvider ?? throw new ArgumentNullException(nameof(dbProvider));
+        _gameDatabase = gameDatabase ?? throw new ArgumentNullException(nameof(gameDatabase));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _roomManager = roomManager ?? throw new ArgumentNullException(nameof(roomManager));
+        _functionManager = functionManager ?? throw new ArgumentNullException(nameof(functionManager));
+        _hotReloadManager = hotReloadManager;
+        _coreHotReloadManager = coreHotReloadManager;
+        _functionInitializer = functionInitializer;
+        _propertyInitializer = propertyInitializer;
+    }
+
+    // Backward compatibility constructor
+    public ProgrammingCommands(CommandProcessor commandProcessor, Player player)
+        : this(commandProcessor, player,
+               CreateDefaultPermissionManager(), CreateDefaultVerbManager(), CreateDefaultFunctionResolver(),
+               CreateDefaultObjectManager(), CreateDefaultPlayerManager(), CreateDefaultDbProvider(),
+               CreateDefaultGameDatabase(), CreateDefaultLogger(), CreateDefaultRoomManager(), CreateDefaultFunctionManager(),
+               CreateDefaultHotReloadManager(), CreateDefaultCoreHotReloadManager(),
+               CreateDefaultFunctionInitializer(), CreateDefaultPropertyInitializer())
+    {
+    }
+
+    // Helper methods for backward compatibility
+    private static IPermissionManager CreateDefaultPermissionManager()
+    {
+        return new PermissionManagerInstance(DbProvider.Instance, new LoggerInstance(Config.Instance));
+    }
+
+    private static IVerbManager CreateDefaultVerbManager()
+    {
+        return new VerbManagerInstance(DbProvider.Instance);
+    }
+
+    private static IFunctionResolver CreateDefaultFunctionResolver()
+    {
+        return new FunctionResolverInstance(DbProvider.Instance, CreateDefaultObjectManager());
+    }
+
+    private static IObjectManager CreateDefaultObjectManager()
+    {
+        var dbProvider = DbProvider.Instance;
+        var logger = new LoggerInstance(Config.Instance);
+        var classManager = new ClassManagerInstance(dbProvider, logger);
+        return new ObjectManagerInstance(dbProvider, classManager);
+    }
+
+    private static IPlayerManager CreateDefaultPlayerManager()
+    {
+        return new PlayerManagerInstance(DbProvider.Instance);
+    }
+
+    private static IDbProvider CreateDefaultDbProvider()
+    {
+        return DbProvider.Instance;
+    }
+
+    private static IGameDatabase CreateDefaultGameDatabase()
+    {
+        return GameDatabase.Instance;
+    }
+
+    private static ILogger CreateDefaultLogger()
+    {
+        return new LoggerInstance(Config.Instance);
+    }
+
+    private static IRoomManager CreateDefaultRoomManager()
+    {
+        return new RoomManagerInstance(DbProvider.Instance, CreateDefaultLogger(), CreateDefaultObjectManager());
+    }
+
+    private static IFunctionManager CreateDefaultFunctionManager()
+    {
+        return new FunctionManagerInstance(new GameDatabase(Config.Instance.Database.GameDataFile));
+    }
+
+    private static IHotReloadManager? CreateDefaultHotReloadManager()
+    {
+        // Create default instance using the same pattern as EnsureInstance
+        var config = Config.Instance;
+        var logger = new LoggerInstance(config);
+        var dbProvider = DbProvider.Instance;
+        var classManager = new ClassManagerInstance(dbProvider, logger);
+        var objectManager = new ObjectManagerInstance(dbProvider, classManager);
+        var playerManager = new PlayerManagerInstance(dbProvider);
+        var verbInitializer = new VerbInitializerInstance(dbProvider, logger, objectManager);
+        var functionManager = CreateDefaultFunctionManager();
+        var functionInitializer = new FunctionInitializerInstance(dbProvider, logger, objectManager, functionManager);
+        return new HotReloadManagerInstance(logger, config, verbInitializer, functionInitializer, playerManager);
+    }
+
+    private static ICoreHotReloadManager? CreateDefaultCoreHotReloadManager()
+    {
+        var logger = new LoggerInstance(Config.Instance);
+        var playerManager = new PlayerManagerInstance(DbProvider.Instance);
+        var permissionManager = new PermissionManagerInstance(DbProvider.Instance, logger);
+        return new CoreHotReloadManagerInstance(logger, playerManager, permissionManager);
+    }
+
+    private static IFunctionInitializer? CreateDefaultFunctionInitializer()
+    {
+        var dbProvider = DbProvider.Instance;
+        var logger = new LoggerInstance(Config.Instance);
+        var classManager = new ClassManagerInstance(dbProvider, logger);
+        var objectManager = new ObjectManagerInstance(dbProvider, classManager);
+        var functionManager = CreateDefaultFunctionManager();
+        return new FunctionInitializerInstance(dbProvider, logger, objectManager, functionManager);
+    }
+
+    private static IPropertyInitializer? CreateDefaultPropertyInitializer()
+    {
+        var dbProvider = DbProvider.Instance;
+        var logger = new LoggerInstance(Config.Instance);
+        var classManager = new ClassManagerInstance(dbProvider, logger);
+        var objectManager = new ObjectManagerInstance(dbProvider, classManager);
+        return new PropertyInitializerInstance(dbProvider, logger, objectManager);
     }
 
     public bool IsInProgrammingMode => _isInProgrammingMode;
@@ -81,7 +235,7 @@ public class ProgrammingCommands
     private bool HandleProgramCommand(string[] parts)
     {
         // Check if player has Programmer flag
-        if (!PermissionManager.HasFlag(_player, PermissionManager.Flag.Programmer))
+        if (!_permissionManager.HasFlag(_player, PermissionManager.Flag.Programmer))
         {
             _commandProcessor.SendToPlayer("You need the Programmer flag to use the @program command.");
             return true;
@@ -149,12 +303,12 @@ public class ProgrammingCommands
         }
 
         // Find or create the verb
-        var verb = VerbManager.GetVerbsOnObject(objectId)
+        var verb = _verbManager.GetVerbsOnObject(objectId)
             .FirstOrDefault(v => v.Name.ToLower() == verbName.ToLower());
 
         if (verb == null)
         {
-            verb = VerbManager.CreateVerb(objectId, verbName, "", "", _player.Name);
+            verb = _verbManager.CreateVerb(objectId, verbName, "", "", _player.Name);
             _commandProcessor.SendToPlayer($"Created new verb '{verbName}' on {GetObjectName(objectId)}.");
         }
         else
@@ -204,7 +358,7 @@ public class ProgrammingCommands
     private bool HandleProgramFunction(string functionId)
     {
         // Find the function
-        var functions = GameDatabase.Instance.GetCollection<Function>("functions");
+        var functions = _gameDatabase.GetCollection<Function>("functions");
         var function = functions.FindById(functionId);
         
         if (function == null)
@@ -283,7 +437,7 @@ public class ProgrammingCommands
         }
 
         // Find function on object
-        var function = FunctionResolver.FindFunction(objectId, functionName);
+        var function = _functionResolver.FindFunction(objectId, functionName);
         if (function == null)
         {
             _commandProcessor.SendToPlayer($"Function '{functionName}' not found on object '{objectName}'.");
@@ -326,7 +480,7 @@ public class ProgrammingCommands
         }
 
         // Find function on object
-        var function = FunctionResolver.FindFunction(objectId, functionName);
+        var function = _functionResolver.FindFunction(objectId, functionName);
         if (function == null)
         {
             _commandProcessor.SendToPlayer($"Function '{functionName}' not found on object '{objectName}'.");
@@ -374,9 +528,9 @@ public class ProgrammingCommands
             if (!string.IsNullOrEmpty(_currentVerbId))
             {
                 // Verb programming mode - save the code
-                VerbManager.UpdateVerbCode(_currentVerbId, code);
+                _verbManager.UpdateVerbCode(_currentVerbId, code);
                 // Verify the code was saved using DbProvider
-                var savedVerb = DbProvider.Instance.FindById<Verb>("verbs", _currentVerbId);
+                var savedVerb = _dbProvider.FindById<Verb>("verbs", _currentVerbId);
                 if (savedVerb != null)
                 {
                     _commandProcessor.SendToPlayer("Verb programming complete.");
@@ -391,17 +545,17 @@ public class ProgrammingCommands
             else if (!string.IsNullOrEmpty(_currentFunctionId))
             {
                 // Function programming mode - save the code
-                var function = DbProvider.Instance.FindById<Function>("functions", _currentFunctionId);
+                var function = _dbProvider.FindById<Function>("functions", _currentFunctionId);
                 if (function != null)
                 {
                     function.Code = code;
-                    var updateResult = FunctionManager.UpdateFunction(function);
+                    var updateResult = _functionManager.UpdateFunction(function);
                     if (updateResult)
                     {
                         _commandProcessor.SendToPlayer("Function programming complete.");
                         _commandProcessor.SendToPlayer($"Code saved ({code.Split('\n').Length} lines).");
                         // Re-fetch to verify
-                        var verifyFunction = DbProvider.Instance.FindById<Function>("functions", _currentFunctionId);
+                        var verifyFunction = _dbProvider.FindById<Function>("functions", _currentFunctionId);
                         if (verifyFunction != null)
                         {
                             _commandProcessor.SendToPlayer($"Verified: Code length is {verifyFunction.Code?.Length ?? 0} characters.");
@@ -424,9 +578,18 @@ public class ProgrammingCommands
                 {
                     var result = Builtins.ExecuteScript(code, _player, _commandProcessor, _player.Location!, "");
                     
+                    // Log script execution
+                    try
+                    {
+                        Builtins.Log($"[SCRIPT RESULT] Player '{_player.Name}' (ID: {_player.Id}): Script executed successfully (no result)");
+                    }
+                    catch { /* Logger may not be available in script context */ }
+                    
+                    _logger.Info($"[SCRIPT RESULT] Player '{_player.Name}' (ID: {_player.Id}): Script executed successfully (no result)");
                     _commandProcessor.SendToPlayer("Script executed successfully.");
                     if (!string.IsNullOrEmpty(result) && result != "null")
                     {
+                        _logger.Info($"[SCRIPT RESULT] Player '{_player.Name}' (ID: {_player.Id}): Script result: {result}");
                         _commandProcessor.SendToPlayer($"Script result: {result}");
                     }
                 }
@@ -467,7 +630,7 @@ public class ProgrammingCommands
     private bool HandleVerbCommand(string[] parts)
     {
         // Check if player has Programmer flag
-        if (!PermissionManager.HasFlag(_player, PermissionManager.Flag.Programmer))
+        if (!_permissionManager.HasFlag(_player, PermissionManager.Flag.Programmer))
         {
             _commandProcessor.SendToPlayer("You need the Programmer flag to use the @verb command.");
             return true;
@@ -492,10 +655,10 @@ public class ProgrammingCommands
             return true;
         }
 
-        var verb = VerbManager.CreateVerb(objectId, verbName, pattern, "", _player.Name);
+        var verb = _verbManager.CreateVerb(objectId, verbName, pattern, "", _player.Name);
         if (!string.IsNullOrEmpty(aliases))
         {
-            var verbCollection = GameDatabase.Instance.GetCollection<Verb>("verbs");
+            var verbCollection = _gameDatabase.GetCollection<Verb>("verbs");
             verb.Aliases = aliases;
             verbCollection.Update(verb);
         }
@@ -581,7 +744,7 @@ public class ProgrammingCommands
         }
 
         // Retrieve the object using its objectId
-        var gameObject = ObjectManager.GetObject(objectId);
+        var gameObject = _objectManager.GetObject(objectId);
         var dbref = gameObject != null ? $"#{gameObject.DbRef}" : objectId;
 
         if (dbref.StartsWith("class"))
@@ -589,7 +752,7 @@ public class ProgrammingCommands
             dbref = $"class:{dbref.Substring(6)}";
         }
 
-        var verb = VerbManager.GetVerbsOnObject(objectId)
+        var verb = _verbManager.GetVerbsOnObject(objectId)
             .FirstOrDefault(v => v.Name.ToLower() == verbName.ToLower());
 
         if (verb == null)
@@ -650,7 +813,7 @@ public class ProgrammingCommands
         const string progEditPrefix = "ProgEdit > ";
         const string progEndPrefix = "ProgEnd > ";
 
-        var function = DbProvider.Instance.FindById<Function>("functions", functionId);
+        var function = _dbProvider.FindById<Function>("functions", functionId);
         if (function == null)
         {
             _commandProcessor.SendToPlayer($"{progStartPrefix}Function with ID '{functionId}' not found.");
@@ -659,7 +822,7 @@ public class ProgrammingCommands
         }
 
         // Get dbref for the object
-        var gameObject = ObjectManager.GetObject(function.ObjectId);
+        var gameObject = _objectManager.GetObject(function.ObjectId);
         var dbref = gameObject != null ? $"#{gameObject.DbRef}" : function.ObjectId;
 
 
@@ -724,7 +887,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
         }
 
         // Find function on object
-        var function = FunctionResolver.FindFunction(objectId, functionName);
+        var function = _functionResolver.FindFunction(objectId, functionName);
         if (function == null)
         {
             _commandProcessor.SendToPlayer($"Function '{functionName}' not found on object '{objectName}'.");
@@ -767,7 +930,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
         }
 
         // Find function on object
-        var function = FunctionResolver.FindFunction(objectId, functionName);
+        var function = _functionResolver.FindFunction(objectId, functionName);
         if (function == null)
         {
             _commandProcessor.SendToPlayer($"Function '{functionName}' not found on object '{objectName}'.");
@@ -784,7 +947,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
     private bool HandleEditCommand(string[] parts)
     {
         // Check if player has Programmer flag
-        if (!PermissionManager.HasFlag(_player, PermissionManager.Flag.Programmer))
+        if (!_permissionManager.HasFlag(_player, PermissionManager.Flag.Programmer))
         {
             _commandProcessor.SendToPlayer("You need the Programmer flag to use the @edit command.");
             return true;
@@ -806,7 +969,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
             _commandProcessor.SendToPlayer($"Object '{objectName}' not found.");
             return true;
         }
-        var obj = ObjectManager.GetObject(objectId);
+        var obj = _objectManager.GetObject(objectId);
         if (obj == null)
         {
             _commandProcessor.SendToPlayer($"Object '{objectName}' not found.");
@@ -833,7 +996,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
         }
 
         var allVerbs = VerbResolver.GetAllVerbsOnObject(objectId);
-        var allFunctions = FunctionResolver.GetAllFunctionsOnObject(objectId);
+        var allFunctions = _functionResolver.GetAllFunctionsOnObject(objectId);
         
         _commandProcessor.SendToPlayer($"=== Verbs and Functions on {GetObjectName(objectId)} ===");
         
@@ -898,7 +1061,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
     private bool HandleRemoveVerbCommand(string[] parts)
     {
         // Check if player has Programmer flag
-        if (!PermissionManager.HasFlag(_player, PermissionManager.Flag.Programmer))
+        if (!_permissionManager.HasFlag(_player, PermissionManager.Flag.Programmer))
         {
             _commandProcessor.SendToPlayer("You need the Programmer flag to use the @rmverb command.");
             return true;
@@ -929,7 +1092,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
             return true;
         }
 
-        var verb = VerbManager.GetVerbsOnObject(objectId)
+        var verb = _verbManager.GetVerbsOnObject(objectId)
             .FirstOrDefault(v => v.Name.ToLower() == verbName.ToLower());
 
         if (verb == null)
@@ -938,7 +1101,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
             return true;
         }
 
-        DbProvider.Instance.Delete<Verb>("verbs", verb.Id);
+        _dbProvider.Delete<Verb>("verbs", verb.Id);
         _commandProcessor.SendToPlayer($"Removed verb '{verbName}' from {GetObjectName(objectId)}.");
 
         return true;
@@ -956,7 +1119,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
         }
 
         var verbId = parts[2];
-        var verb = DbProvider.Instance.FindById<Verb>("verbs", verbId);
+        var verb = _dbProvider.FindById<Verb>("verbs", verbId);
 
         if (verb == null)
         {
@@ -974,7 +1137,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
             // For now, just proceed - in a real implementation you'd want confirmation
         }
 
-        DbProvider.Instance.Delete<Verb>("verbs", verbId);
+        _dbProvider.Delete<Verb>("verbs", verbId);
         _commandProcessor.SendToPlayer($"Removed verb '{verb.Name}' (ID: {verbId})");
         return true;
     }
@@ -984,7 +1147,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
     /// </summary>
     private bool HandleFunctionsCommand(string[] parts)
     {
-        var isProg = PermissionManager.HasFlag(_player, PermissionManager.Flag.Programmer);
+        var isProg = _permissionManager.HasFlag(_player, PermissionManager.Flag.Programmer);
 
         if (parts.Length != 2)
         {
@@ -1000,7 +1163,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
             return true;
         }
 
-        var functions = FunctionManager.GetFunctionsOnObject(objectId);
+        var functions = _functionManager.GetFunctionsOnObject(objectId);
         if (!functions.Any())
         {
             _commandProcessor.SendToPlayer($"No functions found on {GetObjectName(objectId)}.");
@@ -1054,7 +1217,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
             return true;
         }
 
-        var allVerbs = DbProvider.Instance.FindAll<Verb>("verbs").ToList();
+        var allVerbs = _dbProvider.FindAll<Verb>("verbs").ToList();
         var objectVerbs = allVerbs.Where(v => v.ObjectId == objectId).ToList();
 
         _commandProcessor.SendToPlayer("=== COMPREHENSIVE VERB DEBUG ===");
@@ -1120,7 +1283,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
             return true;
         }
 
-        var objectVerbs = DbProvider.Instance.Find<Verb>("verbs", v => v.ObjectId == objectId).ToList();
+        var objectVerbs = _dbProvider.Find<Verb>("verbs", v => v.ObjectId == objectId).ToList();
 
         _commandProcessor.SendToPlayer("=== FIXING DUPLICATE VERBS ===");
         
@@ -1146,7 +1309,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
                 foreach (var emptyVerb in emptyVerbs)
                 {
                     _commandProcessor.SendToPlayer($"  Removing empty verb: {emptyVerb.Id}");
-                    DbProvider.Instance.Delete<Verb>("verbs", emptyVerb.Id);
+                    _dbProvider.Delete<Verb>("verbs", emptyVerb.Id);
                     removedCount++;
                 }
             }
@@ -1157,7 +1320,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
                 foreach (var verb in verbsToRemove)
                 {
                     _commandProcessor.SendToPlayer($"  Removing duplicate empty verb: {verb.Id}");
-                    DbProvider.Instance.Delete<Verb>("verbs", verb.Id);
+                    _dbProvider.Delete<Verb>("verbs", verb.Id);
                     removedCount++;
                 }
             }
@@ -1190,26 +1353,26 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
                 // Check if it's a DBREF (starts with # followed by digits)
                 if (objectName.StartsWith("#") && int.TryParse(objectName.Substring(1), out int dbref))
                 {
-                    var obj = ObjectManager.GetObjectByDbRef(dbref);
+                    var obj = _objectManager.GetObjectByDbRef(dbref);
                     result = obj?.Id;
                 }
                 // Check if it's a class reference (starts with "class:" or ends with ".class")
                 else if (objectName.StartsWith("class:", StringComparison.OrdinalIgnoreCase))
                 {
                     var className = objectName.Substring(6); // Remove "class:" prefix
-                    var objectClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => 
+                    var objectClass = _dbProvider.FindOne<ObjectClass>("objectclasses", c => 
                         c.Name.Equals(className, StringComparison.OrdinalIgnoreCase));
                     result = objectClass?.Id;
                 }
                 else if (objectName.EndsWith(".class", StringComparison.OrdinalIgnoreCase))
                 {
                     var className = objectName.Substring(0, objectName.Length - 6); // Remove ".class" suffix
-                    var objectClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => 
+                    var objectClass = _dbProvider.FindOne<ObjectClass>("objectclasses", c => 
                         c.Name.Equals(className, StringComparison.OrdinalIgnoreCase));
                     result = objectClass?.Id;
                 }
                 // Check if it's a direct class ID (like "Room", "Exit", etc.)
-                else if (DbProvider.Instance.FindById<ObjectClass>("objectclasses", objectName) != null)
+                else if (_dbProvider.FindById<ObjectClass>("objectclasses", objectName) != null)
                 {
                     result = objectName; // The objectName itself is the class ID
                 }
@@ -1221,7 +1384,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
                     // If not found as an object, try as a class name
                     if (result == null)
                     {
-                        var objectClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => 
+                        var objectClass = _dbProvider.FindOne<ObjectClass>("objectclasses", c => 
                             c.Name.Equals(objectName, StringComparison.OrdinalIgnoreCase));
                         if (objectClass != null)
                         {
@@ -1245,11 +1408,11 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
         // First, search in current location (most common case)
         if (_player.Location != null)
         {
-            var localObjects = ObjectManager.GetObjectsInLocation(_player.Location);
+            var localObjects = _objectManager.GetObjectsInLocation(_player.Location);
             var localMatch = localObjects.FirstOrDefault(obj =>
             {
-                var objName = ObjectManager.GetProperty(obj, "name")?.AsString?.ToLower();
-                var shortDesc = ObjectManager.GetProperty(obj, "shortDescription")?.AsString?.ToLower();
+                var objName = _objectManager.GetProperty(obj, "name")?.AsString?.ToLower();
+                var shortDesc = _objectManager.GetProperty(obj, "shortDescription")?.AsString?.ToLower();
                 return objName?.Contains(name) == true || shortDesc?.Contains(name) == true;
             });
             
@@ -1260,11 +1423,11 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
         }
         
         // If not found locally, search all players (common for targeting players)
-        var players = PlayerManager.GetOnlinePlayers();
+        var players = _playerManager.GetOnlinePlayers();
         var playerMatch = players.FirstOrDefault(p => p.Name.ToLower().Contains(name));
         if (playerMatch != null)
         {
-            var playerObj = ObjectManager.GetObject(playerMatch.Id);
+            var playerObj = _objectManager.GetObject(playerMatch.Id);
             if (playerObj != null)
             {
                 return playerMatch.Id;
@@ -1272,11 +1435,11 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
         }
         
         // Finally, search globally (for admin/building purposes)
-        var allObjects = ObjectManager.GetAllObjects();
+        var allObjects = _objectManager.GetAllObjects();
         var globalMatch = allObjects.OfType<GameObject>().FirstOrDefault(obj =>
         {
-            var objName = ObjectManager.GetProperty(obj, "name")?.AsString?.ToLower();
-            var shortDesc = ObjectManager.GetProperty(obj, "shortDescription")?.AsString?.ToLower();
+            var objName = _objectManager.GetProperty(obj, "name")?.AsString?.ToLower();
+            var shortDesc = _objectManager.GetProperty(obj, "shortDescription")?.AsString?.ToLower();
             return objName?.Contains(name) == true || shortDesc?.Contains(name) == true;
         });
         
@@ -1294,7 +1457,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
     private string? GetSystemObjectId()
     {
         // Get all objects from ObjectManager cache
-        var allObjects = ObjectManager.GetAllObjects();
+        var allObjects = _objectManager.GetAllObjects();
         var systemObj = allObjects.OfType<GameObject>().FirstOrDefault(obj => 
             obj.Properties.ContainsKey("isSystemObject") && obj.Properties["isSystemObject"].AsBoolean == true);
         
@@ -1302,15 +1465,15 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
         {
 
             // Use Container class instead of abstract Object class
-            var containerClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "Container");
+            var containerClass = _dbProvider.FindOne<ObjectClass>("objectclasses", c => c.Name == "Container");
             if (containerClass != null)
             {
-                systemObj = ObjectManager.CreateInstance(containerClass.Id);
-                ObjectManager.SetProperty(systemObj, "name", "System");
-                ObjectManager.SetProperty(systemObj, "shortDescription", "the system object");
-                ObjectManager.SetProperty(systemObj, "longDescription", "This is the system object that holds global verbs and functions.");
-                ObjectManager.SetProperty(systemObj, "isSystemObject", true);
-                ObjectManager.SetProperty(systemObj, "gettable", false); // Don't allow players to pick up the system
+                systemObj = _objectManager.CreateInstance(containerClass.Id);
+                _objectManager.SetProperty(systemObj, "name", "System");
+                _objectManager.SetProperty(systemObj, "shortDescription", "the system object");
+                _objectManager.SetProperty(systemObj, "longDescription", "This is the system object that holds global verbs and functions.");
+                _objectManager.SetProperty(systemObj, "isSystemObject", true);
+                _objectManager.SetProperty(systemObj, "gettable", false); // Don't allow players to pick up the system
             }
             else
             {
@@ -1331,10 +1494,10 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
         if (objectId == _player.Location?.Id) return "here";
 
         // Try as a GameObject first
-        var obj = ObjectManager.GetObject(objectId);
+        var obj = _objectManager.GetObject(objectId);
         if (obj != null)
         {
-            var name = ObjectManager.GetProperty(obj, "name")?.AsString;
+            var name = _objectManager.GetProperty(obj, "name")?.AsString;
             if (!string.IsNullOrEmpty(name))
                 return $"{name} (#{obj.DbRef})";
             else
@@ -1342,7 +1505,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
         }
 
         // Try as an ObjectClass
-        var objectClass = DbProvider.Instance.FindById<ObjectClass>("objectclasses", objectId);
+        var objectClass = _dbProvider.FindById<ObjectClass>("objectclasses", objectId);
         if (objectClass != null)
         {
             return $"class {objectClass.Name}";
@@ -1417,10 +1580,10 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
     private bool HandleCleanupPlayerCommand(string[] parts)
     {
         // Get the actual player object ID (not the system object)
-        var allObjects = ObjectManager.GetAllObjects();
+        var allObjects = _objectManager.GetAllObjects();
         var playerObject = allObjects.OfType<GameObject>().FirstOrDefault(obj => 
         {
-            var playerIdProp = ObjectManager.GetProperty(obj, "playerId");
+            var playerIdProp = _objectManager.GetProperty(obj, "playerId");
             return playerIdProp != null && playerIdProp.AsString == _player.Id;
         });
 
@@ -1430,7 +1593,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
             return true;
         }
 
-        var playerVerbs = DbProvider.Instance.FindVerbsByObjectId(playerObject.Id).ToList();
+        var playerVerbs = _dbProvider.FindVerbsByObjectId(playerObject.Id).ToList();
 
         _commandProcessor.SendToPlayer($"=== CLEANING PLAYER OBJECT {playerObject.Id} ===");
         _commandProcessor.SendToPlayer($"Found {playerVerbs.Count} verbs on your player object:");
@@ -1456,7 +1619,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
             foreach (var emptyVerb in emptyVerbs)
             {
                 _commandProcessor.SendToPlayer($"  Removing empty verb: {emptyVerb.Id}");
-                DbProvider.Instance.Delete<Verb>("verbs", emptyVerb.Id);
+                _dbProvider.Delete<Verb>("verbs", emptyVerb.Id);
                 removedCount++;
             }
         }
@@ -1500,7 +1663,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
         }
 
         // Find the target player
-        var targetPlayer = PlayerManager.FindPlayerByName(playerName);
+        var targetPlayer = _playerManager.FindPlayerByName(playerName);
         
         if (targetPlayer == null)
         {
@@ -1511,14 +1674,14 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
         bool success;
         if (isGranting)
         {
-            success = PermissionManager.GrantFlag(targetPlayer, flag, _player);
+            success = _permissionManager.GrantFlag(targetPlayer, flag, _player);
             if (success)
             {
                 _commandProcessor.SendToPlayer($"Granted {flag} flag to {targetPlayer.Name}.");
             }
             else
             {
-                if (!PermissionManager.CanGrantFlag(_player, flag))
+                if (!_permissionManager.CanGrantFlag(_player, flag))
                 {
                     _commandProcessor.SendToPlayer($"You don't have permission to grant the {flag} flag.");
                 }
@@ -1530,7 +1693,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
         }
         else
         {
-            success = PermissionManager.RemoveFlag(targetPlayer, flag, _player);
+            success = _permissionManager.RemoveFlag(targetPlayer, flag, _player);
             if (success)
             {
                 _commandProcessor.SendToPlayer($"Removed {flag} flag from {targetPlayer.Name}.");
@@ -1542,7 +1705,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
                 {
                     _commandProcessor.SendToPlayer("Cannot remove Admin flag from the original admin player.");
                 }
-                else if (!PermissionManager.CanRemoveFlag(_player, flag))
+                else if (!_permissionManager.CanRemoveFlag(_player, flag))
                 {
                     _commandProcessor.SendToPlayer($"You don't have permission to remove the {flag} flag.");
                 }
@@ -1572,7 +1735,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
         {
             // Show another player's flags
             var playerName = parts[1];
-            var foundPlayer = PlayerManager.FindPlayerByName(playerName);
+            var foundPlayer = _playerManager.FindPlayerByName(playerName);
             if (foundPlayer == null)
             {
                 _commandProcessor.SendToPlayer($"Player '{playerName}' not found.");
@@ -1592,8 +1755,8 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
             return true;
         }
 
-        var flags = PermissionManager.GetPlayerFlags(targetPlayer);
-        var flagsString = PermissionManager.GetFlagsString(targetPlayer);
+        var flags = _permissionManager.GetPlayerFlags(targetPlayer);
+        var flagsString = _permissionManager.GetFlagsString(targetPlayer);
         
         if (targetPlayer == _player)
         {
@@ -1629,7 +1792,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
     private bool HandleUpdatePermissionsCommand(string[] parts)
     {
         // Check if player has Admin flag
-        if (!PermissionManager.HasFlag(_player, PermissionManager.Flag.Admin))
+        if (!_permissionManager.HasFlag(_player, PermissionManager.Flag.Admin))
         {
             _commandProcessor.SendToPlayer("You need the Admin flag to use this command.");
             return true;
@@ -1637,7 +1800,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
 
         _commandProcessor.SendToPlayer("Updating existing player permissions to new flag system...");
 
-        var allPlayers = PlayerManager.GetAllPlayers();
+        var allPlayers = _playerManager.GetAllPlayers();
         int updatedCount = 0;
 
         foreach (var player in allPlayers)
@@ -1667,10 +1830,10 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
                 if (needsUpdate)
                 {
                     player.Permissions = currentPermissions;
-                    DbProvider.Instance.Update<Player>("players", player);
+                    _dbProvider.Update<Player>("players", player);
                     updatedCount++;
                     
-                    var flags = PermissionManager.GetFlagsString(player);
+                    var flags = _permissionManager.GetFlagsString(player);
                     _commandProcessor.SendToPlayer($"Updated {player.Name}: flags = {flags}");
                 }
             }
@@ -1686,7 +1849,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
     private bool HandleReloadCommand(string[] parts)
     {
         // Check if player has Admin flag
-        if (!PermissionManager.HasFlag(_player, PermissionManager.Flag.Admin))
+        if (!_permissionManager.HasFlag(_player, PermissionManager.Flag.Admin))
         {
             _commandProcessor.SendToPlayer("You need the Admin flag to use the @reload command.");
             return true;
@@ -1710,7 +1873,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
                 _commandProcessor.SendToPlayer("🔄 Initiating manual verb reload...");
                 try
                 {
-                    HotReloadManager.ManualReloadVerbs();
+                    _hotReloadManager?.ManualReloadVerbs();
                     _commandProcessor.SendToPlayer("✅ Verb reload completed successfully!");
                 }
                 catch (Exception ex)
@@ -1725,7 +1888,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
                 _commandProcessor.SendToPlayer("🔄 Initiating manual function reload...");
                 try
                 {
-                    HotReloadManager.ManualReloadFunctions();
+                    _hotReloadManager?.ManualReloadFunctions();
                     _commandProcessor.SendToPlayer("✅ Function reload completed successfully!");
                 }
                 catch (Exception ex)
@@ -1739,7 +1902,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
                 _commandProcessor.SendToPlayer("🔄 Initiating manual script reload...");
                 try
                 {
-                    HotReloadManager.ManualReloadScripts();
+                    _hotReloadManager?.ManualReloadScripts();
                     _commandProcessor.SendToPlayer("✅ Script reload completed successfully!");
                 }
                 catch (Exception ex)
@@ -1754,7 +1917,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
                 _commandProcessor.SendToPlayer("🔄 Initiating manual property reload...");
                 try
                 {
-                    PropertyInitializer.ReloadProperties();
+                    _propertyInitializer?.ReloadProperties();
                     _commandProcessor.SendToPlayer("✅ Property reload completed successfully!");
                 }
                 catch (Exception ex)
@@ -1765,7 +1928,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
                 break;
 
             case "status":
-                var status = HotReloadManager.IsEnabled ? "ENABLED" : "DISABLED";
+                var status = (_hotReloadManager?.IsEnabled ?? false) ? "ENABLED" : "DISABLED";
                 _commandProcessor.SendToPlayer($"Hot Reload Status: {status}");
                 _commandProcessor.SendToPlayer("Monitored paths:");
                 _commandProcessor.SendToPlayer("  • resources/verbs/ (*.json)");
@@ -1789,7 +1952,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
     private bool HandleHotReloadCommand(string[] parts)
     {
         // Check if player has Admin flag
-        if (!PermissionManager.HasFlag(_player, PermissionManager.Flag.Admin))
+        if (!_permissionManager.HasFlag(_player, PermissionManager.Flag.Admin))
         {
             _commandProcessor.SendToPlayer("You need the Admin flag to use the @hotreload command.");
             return true;
@@ -1797,7 +1960,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
 
         if (parts.Length < 2)
         {
-            var status = HotReloadManager.IsEnabled ? "ENABLED" : "DISABLED";
+            var status = (_hotReloadManager?.IsEnabled ?? false) ? "ENABLED" : "DISABLED";
             _commandProcessor.SendToPlayer($"Hot Reload Status: {status}");
             _commandProcessor.SendToPlayer("Usage: @hotreload [enable|disable|status]");
             _commandProcessor.SendToPlayer("  @hotreload enable  - Enable automatic hot reloading");
@@ -1810,20 +1973,20 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
         switch (action)
         {
             case "enable":
-                HotReloadManager.SetEnabled(true);
+                _hotReloadManager?.SetEnabled(true);
                 _commandProcessor.SendToPlayer("✅ Hot reload ENABLED");
                 _commandProcessor.SendToPlayer("File changes will now automatically trigger reloads.");
                 break;
 
             case "disable":
-                HotReloadManager.SetEnabled(false);
+                _hotReloadManager?.SetEnabled(false);
                 _commandProcessor.SendToPlayer("⏸️ Hot reload DISABLED");
                 _commandProcessor.SendToPlayer("File changes will no longer trigger automatic reloads.");
                 _commandProcessor.SendToPlayer("You can still use @reload commands for manual reloads.");
                 break;
 
             case "status":
-                var enabled = HotReloadManager.IsEnabled;
+                var enabled = _hotReloadManager?.IsEnabled ?? false;
                 var statusIcon = enabled ? "✅" : "❌";
                 var statusText = enabled ? "ENABLED" : "DISABLED";
                 
@@ -1858,7 +2021,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
     private bool HandleCoreHotReloadCommand(string[] parts)
     {
         // Check if player has Admin flag
-        if (!PermissionManager.HasFlag(_player, PermissionManager.Flag.Admin))
+        if (!_permissionManager.HasFlag(_player, PermissionManager.Flag.Admin))
         {
             _commandProcessor.SendToPlayer("You need the Admin flag to use the @corehot command.");
             return true;
@@ -1880,7 +2043,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
         switch (action)
         {
             case "status":
-                var status = CoreHotReloadManager.GetStatus();
+                var status = _coreHotReloadManager?.GetStatus() ?? "Unknown";
                 _commandProcessor.SendToPlayer("🔥 Core Hot Reload Status:");
                 _commandProcessor.SendToPlayer("");
                 foreach (var line in status.Split('\n'))
@@ -1899,7 +2062,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
                 try
                 {
                     _commandProcessor.SendToPlayer("🧪 Triggering test core hot reload notification...");
-                    CoreHotReloadManager.TriggerTestNotification();
+                    _coreHotReloadManager?.TriggerTestNotification();
                     _commandProcessor.SendToPlayer("✅ Test notification sent!");
                 }
                 catch (Exception ex)
@@ -1978,14 +2141,14 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
         var parametersString = functionSignature.Substring(parenIndex + 1, endParenIndex - parenIndex - 1).Trim();
 
         // Validate function name
-        if (!FunctionManager.IsValidFunctionName(functionName))
+        if (!_functionManager.IsValidFunctionName(functionName))
         {
             _commandProcessor.SendToPlayer($"Invalid function name '{functionName}'. Function names must start with a letter and contain only letters, numbers, and underscores.");
             return true;
         }
 
         // Validate return type
-        if (!FunctionManager.IsValidReturnType(returnType))
+        if (!_functionManager.IsValidReturnType(returnType))
         {
             _commandProcessor.SendToPlayer($"Invalid return type '{returnType}'. Valid types: void, string, int, bool, float, double, decimal, object, Player, GameObject, ObjectClass, List<dynamic>, List<GameObject>, List<Player>, List<string>, List<int>");
             return true;
@@ -2011,7 +2174,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
                 var paramName = paramParts[1];
 
                 // Validate parameter type
-                if (!FunctionManager.IsValidParameterType(paramType))
+                if (!_functionManager.IsValidParameterType(paramType))
                 {
                     _commandProcessor.SendToPlayer($"Invalid parameter type '{paramType}'. Valid types: string, int, bool, float, double, decimal, object, Player, GameObject, ObjectClass, List<dynamic>, List<GameObject>, List<Player>, List<string>, List<int>");
                     return true;
@@ -2037,7 +2200,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
         }
 
         // Check if function already exists
-        var existingFunction = FunctionManager.FindFunction(objectId, functionName);
+        var existingFunction = _functionManager.FindFunction(objectId, functionName);
         if (existingFunction != null)
         {
             // Update existing function signature
@@ -2047,7 +2210,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
             existingFunction.AccessModifiers = permissions;
             existingFunction.ModifiedAt = DateTime.UtcNow;
 
-            var functionsCollection = GameDatabase.Instance.GetCollection<Function>("functions");
+            var functionsCollection = _gameDatabase.GetCollection<Function>("functions");
             functionsCollection.Update(existingFunction);
 
             var updateParamString = string.Join(", ", parameterTypes.Zip(parameterNames, (type, name) => $"{type} {name}"));
@@ -2058,18 +2221,18 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
         }
 
         // Create the function (new signature expects GameObject)
-        var gameObject = ObjectManager.GetObject(objectId);
+        var gameObject = _objectManager.GetObject(objectId);
         if (gameObject == null)
         {
             _commandProcessor.SendToPlayer($"Object with ID '{objectId}' not found.");
             return true;
         }
 
-        var function = FunctionManager.CreateFunction(gameObject, functionName, parameterTypes.ToArray(), parameterNames.ToArray(), returnType, "", _player.Name);
+        var function = _functionManager.CreateFunction(gameObject, functionName, parameterTypes.ToArray(), parameterNames.ToArray(), returnType, "", _player.Name);
 
         // Set visibility
         function.AccessModifiers = permissions;
-        var functions = GameDatabase.Instance.GetCollection<Function>("functions");
+        var functions = _gameDatabase.GetCollection<Function>("functions");
         functions.Update(function);
 
         var paramString = string.Join(", ", parameterTypes.Zip(parameterNames, (type, name) => $"{type} {name}"));
@@ -2100,7 +2263,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
     private bool HandleFuncReloadCommand(string[] parts)
     {
         // Check if player has admin privileges
-        if (!PermissionManager.HasFlag(_player, PermissionManager.Flag.Admin))
+        if (!_permissionManager.HasFlag(_player, PermissionManager.Flag.Admin))
         {
             _commandProcessor.SendToPlayer("You need the Admin flag to use this command.");
             return true;
@@ -2110,7 +2273,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
 
         try
         {
-            FunctionInitializer.ReloadFunctions();
+            _functionInitializer?.ReloadFunctions();
             _commandProcessor.SendToPlayer("Function definitions reloaded successfully!");
         }
         catch (Exception ex)
@@ -2186,7 +2349,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
             return true;
         }
 
-        var obj = ObjectManager.GetObject(objectId);
+        var obj = _objectManager.GetObject(objectId);
         if (obj == null)
         {
             _commandProcessor.SendToPlayer($"Object '{objectName}' not found.");
@@ -2248,7 +2411,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
     private bool HandlePropLoadCommand(string[] parts)
     {
         // Check if player has admin privileges
-        if (!PermissionManager.HasFlag(_player, PermissionManager.Flag.Admin))
+        if (!_permissionManager.HasFlag(_player, PermissionManager.Flag.Admin))
         {
             _commandProcessor.SendToPlayer("You need the Admin flag to use this command.");
             return true;
@@ -2258,7 +2421,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
 
         try
         {
-            PropertyInitializer.ReloadProperties();
+            _propertyInitializer?.ReloadProperties();
             _commandProcessor.SendToPlayer("Property definitions reloaded successfully!");
         }
         catch (Exception ex)

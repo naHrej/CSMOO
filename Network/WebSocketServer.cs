@@ -5,6 +5,13 @@ using System.Text.Json;
 using CSMOO.Commands;
 using CSMOO.Logging;
 using CSMOO.Sessions;
+using Microsoft.Extensions.DependencyInjection;
+using CSMOO.Object;
+using CSMOO.Verbs;
+using CSMOO.Functions;
+using CSMOO.Database;
+using CSMOO.Scripting;
+using CSMOO.Init;
 
 namespace CSMOO.Network;
 
@@ -19,6 +26,7 @@ public class WebSocketServer
     private readonly object _sessionsLock = new object();
     private bool _isRunning;
     private readonly int _port;
+    private readonly IServiceProvider? _serviceProvider;
 
     public WebSocketServer(int port)
     {
@@ -26,6 +34,16 @@ public class WebSocketServer
         _httpListener = new HttpListener();
         _httpListener.Prefixes.Add($"http://localhost:{port}/");
         _sessions = new Dictionary<Guid, WebSocketSession>();
+        _serviceProvider = null;
+    }
+
+    public WebSocketServer(int port, IServiceProvider serviceProvider)
+    {
+        _port = port;
+        _httpListener = new HttpListener();
+        _httpListener.Prefixes.Add($"http://localhost:{port}/");
+        _sessions = new Dictionary<Guid, WebSocketSession>();
+        _serviceProvider = serviceProvider;
     }
 
     public async Task StartAsync()
@@ -135,7 +153,33 @@ public class WebSocketServer
     private async Task HandleWebSocketSession(WebSocketSession session)
     {
         var connection = new WebSocketConnection(session);
-        var commandProcessor = new CommandProcessor(session.SessionId, connection);
+        CommandProcessor commandProcessor;
+        if (_serviceProvider != null)
+        {
+            // Use DI to create CommandProcessor
+            var playerManager = _serviceProvider.GetRequiredService<IPlayerManager>();
+            var verbResolver = _serviceProvider.GetRequiredService<IVerbResolver>();
+            var permissionManager = _serviceProvider.GetRequiredService<IPermissionManager>();
+            var objectManager = _serviceProvider.GetRequiredService<IObjectManager>();
+            var functionResolver = _serviceProvider.GetRequiredService<IFunctionResolver>();
+            var dbProvider = _serviceProvider.GetRequiredService<IDbProvider>();
+            var gameDatabase = _serviceProvider.GetRequiredService<IGameDatabase>();
+            var logger = _serviceProvider.GetRequiredService<ILogger>();
+            var roomManager = _serviceProvider.GetRequiredService<IRoomManager>();
+            var scriptEngineFactory = _serviceProvider.GetRequiredService<IScriptEngineFactory>();
+            var verbManager = _serviceProvider.GetRequiredService<IVerbManager>();
+            var functionManager = _serviceProvider.GetRequiredService<IFunctionManager>();
+            var hotReloadManager = _serviceProvider.GetService<IHotReloadManager>();
+            var coreHotReloadManager = _serviceProvider.GetService<ICoreHotReloadManager>();
+            var functionInitializer = _serviceProvider.GetService<IFunctionInitializer>();
+            var propertyInitializer = _serviceProvider.GetService<IPropertyInitializer>();
+            commandProcessor = new CommandProcessor(session.SessionId, connection, playerManager, verbResolver, permissionManager, objectManager, functionResolver, dbProvider, gameDatabase, logger, roomManager, scriptEngineFactory, verbManager, functionManager, hotReloadManager, coreHotReloadManager, functionInitializer, propertyInitializer);
+        }
+        else
+        {
+            // Backward compatibility - use static constructor
+            commandProcessor = new CommandProcessor(session.SessionId, connection);
+        }
         var buffer = new byte[4096];
 
         try

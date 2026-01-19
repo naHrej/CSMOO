@@ -7,40 +7,71 @@ using System.Threading.Tasks;
 using CSMOO.Configuration;
 using CSMOO.Logging;
 using CSMOO.Object;
+using CSMOO.Database;
+
 namespace CSMOO.Network;
 
 public class HttpServer
 {
+    private readonly IConfig _config;
+    private readonly ILogger _logger;
+    private readonly IObjectManager _objectManager;
     public readonly HttpListener _listener;
     public string _baseUrl => _listener.Prefixes.Count > 0 ? _listener.Prefixes.First() : "http://localhost:1703/";
 
-    public HttpServer()
+    // Primary constructor with DI dependencies
+    public HttpServer(IConfig config, ILogger logger, IObjectManager objectManager)
     {
+        _config = config ?? throw new ArgumentNullException(nameof(config));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _objectManager = objectManager ?? throw new ArgumentNullException(nameof(objectManager));
         _listener = new HttpListener();
 
         string prefix = "";
-        var config = Config.Instance;
-        if (config.Server.HttpPort > 0)
+        if (_config.Server.HttpPort > 0)
         {
-            prefix = $"http://localhost:{config.Server.HttpPort}/";
+            prefix = $"http://localhost:{_config.Server.HttpPort}/";
         }
-        else if (config.Server.Port > 0)
+        else if (_config.Server.Port > 0)
         {
-            prefix = $"http://localhost:{config.Server.Port+2}/";
+            prefix = $"http://localhost:{_config.Server.Port+2}/";
         }
         else
         {
             throw new InvalidOperationException("No valid port configured for HTTP server.");
         }
 
-
         _listener.Prefixes.Add(prefix);
+    }
 
+    // Backward compatibility constructor
+    public HttpServer()
+        : this(CreateDefaultConfig(), CreateDefaultLogger(), CreateDefaultObjectManager())
+    {
+    }
+
+    // Helper methods for backward compatibility
+    private static IConfig CreateDefaultConfig()
+    {
+        return Config.Instance;
+    }
+
+    private static ILogger CreateDefaultLogger()
+    {
+        return new LoggerInstance(Config.Instance);
+    }
+
+    private static IObjectManager CreateDefaultObjectManager()
+    {
+        var dbProvider = DbProvider.Instance;
+        var logger = new LoggerInstance(Config.Instance);
+        var classManager = new ClassManagerInstance(dbProvider, logger);
+        return new ObjectManagerInstance(dbProvider, classManager);
     }
 
     public async Task StartAsync()
     {
-        Logger.Info($"HTTP Server started at {_baseUrl}");
+        _logger.Info($"HTTP Server started at {_baseUrl}");
         _listener.Start();
 
         while (_listener.IsListening)
@@ -54,7 +85,7 @@ public class HttpServer
             }
             catch (Exception ex)
             {
-                Logger.Error($"Error handling request: {ex.Message}");
+                _logger.Error($"Error handling request: {ex.Message}");
                 context.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
             }
             finally
@@ -72,7 +103,7 @@ public class HttpServer
         context.Response.ContentType = "text/plain";
         using (var writer = new StreamWriter(context.Response.OutputStream))
         {
-            var allObjects = ObjectManager.GetAllObjects();
+            var allObjects = _objectManager.GetAllObjects();
             var systemObject = allObjects.FirstOrDefault(obj =>
                 obj.Properties.ContainsKey("isSystemObject"));
 

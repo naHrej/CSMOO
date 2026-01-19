@@ -3,6 +3,7 @@ using CSMOO.Database;
 using CSMOO.Commands;
 using CSMOO.Functions;
 using CSMOO.Logging;
+using CSMOO.Configuration;
 using CSMOO.Exceptions;
 using LiteDB;
 using CSMOO.Object;
@@ -19,13 +20,56 @@ public class ScriptObject : DynamicObject
     private readonly Player _currentPlayer;
     private readonly CommandProcessor _commandProcessor;
     private readonly ScriptHelpers _helpers;
+    private readonly IObjectManager _objectManager;
+    private readonly IFunctionResolver _functionResolver;
+    private readonly IDbProvider _dbProvider;
 
-    public ScriptObject(string objectId, Player currentPlayer, CommandProcessor commandProcessor, ScriptHelpers helpers)
+    // Primary constructor with DI dependencies
+    public ScriptObject(
+        string objectId, 
+        Player currentPlayer, 
+        CommandProcessor commandProcessor, 
+        ScriptHelpers helpers,
+        IObjectManager objectManager,
+        IFunctionResolver functionResolver,
+        IDbProvider dbProvider)
     {
-        _objectId = objectId;
-        _currentPlayer = currentPlayer;
-        _commandProcessor = commandProcessor;
-        _helpers = helpers;
+        _objectId = objectId ?? throw new ArgumentNullException(nameof(objectId));
+        _currentPlayer = currentPlayer ?? throw new ArgumentNullException(nameof(currentPlayer));
+        _commandProcessor = commandProcessor ?? throw new ArgumentNullException(nameof(commandProcessor));
+        _helpers = helpers ?? throw new ArgumentNullException(nameof(helpers));
+        _objectManager = objectManager ?? throw new ArgumentNullException(nameof(objectManager));
+        _functionResolver = functionResolver ?? throw new ArgumentNullException(nameof(functionResolver));
+        _dbProvider = dbProvider ?? throw new ArgumentNullException(nameof(dbProvider));
+    }
+
+    // Backward compatibility constructor
+    public ScriptObject(string objectId, Player currentPlayer, CommandProcessor commandProcessor, ScriptHelpers helpers)
+        : this(objectId, currentPlayer, commandProcessor, helpers, 
+               CreateDefaultObjectManager(), CreateDefaultFunctionResolver(), CreateDefaultDbProvider())
+    {
+    }
+
+    private static IObjectManager CreateDefaultObjectManager()
+    {
+        var dbProvider = DbProvider.Instance;
+        var logger = new LoggerInstance(Config.Instance);
+        var classManager = new ClassManagerInstance(dbProvider, logger);
+        return new ObjectManagerInstance(dbProvider, classManager);
+    }
+
+    private static IFunctionResolver CreateDefaultFunctionResolver()
+    {
+        var dbProvider = DbProvider.Instance;
+        var logger = new LoggerInstance(Config.Instance);
+        var classManager = new ClassManagerInstance(dbProvider, logger);
+        var objectManager = new ObjectManagerInstance(dbProvider, classManager);
+        return new FunctionResolverInstance(dbProvider, objectManager);
+    }
+
+    private static IDbProvider CreateDefaultDbProvider()
+    {
+        return DbProvider.Instance;
     }
 
     /// <summary>
@@ -38,8 +82,8 @@ public class ScriptObject : DynamicObject
     /// </summary>
     public GameObject? GetGameObject()
     {
-        // Use DbProvider for all DB access
-        return ObjectManager.GetObject(_objectId);
+        // Use injected ObjectManager
+        return _objectManager.GetObject(_objectId);
     }
 
     /// <summary>
@@ -58,7 +102,7 @@ public class ScriptObject : DynamicObject
             }
 
             // Direct database lookup for the property
-            var propertyValue = ObjectManager.GetProperty(obj, propertyName);
+            var propertyValue = _objectManager.GetProperty(obj, propertyName);
             
             if (propertyValue == null)
             {
@@ -106,7 +150,7 @@ public class ScriptObject : DynamicObject
                 _ => new BsonValue(value.ToString() ?? "")
             };
 
-            ObjectManager.SetProperty(obj, propertyName, bsonValue);
+            _objectManager.SetProperty(obj, propertyName, bsonValue);
             return true;
         }
         catch (Exception ex)
@@ -177,7 +221,7 @@ public class ScriptObject : DynamicObject
         }
 
         // Execute the verb using the unified script engine
-        var scriptEngine = new ScriptEngine();
+        var scriptEngine = ScriptEngineFactoryStatic.Create();
         return scriptEngine.ExecuteVerb(verb, input, _currentPlayer, _commandProcessor, _objectId);
     }
 
@@ -196,7 +240,7 @@ public class ScriptObject : DynamicObject
             }
 
             // Execute the function using the unified script engine
-            var functionEngine = new ScriptEngine();
+            var functionEngine = ScriptEngineFactoryStatic.Create();
             var result = functionEngine.ExecuteFunction(function, args ?? new object[0], _currentPlayer, _commandProcessor, _objectId);
             return result;
         }
@@ -214,7 +258,7 @@ public class ScriptObject : DynamicObject
     /// </summary>
     private Verb? FindVerb(string verbName)
     {
-        var verbs = DbProvider.Instance.Find<Verb>("verbs", v => v.ObjectId == _objectId).ToList();
+        var verbs = _dbProvider.Find<Verb>("verbs", v => v.ObjectId == _objectId).ToList();
         var verb = verbs.FirstOrDefault(v =>
             v.Name.Equals(verbName, StringComparison.OrdinalIgnoreCase) ||
             (!string.IsNullOrEmpty(v.Aliases) &&
@@ -227,10 +271,10 @@ public class ScriptObject : DynamicObject
         var obj = GetGameObject();
         if (obj != null)
         {
-            var objectClass = DbProvider.Instance.FindById<ObjectClass>("objectclasses", obj.ClassId);
+            var objectClass = _dbProvider.FindById<ObjectClass>("objectclasses", obj.ClassId);
             while (objectClass != null)
             {
-                var classVerbs = DbProvider.Instance.Find<Verb>("verbs", v => v.ObjectId == objectClass.Id).ToList();
+                var classVerbs = _dbProvider.Find<Verb>("verbs", v => v.ObjectId == objectClass.Id).ToList();
                 verb = classVerbs.FirstOrDefault(v =>
                     v.Name.Equals(verbName, StringComparison.OrdinalIgnoreCase) ||
                     (!string.IsNullOrEmpty(v.Aliases) &&
@@ -242,7 +286,7 @@ public class ScriptObject : DynamicObject
                 // Move up the class hierarchy
                 if (!string.IsNullOrEmpty(objectClass.ParentClassId))
                 {
-                    objectClass = DbProvider.Instance.FindById<ObjectClass>("objectclasses", objectClass.ParentClassId);
+                    objectClass = _dbProvider.FindById<ObjectClass>("objectclasses", objectClass.ParentClassId);
                 }
                 else
                 {
@@ -259,8 +303,8 @@ public class ScriptObject : DynamicObject
     /// </summary>
     private Function? FindFunction(string functionName)
     {
-        // Use the existing FunctionResolver to find the function
-        return FunctionResolver.FindFunction(_objectId, functionName);
+        // Use the injected FunctionResolver to find the function
+        return _functionResolver.FindFunction(_objectId, functionName);
     }
 
     /// <summary>
@@ -271,8 +315,8 @@ public class ScriptObject : DynamicObject
         var obj = GetGameObject();
         if (obj == null) return $"ScriptObject({_objectId}) [INVALID]";
         
-        var nameProperty = ObjectManager.GetProperty(obj, "name");
-        var shortDescProperty = ObjectManager.GetProperty(obj, "shortDescription");
+        var nameProperty = _objectManager.GetProperty(obj, "name");
+        var shortDescProperty = _objectManager.GetProperty(obj, "shortDescription");
         
         var name = nameProperty?.AsString;
         var shortDesc = shortDescProperty?.AsString;

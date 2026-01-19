@@ -2,48 +2,58 @@ using LiteDB;
 using CSMOO.Database;
 using CSMOO.Logging;
 using CSMOO.Object;
+using CSMOO.Configuration;
+using System.Collections.Generic;
 
 namespace CSMOO.Functions;
 
 /// <summary>
-/// Manages function creation, modification, and deletion
+/// Static wrapper for FunctionManager (backward compatibility)
+/// Delegates to FunctionManagerInstance for dependency injection support
 /// </summary>
 public static class FunctionManager
 {
+    private static IFunctionManager? _instance;
+    
+    /// <summary>
+    /// Sets the function manager instance for static methods to delegate to
+    /// </summary>
+    public static void SetInstance(IFunctionManager instance)
+    {
+        _instance = instance;
+    }
+    
+    private static IFunctionManager Instance => _instance ?? throw new InvalidOperationException("FunctionManager instance not set. Call FunctionManager.SetInstance() first.");
+    
+    /// <summary>
+    /// Ensures an instance exists (creates default if not set)
+    /// </summary>
+    private static void EnsureInstance()
+    {
+        if (_instance == null)
+        {
+            // Create default instances for backward compatibility
+            var config = Config.Instance;
+            var gameDatabase = new GameDatabase(config.Database.GameDataFile);
+            _instance = new FunctionManagerInstance(gameDatabase);
+        }
+    }
 
     /// <summary>
     /// Creates a new function on an object
     /// </summary>
     public static Function CreateFunction(GameObject obj, string name, string[] parameterTypes, string[] parameterNames, string returnType = "void", string code = "", string createdBy = "system")
     {
-        var function = new Function
-        {
-            ObjectId = obj.Id,
-            Name = name,
-            ParameterTypes = parameterTypes,
-            ParameterNames = parameterNames,
-            ReturnType = returnType,
-            Code = code,
-            CreatedBy = createdBy,
-            CreatedAt = DateTime.UtcNow,
-            ModifiedAt = DateTime.UtcNow
-        };
-
-        var functionCollection = GameDatabase.Instance.GetCollection<Function>("functions");
-        functionCollection.Insert(function);
-
-        return function;
+        EnsureInstance();
+        return Instance.CreateFunction(obj, name, parameterTypes, parameterNames, returnType, code, createdBy);
     }
     /// <summary>
     /// Updates an existing function
     /// </summary>
     public static bool UpdateFunction(Function function)
     {
-        function.ModifiedAt = DateTime.UtcNow;
-        var functionCollection = GameDatabase.Instance.GetCollection<Function>("functions");
-        var result = functionCollection.Update(function);
-        
-        return result;
+        EnsureInstance();
+        return Instance.UpdateFunction(function);
     }
 
     /// <summary>
@@ -51,14 +61,8 @@ public static class FunctionManager
     /// </summary>
     public static bool DeleteFunction(string functionId)
     {
-        var functionCollection = GameDatabase.Instance.GetCollection<Function>("functions");
-        var function = functionCollection.FindById(functionId);
-        
-        if (function == null) return false;
-        
-        var result = functionCollection.Delete(functionId);
-        
-        return result;
+        EnsureInstance();
+        return Instance.DeleteFunction(functionId);
     }
 
     /// <summary>
@@ -66,15 +70,8 @@ public static class FunctionManager
     /// </summary>
     public static int DeleteFunctionsOnObject(string objectId)
     {
-        var functionCollection = GameDatabase.Instance.GetCollection<Function>("functions");
-        var functions = functionCollection.Find(f => f.ObjectId == objectId).ToList();
-        
-        foreach (var function in functions)
-        {
-            functionCollection.Delete(function.Id);
-        }
-        
-        return functions.Count;
+        EnsureInstance();
+        return Instance.DeleteFunctionsOnObject(objectId);
     }
 
     /// <summary>
@@ -82,8 +79,8 @@ public static class FunctionManager
     /// </summary>
     public static Function? GetFunction(string functionId)
     {
-        var functionCollection = GameDatabase.Instance.GetCollection<Function>("functions");
-        return functionCollection.FindById(functionId);
+        EnsureInstance();
+        return Instance.GetFunction(functionId);
     }
 
     /// <summary>
@@ -91,8 +88,8 @@ public static class FunctionManager
     /// </summary>
     public static Function? FindFunction(string objectId, string functionName)
     {
-        var functionCollection = GameDatabase.Instance.GetCollection<Function>("functions");
-        return functionCollection.FindOne(f => f.ObjectId == objectId && f.Name.Equals(functionName, StringComparison.OrdinalIgnoreCase));
+        EnsureInstance();
+        return Instance.FindFunction(objectId, functionName);
     }
 
     /// <summary>
@@ -100,8 +97,8 @@ public static class FunctionManager
     /// </summary>
     public static List<Function> GetFunctionsOnObject(string objectId)
     {
-        var functionCollection = GameDatabase.Instance.GetCollection<Function>("functions");
-        return functionCollection.Find(f => f.ObjectId == objectId).ToList();
+        EnsureInstance();
+        return Instance.GetFunctionsOnObject(objectId);
     }
 
     /// <summary>
@@ -109,8 +106,8 @@ public static class FunctionManager
     /// </summary>
     public static List<Function> GetFunctionsByCreator(string createdBy)
     {
-        var functionCollection = GameDatabase.Instance.GetCollection<Function>("functions");
-        return functionCollection.Find(f => f.CreatedBy == createdBy).ToList();
+        EnsureInstance();
+        return Instance.GetFunctionsByCreator(createdBy);
     }
 
     /// <summary>
@@ -118,15 +115,8 @@ public static class FunctionManager
     /// </summary>
     public static bool IsValidParameterType(string type)
     {
-        var validTypes = new HashSet<string>
-        {
-            "string", "int", "bool", "float", "double", "decimal",
-            "object", "Player", "GameObject", "ObjectClass",
-            "List<dynamic>", "List<GameObject>", "List<Player>", "List<string>", "List<int>",
-            "IEnumerable<dynamic>", "IEnumerable<GameObject>", "IEnumerable<Player>"
-        };
-        
-        return validTypes.Contains(type);
+        EnsureInstance();
+        return Instance.IsValidParameterType(type);
     }
 
     /// <summary>
@@ -134,15 +124,8 @@ public static class FunctionManager
     /// </summary>
     public static bool IsValidReturnType(string type)
     {
-        var validTypes = new HashSet<string>
-        {
-            "void", "string", "int", "bool", "float", "double", "decimal",
-            "object", "Player", "GameObject", "ObjectClass",
-            "List<dynamic>", "List<GameObject>", "List<Player>", "List<string>", "List<int>",
-            "IEnumerable<dynamic>", "IEnumerable<GameObject>", "IEnumerable<Player>"
-        };
-        
-        return validTypes.Contains(type);
+        EnsureInstance();
+        return Instance.IsValidReturnType(type);
     }
 
     /// <summary>
@@ -150,14 +133,8 @@ public static class FunctionManager
     /// </summary>
     public static bool IsValidFunctionName(string name)
     {
-        if (string.IsNullOrWhiteSpace(name))
-            return false;
-            
-        // Function names must start with a letter and contain only letters, numbers, and underscores
-        if (!char.IsLetter(name[0]))
-            return false;
-            
-        return name.All(c => char.IsLetterOrDigit(c) || c == '_');
+        EnsureInstance();
+        return Instance.IsValidFunctionName(name);
     }
 
     /// <summary>
@@ -165,20 +142,8 @@ public static class FunctionManager
     /// </summary>
     public static Dictionary<string, int> GetFunctionStatistics()
     {
-        var functionCollection = GameDatabase.Instance.GetCollection<Function>("functions");
-        var allFunctions = functionCollection.FindAll().ToList();
-
-        var stats = new Dictionary<string, int>
-        {
-            ["TotalFunctions"] = allFunctions.Count,
-            ["FunctionsWithCode"] = allFunctions.Count(f => !string.IsNullOrEmpty(f.Code)),
-            ["SystemFunctions"] = allFunctions.Count(f => f.CreatedBy == "system"),
-            ["UserFunctions"] = allFunctions.Count(f => f.CreatedBy != "system"),
-            ["FunctionsWithParameters"] = allFunctions.Count(f => f.ParameterTypes.Length > 0),
-            ["VoidFunctions"] = allFunctions.Count(f => f.ReturnType == "void")
-        };
-
-        return stats;
+        EnsureInstance();
+        return Instance.GetFunctionStatistics();
     }
 
     /// <summary>
@@ -186,11 +151,8 @@ public static class FunctionManager
     /// </summary>
     public static bool SetFunctionCode(string functionId, string code)
     {
-        var function = GetFunction(functionId);
-        if (function == null) return false;
-
-        function.Code = code;
-        return UpdateFunction(function);
+        EnsureInstance();
+        return Instance.SetFunctionCode(functionId, code);
     }
 
     /// <summary>
@@ -198,11 +160,8 @@ public static class FunctionManager
     /// </summary>
     public static bool SetFunctionDescription(string functionId, string description)
     {
-        var function = GetFunction(functionId);
-        if (function == null) return false;
-
-        function.Description = description;
-        return UpdateFunction(function);
+        EnsureInstance();
+        return Instance.SetFunctionDescription(functionId, description);
     }
 
     /// <summary>
@@ -210,11 +169,8 @@ public static class FunctionManager
     /// </summary>
     public static bool SetFunctionPermissions(string functionId, List<Keyword> permissions)
     {
-        var function = GetFunction(functionId);
-        if (function == null) return false;
-
-        function.AccessModifiers = permissions;
-        return UpdateFunction(function);
+        EnsureInstance();
+        return Instance.SetFunctionPermissions(functionId, permissions);
     }
 }
 

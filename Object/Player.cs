@@ -11,6 +11,8 @@ public class Player : GameObject
 
     /// <summary>
     /// Password hash for authentication
+    /// Note: Setting this property does NOT automatically update the database.
+    /// Use PlayerManager.ChangePassword() or explicitly call DbProvider.Update() after setting.
     /// </summary>
     public string PasswordHash
     {
@@ -21,7 +23,9 @@ public class Player : GameObject
         set
         {
             _passwordHash = value;
-            DbProvider.Instance.Update<Player>("players", this);
+            // Removed automatic database update to prevent issues during deserialization
+            // and to avoid creating multiple database connections. Use PlayerManager.ChangePassword()
+            // or explicitly update the database after setting this property.
         }
     }
 

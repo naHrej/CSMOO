@@ -2,33 +2,49 @@ using LiteDB;
 using CSMOO.Database;
 using CSMOO.Logging;
 using CSMOO.Object;
+using CSMOO.Configuration;
+using System.Collections.Generic;
 
 namespace CSMOO.Verbs;
 
 /// <summary>
-/// Manages verb creation, modification, and deletion
+/// Static wrapper for VerbManager (backward compatibility)
+/// Delegates to VerbManagerInstance for dependency injection support
 /// </summary>
 public static class VerbManager
 {
+    private static IVerbManager? _instance;
+    
+    /// <summary>
+    /// Sets the verb manager instance for static methods to delegate to
+    /// </summary>
+    public static void SetInstance(IVerbManager instance)
+    {
+        _instance = instance;
+    }
+    
+    private static IVerbManager Instance => _instance ?? throw new InvalidOperationException("VerbManager instance not set. Call VerbManager.SetInstance() first.");
+    
+    /// <summary>
+    /// Ensures an instance exists (creates default if not set)
+    /// </summary>
+    private static void EnsureInstance()
+    {
+        if (_instance == null)
+        {
+            // Create default instances for backward compatibility
+            var dbProvider = DbProvider.Instance;
+            _instance = new VerbManagerInstance(dbProvider);
+        }
+    }
+    
     /// <summary>
     /// Creates a new verb on an object
     /// </summary>
     public static Verb CreateVerb(string objectId, string name, string pattern = "", string code = "", string createdBy = "system")
     {
-        var verb = new Verb
-        {
-            ObjectId = objectId,
-            Name = name,
-            Pattern = pattern,
-            Code = code,
-            CreatedBy = createdBy,
-            CreatedAt = DateTime.UtcNow,
-            ModifiedAt = DateTime.UtcNow
-        };
-
-        DbProvider.Instance.Insert("verbs", verb);
-        
-        return verb;
+        EnsureInstance();
+        return Instance.CreateVerb(objectId, name, pattern, code, createdBy);
     }
 
     /// <summary>
@@ -36,10 +52,8 @@ public static class VerbManager
     /// </summary>
     public static bool UpdateVerb(Verb verb)
     {
-        verb.ModifiedAt = DateTime.UtcNow;
-        var result = DbProvider.Instance.Update("verbs", verb);
-        
-        return result;
+        EnsureInstance();
+        return Instance.UpdateVerb(verb);
     }
 
     /// <summary>
@@ -47,11 +61,8 @@ public static class VerbManager
     /// </summary>
     public static bool DeleteVerb(string verbId)
     {
-        var verb = DbProvider.Instance.FindById<Verb>("verbs", verbId);
-        if (verb == null) return false;
-        var result = DbProvider.Instance.Delete<Verb>("verbs", verbId);
-
-        return result;
+        EnsureInstance();
+        return Instance.DeleteVerb(verbId);
     }
 
     /// <summary>
@@ -59,15 +70,8 @@ public static class VerbManager
     /// </summary>
     public static int DeleteVerbsOnObject(string objectId)
     {
-        var verbsToDelete = DbProvider.Instance.Find<Verb>("verbs", v => v.ObjectId == objectId).ToList();
-        int deletedCount = 0;
-        foreach (var verb in verbsToDelete)
-        {
-            if (DbProvider.Instance.Delete<Verb>("verbs", verb.Id))
-                deletedCount++;
-        }
-
-        return deletedCount;
+        EnsureInstance();
+        return Instance.DeleteVerbsOnObject(objectId);
     }
 
     /// <summary>
@@ -75,7 +79,8 @@ public static class VerbManager
     /// </summary>
     public static Verb? GetVerb(string verbId)
     {
-        return DbProvider.Instance.FindById<Verb>("verbs", verbId);
+        EnsureInstance();
+        return Instance.GetVerb(verbId);
     }
 
     /// <summary>
@@ -83,7 +88,8 @@ public static class VerbManager
     /// </summary>
     public static Verb? FindVerb(string objectId, string verbName)
     {
-        return DbProvider.Instance.FindOne<Verb>("verbs", v => v.ObjectId == objectId && v.Name == verbName);
+        EnsureInstance();
+        return Instance.FindVerb(objectId, verbName);
     }
 
     /// <summary>
@@ -91,7 +97,8 @@ public static class VerbManager
     /// </summary>
     public static List<Verb> GetVerbsOnObject(string objectId)
     {
-        return DbProvider.Instance.Find<Verb>("verbs", v => v.ObjectId == objectId).ToList();
+        EnsureInstance();
+        return Instance.GetVerbsOnObject(objectId);
     }
 
     /// <summary>
@@ -99,7 +106,8 @@ public static class VerbManager
     /// </summary>
     public static List<Verb> GetVerbsByCreator(string createdBy)
     {
-        return DbProvider.Instance.Find<Verb>("verbs", v => v.CreatedBy == createdBy).ToList();
+        EnsureInstance();
+        return Instance.GetVerbsByCreator(createdBy);
     }
 
     /// <summary>
@@ -107,26 +115,8 @@ public static class VerbManager
     /// </summary>
     public static Verb? CopyVerb(string sourceVerbId, string targetObjectId, string copiedBy = "system")
     {
-        var sourceVerb = GetVerb(sourceVerbId);
-        if (sourceVerb == null) return null;
-
-        var newVerb = new Verb
-        {
-            ObjectId = targetObjectId,
-            Name = sourceVerb.Name,
-            Aliases = sourceVerb.Aliases,
-            Pattern = sourceVerb.Pattern,
-            Code = sourceVerb.Code,
-            Permissions = sourceVerb.Permissions,
-            Description = sourceVerb.Description + $" (copied from {sourceVerb.ObjectId})",
-            CreatedBy = copiedBy,
-            CreatedAt = DateTime.UtcNow,
-            ModifiedAt = DateTime.UtcNow
-        };
-
-        DbProvider.Instance.Insert("verbs", newVerb);
-        
-        return newVerb;
+        EnsureInstance();
+        return Instance.CopyVerb(sourceVerbId, targetObjectId, copiedBy);
     }
 
     /// <summary>
@@ -134,16 +124,8 @@ public static class VerbManager
     /// </summary>
     public static bool MoveVerb(string verbId, string newObjectId)
     {
-        var verb = GetVerb(verbId);
-        if (verb == null) return false;
-
-        var oldObjectId = verb.ObjectId;
-        verb.ObjectId = newObjectId;
-        verb.ModifiedAt = DateTime.UtcNow;
-        
-        var result = UpdateVerb(verb);
-
-        return result;
+        EnsureInstance();
+        return Instance.MoveVerb(verbId, newObjectId);
     }
 
     /// <summary>
@@ -151,11 +133,8 @@ public static class VerbManager
     /// </summary>
     public static bool SetVerbAliases(string verbId, string aliases)
     {
-        var verb = GetVerb(verbId);
-        if (verb == null) return false;
-
-        verb.Aliases = aliases;
-        return UpdateVerb(verb);
+        EnsureInstance();
+        return Instance.SetVerbAliases(verbId, aliases);
     }
 
     /// <summary>
@@ -163,11 +142,8 @@ public static class VerbManager
     /// </summary>
     public static bool SetVerbPattern(string verbId, string pattern)
     {
-        var verb = GetVerb(verbId);
-        if (verb == null) return false;
-
-        verb.Pattern = pattern;
-        return UpdateVerb(verb);
+        EnsureInstance();
+        return Instance.SetVerbPattern(verbId, pattern);
     }
 
     /// <summary>
@@ -175,11 +151,8 @@ public static class VerbManager
     /// </summary>
     public static bool SetVerbPermissions(string verbId, string permissions)
     {
-        var verb = GetVerb(verbId);
-        if (verb == null) return false;
-
-        verb.Permissions = permissions;
-        return UpdateVerb(verb);
+        EnsureInstance();
+        return Instance.SetVerbPermissions(verbId, permissions);
     }
 
     /// <summary>
@@ -187,11 +160,8 @@ public static class VerbManager
     /// </summary>
     public static bool SetVerbDescription(string verbId, string description)
     {
-        var verb = GetVerb(verbId);
-        if (verb == null) return false;
-
-        verb.Description = description;
-        return UpdateVerb(verb);
+        EnsureInstance();
+        return Instance.SetVerbDescription(verbId, description);
     }
 
     /// <summary>
@@ -199,11 +169,8 @@ public static class VerbManager
     /// </summary>
     public static bool SetVerbCode(string verbId, string code)
     {
-        var verb = GetVerb(verbId);
-        if (verb == null) return false;
-
-        verb.Code = code;
-        return UpdateVerb(verb);
+        EnsureInstance();
+        return Instance.SetVerbCode(verbId, code);
     }
 
     /// <summary>
@@ -211,11 +178,8 @@ public static class VerbManager
     /// </summary>
     public static bool IsValidVerbName(string name)
     {
-        if (string.IsNullOrWhiteSpace(name)) return false;
-        if (name.Length > 50) return false;
-        
-        // Allow letters, numbers, underscore, hyphen
-        return System.Text.RegularExpressions.Regex.IsMatch(name, @"^[a-zA-Z][a-zA-Z0-9_-]*$");
+        EnsureInstance();
+        return Instance.IsValidVerbName(name);
     }
 
     /// <summary>
@@ -223,19 +187,8 @@ public static class VerbManager
     /// </summary>
     public static Dictionary<string, int> GetVerbStatistics()
     {
-        var allVerbs = DbProvider.Instance.FindAll<Verb>("verbs").ToList();
-
-        var stats = new Dictionary<string, int>
-        {
-            ["TotalVerbs"] = allVerbs.Count,
-            ["VerbsWithCode"] = allVerbs.Count(v => !string.IsNullOrEmpty(v.Code)),
-            ["VerbsWithAliases"] = allVerbs.Count(v => !string.IsNullOrEmpty(v.Aliases)),
-            ["VerbsWithPatterns"] = allVerbs.Count(v => !string.IsNullOrEmpty(v.Pattern)),
-            ["SystemVerbs"] = allVerbs.Count(v => v.CreatedBy == "system"),
-            ["UserVerbs"] = allVerbs.Count(v => v.CreatedBy != "system")
-        };
-
-        return stats;
+        EnsureInstance();
+        return Instance.GetVerbStatistics();
     }
 
     /// <summary>
@@ -243,27 +196,8 @@ public static class VerbManager
     /// </summary>
     public static List<Verb> SearchVerbs(string namePattern, bool useRegex = false)
     {
-        var allVerbs = DbProvider.Instance.FindAll<Verb>("verbs").ToList();
-
-        if (useRegex)
-        {
-            try
-            {
-                var regex = new System.Text.RegularExpressions.Regex(namePattern, System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-                return allVerbs.Where(v => !string.IsNullOrEmpty(v.Name) && regex.IsMatch(v.Name)).ToList();
-            }
-            catch
-            {
-                return new List<Verb>();
-            }
-        }
-        else
-        {
-            return allVerbs.Where(v => 
-                !string.IsNullOrEmpty(v.Name) && 
-                v.Name.Contains(namePattern, StringComparison.OrdinalIgnoreCase)
-            ).ToList();
-        }
+        EnsureInstance();
+        return Instance.SearchVerbs(namePattern, useRegex);
     }
 
     /// <summary>
@@ -271,14 +205,8 @@ public static class VerbManager
     /// </summary>
     public static bool UpdateVerbCode(string verbId, string code)
     {
-        var verb = DbProvider.Instance.FindById<Verb>("verbs", verbId);
-        if (verb == null)
-            return false;
-        verb.Code = code;
-        verb.ModifiedAt = DateTime.UtcNow;
-        var result = DbProvider.Instance.Update("verbs", verb);
-
-        return result;
+        EnsureInstance();
+        return Instance.UpdateVerbCode(verbId, code);
     }
 }
 

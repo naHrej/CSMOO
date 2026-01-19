@@ -6,7 +6,7 @@ namespace CSMOO.Configuration;
 /// <summary>
 /// Main configuration class for the CSMOO server
 /// </summary>
-public class Config
+public class Config : IConfig
 {
     public ServerConfig Server { get; set; } = new();
     public DatabaseConfig Database { get; set; } = new();
@@ -28,6 +28,14 @@ public class Config
                 return _instance ??= LoadConfig();
             }
         }
+    }
+    
+    /// <summary>
+    /// Loads configuration from config.json file
+    /// </summary>
+    public static IConfig Load()
+    {
+        return LoadConfig();
     }
     
     /// <summary>

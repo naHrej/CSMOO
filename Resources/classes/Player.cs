@@ -1,23 +1,28 @@
+// ============================================================================
+// IMPORTANT: VERBS AND SUPPORTING CODE ONLY
+// ============================================================================
+// This file is for VERBS (commands) and supporting code ONLY.
+// 
+// DO NOT PUT FUNCTIONS HERE. Functions belong in:
+//   Resources/functions/classes/Player.cs
+//
+// The system automatically combines verbs from this file with functions
+// from Resources/functions/classes/Player.cs by class name. Both files
+// represent the same logical class, but are separated by file system
+// location for organizational purposes.
+//
+// WARNING: Do NOT duplicate code between this file and the functions file.
+// If you need helper methods that are used by both verbs and functions,
+// they should go in the functions file (since functions can call them,
+// and verbs can call functions).
+// ============================================================================
+
 public class Player
 {
-    /// <summary>
-    /// Returns a formatted description of any player
-    /// </summary>
-    public string Description()
-    {
-        StringBuilder desc = new StringBuilder("");
-        try
-        {
-            desc.Append($"<section class='player' style='color:green'>");
-            desc.Append($"<h3 class='name'>{This.Name}");
-            desc.Append($"<span class='dbref' style='color:chartreuse'> ({This.ClassId})</span>");
-            desc.Append($"</h3>");
-            desc.Append($"<p class='description' style='color:#66FF66;'>");
-            desc.Append(This.longDescription ?? This.shortDescription ?? "You see nothing special.");
-            desc.Append($"</p>");
-        }
-        catch (Exception ex)
-        { }
-        return desc.ToString();
-    }
+    // Add verbs (commands) here using the format:
+    // public verb VerbName(string parameter) { ... }
+    
+    // Example:
+    // public verb Say(string message) { ... }
+    // public verb Emote(string action) { ... }
 }

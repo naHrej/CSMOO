@@ -3,6 +3,13 @@ using System.Net.Sockets;
 using CSMOO.Sessions;
 using CSMOO.Commands;
 using CSMOO.Logging;
+using Microsoft.Extensions.DependencyInjection;
+using CSMOO.Object;
+using CSMOO.Verbs;
+using CSMOO.Functions;
+using CSMOO.Database;
+using CSMOO.Scripting;
+using CSMOO.Init;
 
 namespace CSMOO.Network;
 
@@ -10,11 +17,20 @@ internal class TelnetServer
 {
     private TcpListener _listener;
     private bool _isRunning;
+    private readonly IServiceProvider? _serviceProvider;
     
     public TelnetServer(int port)
     {
         _listener = new TcpListener(System.Net.IPAddress.Any, port);
         _isRunning = false;
+        _serviceProvider = null;
+    }
+
+    public TelnetServer(int port, IServiceProvider serviceProvider)
+    {
+        _listener = new TcpListener(System.Net.IPAddress.Any, port);
+        _isRunning = false;
+        _serviceProvider = serviceProvider;
     }
     
     public void Start()
@@ -38,7 +54,34 @@ internal class TelnetServer
         var clientGuid = Guid.NewGuid();
         SessionHandler.AddSession(clientGuid, client);
         
-        var commandProcessor = new CommandProcessor(clientGuid, client);
+        CommandProcessor commandProcessor;
+        if (_serviceProvider != null)
+        {
+            // Use DI to create CommandProcessor
+            var connection = new TelnetConnection(clientGuid, client);
+            var playerManager = _serviceProvider.GetRequiredService<IPlayerManager>();
+            var verbResolver = _serviceProvider.GetRequiredService<IVerbResolver>();
+            var permissionManager = _serviceProvider.GetRequiredService<IPermissionManager>();
+            var objectManager = _serviceProvider.GetRequiredService<IObjectManager>();
+            var functionResolver = _serviceProvider.GetRequiredService<IFunctionResolver>();
+            var dbProvider = _serviceProvider.GetRequiredService<IDbProvider>();
+            var gameDatabase = _serviceProvider.GetRequiredService<IGameDatabase>();
+            var logger = _serviceProvider.GetRequiredService<ILogger>();
+            var roomManager = _serviceProvider.GetRequiredService<IRoomManager>();
+            var scriptEngineFactory = _serviceProvider.GetRequiredService<IScriptEngineFactory>();
+            var verbManager = _serviceProvider.GetRequiredService<IVerbManager>();
+            var functionManager = _serviceProvider.GetRequiredService<IFunctionManager>();
+            var hotReloadManager = _serviceProvider.GetService<IHotReloadManager>();
+            var coreHotReloadManager = _serviceProvider.GetService<ICoreHotReloadManager>();
+            var functionInitializer = _serviceProvider.GetService<IFunctionInitializer>();
+            var propertyInitializer = _serviceProvider.GetService<IPropertyInitializer>();
+            commandProcessor = new CommandProcessor(clientGuid, connection, playerManager, verbResolver, permissionManager, objectManager, functionResolver, dbProvider, gameDatabase, logger, roomManager, scriptEngineFactory, verbManager, functionManager, hotReloadManager, coreHotReloadManager, functionInitializer, propertyInitializer);
+        }
+        else
+        {
+            // Backward compatibility - use static constructor
+            commandProcessor = new CommandProcessor(clientGuid, client);
+        }
         
         // Send dynamic login banner
         commandProcessor.DisplayLoginBanner();

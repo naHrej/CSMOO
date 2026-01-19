@@ -5,6 +5,7 @@ using CSMOO.Functions;
 using LiteDB;
 using CSMOO.Object;
 using CSMOO.Scripting;
+using CSMOO.Configuration;
 
 namespace CSMOO.Core;
 
@@ -13,6 +14,155 @@ namespace CSMOO.Core;
 /// </summary>
 public static class Builtins
 {
+    private static IBuiltinsInstance? _instance;
+    
+    /// <summary>
+    /// Sets the builtins instance for dependency injection
+    /// </summary>
+    public static void SetInstance(IBuiltinsInstance instance)
+    {
+        _instance = instance;
+    }
+    
+    /// <summary>
+    /// Ensures an instance exists (creates default if not set)
+    /// </summary>
+    private static void EnsureInstance()
+    {
+        if (_instance == null)
+        {
+            // Create default instances for backward compatibility
+            var dbProvider = DbProvider.Instance;
+            var config = Config.Instance;
+            var logger = new LoggerInstance(config);
+            var classManager = new ClassManagerInstance(dbProvider, logger);
+            var objectManager = new ObjectManagerInstance(dbProvider, classManager);
+            
+            // Create PropertyManager and InstanceManager and set them on ObjectManagerInstance
+            var propertyManager = new PropertyManagerInstance(dbProvider, classManager, objectManager);
+            if (objectManager is ObjectManagerInstance omi)
+            {
+                omi.SetPropertyManager(propertyManager);
+            }
+            
+            var instanceManager = new InstanceManagerInstance(dbProvider, classManager, objectManager, propertyManager);
+            if (objectManager is ObjectManagerInstance omi2)
+            {
+                omi2.SetInstanceManager(instanceManager);
+            }
+            
+            var playerManager = new PlayerManagerInstance(dbProvider);
+            var permissionManager = new PermissionManagerInstance(dbProvider, logger);
+            var functionResolver = new FunctionResolverInstance(dbProvider, objectManager);
+            var verbResolver = new VerbResolverInstance(dbProvider, objectManager, logger);
+            var verbManager = new VerbManagerInstance(dbProvider);
+            var roomManager = new RoomManagerInstance(dbProvider, logger, objectManager);
+            var objectResolver = CreateDefaultObjectResolver();
+            var scriptEngineFactory = new ScriptEngineFactory(objectManager, logger, config, objectResolver, verbResolver, functionResolver, dbProvider, playerManager, verbManager, roomManager);
+            _instance = new BuiltinsInstance(
+                objectManager,
+                playerManager,
+                permissionManager,
+                functionResolver,
+                verbManager,
+                roomManager,
+                logger,
+                scriptEngineFactory);
+        }
+    }
+    
+    private static IObjectResolver CreateDefaultObjectResolver()
+    {
+        var dbProvider = DbProvider.Instance;
+        var config = Config.Instance;
+        var logger = new LoggerInstance(config);
+        var classManager = new ClassManagerInstance(dbProvider, logger);
+        var objectManager = new ObjectManagerInstance(dbProvider, classManager);
+        var coreClassFactory = new CoreClassFactoryInstance(dbProvider, logger);
+        return new ObjectResolverInstance(objectManager, coreClassFactory);
+    }
+    
+    // Helper properties to get managers (from instance if available, otherwise create default instances)
+    private static IObjectManager ObjectManagerInstance
+    {
+        get
+        {
+            if (_instance != null) return _instance.ObjectManager;
+            EnsureInstance();
+            return _instance!.ObjectManager;
+        }
+    }
+    
+    private static IPlayerManager PlayerManagerInstance
+    {
+        get
+        {
+            if (_instance != null) return _instance.PlayerManager;
+            EnsureInstance();
+            return _instance!.PlayerManager;
+        }
+    }
+    
+    private static IPermissionManager PermissionManagerInstance
+    {
+        get
+        {
+            if (_instance != null) return _instance.PermissionManager;
+            EnsureInstance();
+            return _instance!.PermissionManager;
+        }
+    }
+    
+    private static IFunctionResolver FunctionResolverInstance
+    {
+        get
+        {
+            if (_instance != null) return _instance.FunctionResolver;
+            EnsureInstance();
+            return _instance!.FunctionResolver;
+        }
+    }
+    
+    private static IVerbManager VerbManagerInstance
+    {
+        get
+        {
+            if (_instance != null) return _instance.VerbManager;
+            EnsureInstance();
+            return _instance!.VerbManager;
+        }
+    }
+    
+    private static IRoomManager RoomManagerInstance
+    {
+        get
+        {
+            if (_instance != null) return _instance.RoomManager;
+            EnsureInstance();
+            return _instance!.RoomManager;
+        }
+    }
+    
+    private static ILogger LoggerInstance
+    {
+        get
+        {
+            if (_instance != null) return _instance.Logger;
+            EnsureInstance();
+            return _instance!.Logger;
+        }
+    }
+    
+    private static IScriptEngineFactory ScriptEngineFactoryInstance
+    {
+        get
+        {
+            if (_instance != null) return _instance.ScriptEngineFactory;
+            EnsureInstance();
+            return _instance!.ScriptEngineFactory;
+        }
+    }
+    
     /// <summary>
     /// Current script context - set by the script engine before execution (legacy, now UnifiedScriptGlobals)
     /// </summary>
@@ -33,7 +183,7 @@ public static class Builtins
     public static dynamic? FindObject(string objectId)
     {
         if (string.IsNullOrEmpty(objectId)) return null;
-        return ObjectManager.GetObject(objectId);
+        return ObjectManagerInstance.GetObject(objectId);
     }
     
     
@@ -42,12 +192,12 @@ public static class Builtins
     /// </summary>
     public static BsonValue? GetProperty(GameObject obj, string propertyName)
     {
-        return ObjectManager.GetProperty(obj, propertyName);
+        return ObjectManagerInstance.GetProperty(obj, propertyName);
     }
 
     public static string[] GetAllPropertyNames(GameObject obj)
     {
-        return ObjectManager.GetPropertyNames(obj);
+        return ObjectManagerInstance.GetPropertyNames(obj);
     }
 
   
@@ -57,18 +207,138 @@ public static class Builtins
     /// </summary>
     public static string GetProperty(GameObject obj, string propertyName, string defaultValue = "")
     {
-        var property = ObjectManager.GetProperty(obj, propertyName) as BsonValue;
+        var property = ObjectManagerInstance.GetProperty(obj, propertyName) as BsonValue;
         return property?.AsString ?? defaultValue;
     }
     
+    /// <summary>
+    /// Get the string value of an object property with default (dynamic overload for script compatibility)
+    /// </summary>
+    public static string GetProperty(dynamic obj, string propertyName, string defaultValue = "")
+    {
+        // Handle null
+        if (obj == null)
+            return defaultValue;
+        
+        // Convert dynamic to GameObject if possible (most common case)
+        // Use pattern matching to handle both GameObject and its subtypes
+        if (obj is GameObject gameObject)
+        {
+            return GetProperty(gameObject, propertyName, defaultValue);
+        }
+        
+        // If it's a BsonValue, return default (shouldn't happen, but handle gracefully)
+        if (obj is LiteDB.BsonValue)
+        {
+            return defaultValue;
+        }
+        
+        // Try to get the object ID if it's a GameObject-like object
+        string? objectId = null;
+        try
+        {
+            // Try accessing Id property directly
+            var idValue = obj.Id;
+            if (idValue != null)
+            {
+                objectId = idValue.ToString();
+            }
+        }
+        catch
+        {
+            // If Id property doesn't exist or throws, try to get it as a string
+            try
+            {
+                var str = obj.ToString();
+                // Only use as objectId if it looks like a GUID
+                if (!string.IsNullOrEmpty(str) && Guid.TryParse(str, out Guid guid))
+                {
+                    objectId = str;
+                }
+            }
+            catch
+            {
+                // If all else fails, return default
+                return defaultValue;
+            }
+        }
+        
+        if (!string.IsNullOrEmpty(objectId))
+        {
+            var gameObj = ObjectManagerInstance.GetObject(objectId);
+            if (gameObj != null)
+            {
+                return GetProperty(gameObj, propertyName, defaultValue);
+            }
+        }
+        
+        return defaultValue;
+    }
     
     /// <summary>
     /// Get the boolean value of an object property (GameObject overload)
     /// </summary>
     public static bool GetBoolProperty(GameObject obj, string propertyName, bool defaultValue = false)
     {
-        var property = ObjectManager.GetProperty(obj, propertyName) as BsonValue;
+        var property = ObjectManagerInstance.GetProperty(obj, propertyName) as BsonValue;
         return property?.AsBoolean ?? defaultValue;
+    }
+    
+    /// <summary>
+    /// Get the boolean value of an object property (dynamic overload for script compatibility)
+    /// </summary>
+    public static bool GetBoolProperty(dynamic obj, string propertyName, bool defaultValue = false)
+    {
+        // Handle null
+        if (obj == null)
+            return defaultValue;
+        
+        // Convert dynamic to GameObject if possible (most common case)
+        if (obj is GameObject gameObject)
+        {
+            return GetBoolProperty(gameObject, propertyName, defaultValue);
+        }
+        
+        // Try to get the object ID if it's a GameObject-like object
+        string? objectId = null;
+        try
+        {
+            // Try accessing Id property directly
+            var idValue = obj.Id;
+            if (idValue != null)
+            {
+                objectId = idValue.ToString();
+            }
+        }
+        catch
+        {
+            // If Id property doesn't exist or throws, try to get it as a string
+            try
+            {
+                var str = obj.ToString();
+                // Only use as objectId if it looks like a GUID
+                if (!string.IsNullOrEmpty(str) && Guid.TryParse(str, out Guid guid))
+                {
+                    objectId = str;
+                }
+            }
+            catch
+            {
+                // If all else fails, return default
+                return defaultValue;
+            }
+        }
+        
+        if (!string.IsNullOrEmpty(objectId))
+        {
+            var gameObj = ObjectManagerInstance.GetObject(objectId);
+            if (gameObj != null)
+            {
+                return GetBoolProperty(gameObj, propertyName, defaultValue);
+            }
+        }
+        
+        return defaultValue;
     }
     
 
@@ -80,7 +350,7 @@ public static class Builtins
     {
         if (obj != null)
         {
-            ObjectManager.SetProperty(obj, propertyName, value);
+            ObjectManagerInstance.SetProperty(obj, propertyName, value);
         }
     }
     
@@ -93,7 +363,7 @@ public static class Builtins
     {
         if (obj != null)
         {
-            ObjectManager.SetProperty(obj, propertyName, value);
+            ObjectManagerInstance.SetProperty(obj, propertyName, value);
         }       
     }
     
@@ -102,7 +372,7 @@ public static class Builtins
     /// </summary>
     public static List<dynamic> GetObjectsInLocation(string locationId)
     {
-        var gameObjects = ObjectManager.GetObjectsInLocation(locationId);
+        var gameObjects = ObjectManagerInstance.GetObjectsInLocation(locationId);
         return gameObjects.Cast<dynamic>().ToList();
     }
     
@@ -115,7 +385,7 @@ public static class Builtins
     {
         if (obj != null)
         {
-            ObjectManager.SetProperty(obj, "location", newLocationId);
+            ObjectManagerInstance.SetProperty(obj, "location", newLocationId);
             return true;
         }
         return false;
@@ -160,7 +430,7 @@ public static class Builtins
     /// </summary>
     public static dynamic? FindPlayer(string playerName)
     {
-            return ObjectManager.GetAllObjects()
+            return ObjectManagerInstance.GetAllObjects()
             .OfType<Player>()
             .FirstOrDefault(p => p.Name.Contains(playerName, StringComparison.OrdinalIgnoreCase));
        
@@ -172,7 +442,7 @@ public static class Builtins
     /// </summary>
     public static dynamic? FindPlayerById(string playerId)
     {
-        return ObjectManager.GetObject<Player>(playerId);
+        return ObjectManagerInstance.GetObject<Player>(playerId);
     }
     
     /// <summary>
@@ -180,7 +450,7 @@ public static class Builtins
     /// </summary>
     public static List<dynamic> GetOnlinePlayers()
     {
-        return PlayerManager.GetOnlinePlayers().AsEnumerable().Cast<dynamic>().ToList();
+        return PlayerManagerInstance.GetOnlinePlayers().AsEnumerable().Cast<dynamic>().ToList();
     }
     
     /// <summary>
@@ -188,7 +458,7 @@ public static class Builtins
     /// </summary>
     public static List<dynamic> GetAllPlayers()
     {
-        return ObjectManager.GetAllObjects()
+        return ObjectManagerInstance.GetAllObjects()
             .OfType<Player>()
             .Cast<dynamic>()
             .ToList();
@@ -199,7 +469,7 @@ public static class Builtins
     /// </summary>
     public static List<dynamic> GetAllObjects()
     {
-        return ObjectManager.GetAllObjects()
+        return ObjectManagerInstance.GetAllObjects()
             .OfType<GameObject>()
             .Cast<dynamic>()
             .ToList();
@@ -210,18 +480,18 @@ public static class Builtins
     /// </summary>
     public static List<dynamic> GetAllObjectClasses()
     {
-        return ObjectManager.GetAllObjectClasses().Cast<dynamic>().ToList();
+        return ObjectManagerInstance.GetAllObjectClasses().Cast<dynamic>().ToList();
     }
 
     public static List<dynamic> GetObjectsByClass(string className)
     {
         if (string.IsNullOrEmpty(className)) return new List<dynamic>();
         
-        var objectClass = ObjectManager.GetClassByName(className);
+        var objectClass = ObjectManagerInstance.GetClassByName(className);
         
         if (objectClass == null) return new List<dynamic>();
         
-        return ObjectManager.GetAllObjects()
+        return ObjectManagerInstance.GetAllObjects()
             .Where(obj => obj.ClassId == objectClass.Id)
             .Cast<dynamic>()
             .ToList();
@@ -233,7 +503,7 @@ public static class Builtins
     public static ObjectClass? GetClassByName(string className)
     {
         if (string.IsNullOrEmpty(className)) return null;
-        return ObjectManager.GetClassByName(className);
+        return ObjectManagerInstance.GetClassByName(className);
     }
     
     /// <summary>
@@ -242,7 +512,7 @@ public static class Builtins
     public static ObjectClass? GetClass(string classId)
     {
         if (string.IsNullOrEmpty(classId)) return null;
-        return ObjectManager.GetClass(classId);
+        return ObjectManagerInstance.GetClass(classId);
     }
 
     public static List<Verb> GetVerbsOnClass(string classId)
@@ -254,7 +524,7 @@ public static class Builtins
     public static List<Function> GetFunctionsOnClass(string classId)
     {
         if (string.IsNullOrEmpty(classId)) return new List<Function>();
-        return FunctionResolver.GetFunctionsForObject(classId, true);
+        return FunctionResolverInstance.GetFunctionsForObject(classId, true);
     }
     
     /// <summary>
@@ -264,7 +534,7 @@ public static class Builtins
     {
         if (Enum.TryParse<PermissionManager.Flag>(flagName, true, out var flag))
         {
-            return PermissionManager.HasFlag(player, flag);
+            return PermissionManagerInstance.HasFlag(player, flag);
         }
         return false;
     }
@@ -274,7 +544,7 @@ public static class Builtins
     /// </summary>
     public static bool IsAdmin(Player player)
     {
-        return PermissionManager.HasFlag(player, PermissionManager.Flag.Admin);
+        return PermissionManagerInstance.HasFlag(player, PermissionManager.Flag.Admin);
     }
     
     /// <summary>
@@ -282,7 +552,7 @@ public static class Builtins
     /// </summary>
     public static bool IsModerator(Player player)
     {
-        return PermissionManager.HasFlag(player, PermissionManager.Flag.Moderator);
+        return PermissionManagerInstance.HasFlag(player, PermissionManager.Flag.Moderator);
     }
     
     /// <summary>
@@ -290,7 +560,7 @@ public static class Builtins
     /// </summary>
     public static bool IsProgrammer(Player player)
     {
-        return PermissionManager.HasFlag(player, PermissionManager.Flag.Programmer);
+        return PermissionManagerInstance.HasFlag(player, PermissionManager.Flag.Programmer);
     }
     
 
@@ -300,7 +570,7 @@ public static class Builtins
     /// </summary>
     public static string GetPlayerFlagsString(Player player)
     {
-        return PermissionManager.GetFlagsString(player);
+        return PermissionManagerInstance.GetFlagsString(player);
     }
     
     /// <summary>
@@ -313,21 +583,21 @@ public static class Builtins
         // Handle GameObject wrapper
         if (player is GameObject gameObject)
         {
-            var dbPlayer = ObjectManager.GetObject<Player>( gameObject.Id);
-            return dbPlayer != null && PermissionManager.HasFlag(dbPlayer, PermissionManager.Flag.Admin);
+            var dbPlayer = ObjectManagerInstance.GetObject<Player>( gameObject.Id);
+            return dbPlayer != null && PermissionManagerInstance.HasFlag(dbPlayer, PermissionManager.Flag.Admin);
         }
         
         // Handle direct Database.Player
         if (player is Player dbPlayerDirect)
         {
-            return PermissionManager.HasFlag(dbPlayerDirect, PermissionManager.Flag.Admin);
+            return PermissionManagerInstance.HasFlag(dbPlayerDirect, PermissionManager.Flag.Admin);
         }
         
         // Handle dynamic object with Id property
         if (player.Id != null)
         {
-            var dbPlayer = ObjectManager.GetObject<Player>( (string)player.Id);
-            return dbPlayer != null && PermissionManager.HasFlag(dbPlayer, PermissionManager.Flag.Admin);
+            var dbPlayer = ObjectManagerInstance.GetObject<Player>( (string)player.Id);
+            return dbPlayer != null && PermissionManagerInstance.HasFlag(dbPlayer, PermissionManager.Flag.Admin);
         }
         
         return false;
@@ -343,21 +613,21 @@ public static class Builtins
         // Handle GameObject wrapper
         if (player is GameObject gameObject)
         {
-            var dbPlayer = ObjectManager.GetObject<Player>(gameObject.Id);
-            return dbPlayer != null && PermissionManager.HasFlag(dbPlayer, PermissionManager.Flag.Moderator);
+            var dbPlayer = ObjectManagerInstance.GetObject<Player>(gameObject.Id);
+            return dbPlayer != null && PermissionManagerInstance.HasFlag(dbPlayer, PermissionManager.Flag.Moderator);
         }
         
         // Handle direct Database.Player
         if (player is Player dbPlayerDirect)
         {
-            return PermissionManager.HasFlag(dbPlayerDirect, PermissionManager.Flag.Moderator);
+            return PermissionManagerInstance.HasFlag(dbPlayerDirect, PermissionManager.Flag.Moderator);
         }
         
         // Handle dynamic object with Id property
         if (player.Id != null)
         {
-            var dbPlayer = ObjectManager.GetObject<Player>( (string)player.Id);
-            return dbPlayer != null && PermissionManager.HasFlag(dbPlayer, PermissionManager.Flag.Moderator);
+            var dbPlayer = ObjectManagerInstance.GetObject<Player>( (string)player.Id);
+            return dbPlayer != null && PermissionManagerInstance.HasFlag(dbPlayer, PermissionManager.Flag.Moderator);
         }
         
         return false;
@@ -373,21 +643,21 @@ public static class Builtins
         // Handle GameObject wrapper
         if (player is GameObject gameObject)
         {
-            var dbPlayer = ObjectManager.GetObject<Player>( gameObject.Id);
-            return dbPlayer != null && PermissionManager.HasFlag(dbPlayer, PermissionManager.Flag.Programmer);
+            var dbPlayer = ObjectManagerInstance.GetObject<Player>( gameObject.Id);
+            return dbPlayer != null && PermissionManagerInstance.HasFlag(dbPlayer, PermissionManager.Flag.Programmer);
         }
         
         // Handle direct Database.Player
         if (player is Player dbPlayerDirect)
         {
-            return PermissionManager.HasFlag(dbPlayerDirect, PermissionManager.Flag.Programmer);
+            return PermissionManagerInstance.HasFlag(dbPlayerDirect, PermissionManager.Flag.Programmer);
         }
         
         // Handle dynamic object with Id property
         if (player.Id != null)
         {
-            var dbPlayer = ObjectManager.GetObject<Player>( (string)player.Id);
-            return dbPlayer != null && PermissionManager.HasFlag(dbPlayer, PermissionManager.Flag.Programmer);
+            var dbPlayer = ObjectManagerInstance.GetObject<Player>( (string)player.Id);
+            return dbPlayer != null && PermissionManagerInstance.HasFlag(dbPlayer, PermissionManager.Flag.Programmer);
         }
         
         return false;
@@ -403,21 +673,21 @@ public static class Builtins
         // Handle GameObject wrapper
         if (player is GameObject gameObject)
         {
-            var dbPlayer = ObjectManager.GetObject<Player>(gameObject.Id);
-            return dbPlayer != null ? PermissionManager.GetPlayerFlags(dbPlayer).Select(f => f.ToString()).ToList() : new List<string>();
+            var dbPlayer = ObjectManagerInstance.GetObject<Player>(gameObject.Id);
+            return dbPlayer != null ? PermissionManagerInstance.GetPlayerFlags(dbPlayer).Select(f => f.ToString()).ToList() : new List<string>();
         }
         
         // Handle direct Database.Player
         if (player is Player dbPlayerDirect)
         {
-            return PermissionManager.GetPlayerFlags(dbPlayerDirect).Select(f => f.ToString()).ToList();
+            return PermissionManagerInstance.GetPlayerFlags(dbPlayerDirect).Select(f => f.ToString()).ToList();
         }
         
         // Handle dynamic object with Id property
         if (player.Id != null)
         {
-            var dbPlayer = ObjectManager.GetObject<Player>((string)player.Id);
-            return dbPlayer != null ? PermissionManager.GetPlayerFlags(dbPlayer).Select(f => f.ToString()).ToList() : new List<string>();
+            var dbPlayer = ObjectManagerInstance.GetObject<Player>((string)player.Id);
+            return dbPlayer != null ? PermissionManagerInstance.GetPlayerFlags(dbPlayer).Select(f => f.ToString()).ToList() : new List<string>();
         }
         
         return new List<string>();
@@ -443,7 +713,7 @@ public static class Builtins
                 return currentPlayer.Location?.Id;
             case "system":
                 // Find the system object
-                var allObjects = ObjectManager.GetAllObjects();
+                var allObjects = ObjectManagerInstance.GetAllObjects();
                 var systemObj = allObjects.FirstOrDefault(obj =>
                     (obj.Properties.ContainsKey("name") && obj.Properties["name"].AsString == "system") ||
                     (obj.Properties.ContainsKey("isSystemObject") && obj.Properties["isSystemObject"].AsBoolean == true));
@@ -453,7 +723,7 @@ public static class Builtins
         // Check if it's a DBREF (starts with # followed by digits)
         if (objectName.StartsWith("#") && int.TryParse(objectName.Substring(1), out int dbref))
         {
-            var obj = ObjectManager.FindByDbRef(dbref);
+            var obj = ObjectManagerInstance.GetObjectByDbRef(dbref);
             return obj?.Id;
         }
 
@@ -461,19 +731,19 @@ public static class Builtins
         if (objectName.StartsWith("class:", StringComparison.OrdinalIgnoreCase))
         {
             var className = objectName.Substring(6); // Remove "class:" prefix
-            var objectClass = ObjectManager.GetClassByName(className);
+            var objectClass = ObjectManagerInstance.GetClassByName(className);
             return objectClass?.Id;
         }
         
         if (objectName.EndsWith(".class", StringComparison.OrdinalIgnoreCase))
         {
             var className = objectName.Substring(0, objectName.Length - 6); // Remove ".class" suffix
-            var objectClass = ObjectManager.GetClassByName(className);
+            var objectClass = ObjectManagerInstance.GetClassByName(className);
             return objectClass?.Id;
         }
 
         // Check if it's a direct class ID (like "Room", "Exit", etc.)
-        var classById = ObjectManager.GetClass(objectName);
+        var classById = ObjectManagerInstance.GetClass(objectName);
         if (classById != null)
         {
             return classById.Id;
@@ -522,7 +792,7 @@ public static class Builtins
         }
         
         // If not found as an object, try as a class name
-        var directClass = ObjectManager.GetClassByName(objectName);
+        var directClass = ObjectManagerInstance.GetClassByName(objectName);
 
         if (directClass != null)
         {
@@ -530,7 +800,7 @@ public static class Builtins
         }
 
         // Finally, search globally for any object with a matching name
-        var globalObjects = ObjectManager.GetAllObjects();
+        var globalObjects = ObjectManagerInstance.GetAllObjects();
         var globalObject = globalObjects.FirstOrDefault(obj =>
         {
             var objName = GetObjectName(obj);
@@ -580,7 +850,7 @@ public static class Builtins
     public static dynamic? FindObjectById(string objectId)
     {
         if (string.IsNullOrEmpty(objectId)) return null;
-        return ObjectManager.GetObject(objectId);
+        return ObjectManagerInstance.GetObject(objectId);
     }
     
     #endregion
@@ -592,7 +862,7 @@ public static class Builtins
     /// </summary>
     public static List<(Verb verb, string source)> GetVerbsOnObject(string objectId)
     {
-        return VerbResolver.GetAllVerbsOnObject(objectId);
+        return CreateDefaultVerbResolver().GetAllVerbsOnObject(objectId);
     }
 
     /// <summary>
@@ -609,7 +879,7 @@ public static class Builtins
     public static List<(Function function, string source)> GetFunctionsOnObject(string objectId)
     {
         
-        return FunctionResolver.GetAllFunctionsOnObject(objectId);
+        return FunctionResolverInstance.GetAllFunctionsOnObject(objectId);
     }
 
     /// <summary>
@@ -625,7 +895,7 @@ public static class Builtins
     /// </summary>
     public static Function? FindFunction(string objectId, string functionName)
     {
-        return FunctionResolver.FindFunction(objectId, functionName);
+        return FunctionResolverInstance.FindFunction(objectId, functionName);
     }
     
     /// <summary>
@@ -634,6 +904,15 @@ public static class Builtins
     public static Function? FindFunction(GameObject obj, string functionName)
     {
         return FindFunction(obj.Id, functionName);
+    }
+    
+    private static IVerbResolver CreateDefaultVerbResolver()
+    {
+        var dbProvider = DbProvider.Instance;
+        var logger = new LoggerInstance(Config.Instance);
+        var classManager = new ClassManagerInstance(dbProvider, logger);
+        var objectManager = new ObjectManagerInstance(dbProvider, classManager);
+        return new VerbResolverInstance(dbProvider, objectManager, logger);
     }
     
     #endregion
@@ -661,7 +940,7 @@ public static class Builtins
     /// </summary>    
     public static bool IsPlayerObject(GameObject obj)
     {
-                // Check if this objectId is actually a player ID
+        // Check if this objectId is actually a player ID
         var player = FindPlayerById(obj.Id);
         return player != null;
     }
@@ -752,7 +1031,7 @@ public static class Builtins
     {
         if (obj != null && !string.IsNullOrEmpty(obj.ClassId))
         {
-            return ObjectManager.GetClass(obj.ClassId);
+            return ObjectManagerInstance.GetClass(obj.ClassId);
         }
         return null;
     }
@@ -771,7 +1050,7 @@ public static class Builtins
                 return unifiedPlayer;
             var id = unifiedPlayer?.Id;
             if (!string.IsNullOrEmpty(id))
-                return ObjectManager.GetObject<Player>(id);
+                return ObjectManagerInstance.GetObject<Player>(id);
             return null;
         }
         return (Player?)CurrentContext?.Player;
@@ -784,7 +1063,7 @@ public static class Builtins
     {
         if (roomId == null) return new List<dynamic>();
         
-        return PlayerManager.GetOnlinePlayers()
+        return PlayerManagerInstance.GetOnlinePlayers()
             .Where(p => p.Location?.Id == roomId)
             .ToList<dynamic>();
     }
@@ -795,10 +1074,50 @@ public static class Builtins
     public static List<dynamic> GetPlayersInRoom(GameObject room)
     {
         if (room is null) return new List<dynamic>();
-        return PlayerManager.GetOnlinePlayers()
+        return PlayerManagerInstance.GetOnlinePlayers()
             .Where(p => p.Location?.Id == room.Id)
             .Cast<dynamic>()
             .ToList();
+    }
+    
+    /// <summary>
+    /// Get players in a room (dynamic overload for script compatibility)
+    /// </summary>
+    public static List<dynamic> GetPlayersInRoom(dynamic room)
+    {
+        // Handle null or BsonValue directly
+        if (room == null || room is LiteDB.BsonValue)
+            return new List<dynamic>();
+        
+        // Convert dynamic to GameObject if possible
+        if (room is GameObject gameObject)
+        {
+            return GetPlayersInRoom(gameObject);
+        }
+        
+        // Try to extract ID and get the object
+        try
+        {
+            var idProperty = room?.Id;
+            if (idProperty != null)
+            {
+                var id = idProperty.ToString();
+                if (!string.IsNullOrEmpty(id))
+                {
+                    var obj = ObjectManagerInstance.GetObject(id);
+                    if (obj != null)
+                    {
+                        return GetPlayersInRoom(obj);
+                    }
+                }
+            }
+        }
+        catch
+        {
+            // If extraction fails, return empty list
+        }
+        
+        return new List<dynamic>();
     }
     #endregion
 
@@ -812,7 +1131,7 @@ public static class Builtins
         var currentPlayer = GetCurrentPlayer();
         if (currentPlayer?.Location == null) return "You are nowhere.";
 
-        var room = ObjectManager.GetObject(currentPlayer.Location.Id);
+        var room = ObjectManagerInstance.GetObject(currentPlayer.Location.Id);
         if (room == null) return "You are in a void.";
 
         var name = GetProperty(room, "name")?.AsString ?? "Unknown Room";
@@ -834,7 +1153,7 @@ public static class Builtins
         // Show exits
         if (currentPlayer.Location != null)
         {
-            var exits = WorldManager.GetExits(currentPlayer.Location);
+            var exits = RoomManagerInstance.GetExits(currentPlayer.Location);
             if (exits.Any())
             {
                 var exitNames = ((IEnumerable<GameObject>)exits).Select(e => GetProperty(e, "direction")?.AsString).Where(d => d != null);
@@ -842,8 +1161,8 @@ public static class Builtins
             }
 
             // Show objects
-            var exitClassId = ObjectManager.GetClassByName("Exit")?.Id;
-            var playerClassId = ObjectManager.GetClassByName("Player")?.Id;
+            var exitClassId = ObjectManagerInstance.GetClassByName("Exit")?.Id;
+            var playerClassId = ObjectManagerInstance.GetClassByName("Player")?.Id;
             var objects = ((IEnumerable<dynamic>)GetObjectsInLocation(currentPlayer.Location.Id))
                 .Where(obj => {
                     var gameObject = obj.GameObject as GameObject;
@@ -940,11 +1259,11 @@ public static class Builtins
         if (currentPlayer == null) return null;
 
         itemName = itemName.ToLower();
-        var playerGameObject = ObjectManager.GetObject(currentPlayer.Id);
+        var playerGameObject = ObjectManagerInstance.GetObject(currentPlayer.Id);
         if (playerGameObject?.Contents == null) return null;
 
         var foundObject = ((IEnumerable<string>)playerGameObject.Contents)
-            .Select(id => ObjectManager.GetObject(id))
+            .Select(id => ObjectManagerInstance.GetObject(id))
             .FirstOrDefault(obj =>
             {
                 if (obj == null) return false;
@@ -962,12 +1281,12 @@ public static class Builtins
     {
         try
         {
-            ObjectManager.MoveObject(gameObj, destination);
+            ObjectManagerInstance.MoveObject(gameObj, destination);
             return true;
         }
         catch (Exception ex)
         {
-            Logger.Error($"Failed to move object {gameObj.Id} to {destination.Id}: {ex.Message}");
+            LoggerInstance.Error($"Failed to move object {gameObj.Id} to {destination.Id}: {ex.Message}");
             return false;
         }
     }
@@ -984,7 +1303,7 @@ public static class Builtins
         foreach (var player in playersInRoom)
         {
             if (excludeSelf && player.Id == currentPlayer.Id) continue;
-            var targetPlayer = ObjectManager.GetObject<Player>(player.Id);
+            var targetPlayer = ObjectManagerInstance.GetObject<Player>(player.Id);
             if (targetPlayer != null)
             {
                 Notify(targetPlayer, message);
@@ -997,12 +1316,92 @@ public static class Builtins
     /// </summary>
     public static List<dynamic> GetExits(GameObject room)
     {
-        return WorldManager.GetExits(room);
+        return RoomManagerInstance.GetExits(room);
+    }
+    
+    /// <summary>
+    /// Get all exits from a room (dynamic overload for script compatibility)
+    /// </summary>
+    public static List<dynamic> GetExits(dynamic room)
+    {
+        // Handle null or BsonValue directly
+        if (room == null || room is LiteDB.BsonValue)
+            return new List<dynamic>();
+        
+        // Convert dynamic to GameObject if possible
+        if (room is GameObject gameObject)
+        {
+            return GetExits(gameObject);
+        }
+        
+        // Try to extract ID and get the object
+        try
+        {
+            var idProperty = room?.Id;
+            if (idProperty != null)
+            {
+                var id = idProperty.ToString();
+                if (!string.IsNullOrEmpty(id))
+                {
+                    var obj = ObjectManagerInstance.GetObject(id);
+                    if (obj != null)
+                    {
+                        return GetExits(obj);
+                    }
+                }
+            }
+        }
+        catch
+        {
+            // If extraction fails, return empty list
+        }
+        
+        return new List<dynamic>();
     }
 
     public static List<dynamic> GetContents(GameObject room)
     {
-        return RoomManager.GetItems(room);
+        return RoomManagerInstance.GetItems(room);
+    }
+    
+    /// <summary>
+    /// Get all objects in a room (excluding exits and players) - for script compatibility
+    /// </summary>
+    public static List<dynamic> GetObjectsInRoom(dynamic room)
+    {
+        // Handle null or BsonValue directly
+        if (room == null || room is LiteDB.BsonValue)
+            return new List<dynamic>();
+        
+        // Convert dynamic to GameObject if possible
+        if (room is GameObject gameObject)
+        {
+            return GetContents(gameObject);
+        }
+        
+        // Try to extract ID and get the object
+        try
+        {
+            var idProperty = room?.Id;
+            if (idProperty != null)
+            {
+                var id = idProperty.ToString();
+                if (!string.IsNullOrEmpty(id))
+                {
+                    var obj = ObjectManagerInstance.GetObject(id);
+                    if (obj != null)
+                    {
+                        return GetContents(obj);
+                    }
+                }
+            }
+        }
+        catch
+        {
+            // If extraction fails, return empty list
+        }
+        
+        return new List<dynamic>();
     }
 
 
@@ -1014,7 +1413,7 @@ public static class Builtins
         var currentPlayer = GetCurrentPlayer();
         if (currentPlayer == null) return;
 
-        var playerGameObject = ObjectManager.GetObject(currentPlayer.Id);
+        var playerGameObject = ObjectManagerInstance.GetObject(currentPlayer.Id);
         if (playerGameObject?.Contents == null || !playerGameObject!.Contents.Any())
         {
             Notify(currentPlayer, "You are carrying nothing.");
@@ -1024,7 +1423,7 @@ public static class Builtins
         Notify(currentPlayer, "You are carrying:");
         foreach (var itemId in playerGameObject!.Contents)
         {
-            var item = ObjectManager.GetObject(itemId);
+            var item = ObjectManagerInstance.GetObject(itemId);
             if (item != null)
             {
                 var name = GetProperty(item, "shortDescription") ?? "something";
@@ -1047,7 +1446,7 @@ public static class Builtins
             return null;
         }
 
-        var verb = ((IEnumerable<Verb>)VerbManager.GetVerbsOnObject(objectId))
+        var verb = ((IEnumerable<Verb>)VerbManagerInstance.GetVerbsOnObject(objectId))
             .FirstOrDefault(v => v.Name.ToLower() == verbName.ToLower());
 
         if (verb == null)
@@ -1055,7 +1454,7 @@ public static class Builtins
             return null;
         }
 
-        var obj = ObjectManager.GetObject(objectId);
+        var obj = ObjectManagerInstance.GetObject(objectId);
         return new VerbInfo
         {
             ObjectId = objectId,
@@ -1090,7 +1489,7 @@ public static class Builtins
             }
             catch (Exception ex)
             {
-                Logger.Error($"Error executing action on player {player.Name}: {ex.Message}");
+                LoggerInstance.Error($"Error executing action on player {player.Name}: {ex.Message}");
             }
         }
     }
@@ -1110,7 +1509,7 @@ public static class Builtins
             }
             catch (Exception ex)
             {
-                Logger.Error($"Error executing action on object {obj.Id}: {ex.Message}");
+                LoggerInstance.Error($"Error executing action on object {obj.Id}: {ex.Message}");
             }
         }
     }
@@ -1220,13 +1619,21 @@ public static class Builtins
     #region Script Execution
 
     /// <summary>
+    /// Log a message from script context
+    /// </summary>
+    public static void Log(string message)
+    {
+        LoggerInstance.Info(message);
+    }
+
+    /// <summary>
     /// Execute C# script code with the same environment as verb/function execution
     /// </summary>
     public static string ExecuteScript(string scriptCode, Player player, Commands.CommandProcessor commandProcessor, string? thisObjectId = null, string? input = null)
     {
         try
         {
-            var engine = new ScriptEngine();
+            var engine = ScriptEngineFactoryInstance.Create();
             
             // Create a temporary verb structure for execution
             var tempVerb = new Verb
@@ -1245,7 +1652,7 @@ public static class Builtins
         }
         catch (Exception ex)
         {
-            Logger.Error($"Script execution error: {ex.Message}");
+            LoggerInstance.Error($"Script execution error: {ex.Message}");
             throw;
         }
     }
@@ -1257,7 +1664,7 @@ public static class Builtins
     {
         try
         {
-            var engine = new ScriptEngine();
+            var engine = ScriptEngineFactoryInstance.Create();
             
             // Create a temporary verb structure for execution
             var tempVerb = new Verb
@@ -1271,7 +1678,7 @@ public static class Builtins
         }
         catch (Exception ex)
         {
-            Logger.Error($"Script execution error: {ex.Message}");
+            LoggerInstance.Error($"Script execution error: {ex.Message}");
             throw;
         }
     }
@@ -1284,7 +1691,7 @@ public static class Builtins
         try
         {
             // Look up the Database.Player from the GameObject player
-            var dbPlayer = ObjectManager.GetObject<Player>(player.Id);
+            var dbPlayer = ObjectManagerInstance.GetObject<Player>(player.Id);
             if (dbPlayer == null)
             {
                 throw new ArgumentException($"Player with ID '{player.Id}' not found in database");
@@ -1295,7 +1702,7 @@ public static class Builtins
         }
         catch (Exception ex)
         {
-            Logger.Error($"Script execution error: {ex.Message}");
+            LoggerInstance.Error($"Script execution error: {ex.Message}");
             throw;
         }
     }
