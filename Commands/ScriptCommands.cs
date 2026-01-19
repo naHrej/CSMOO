@@ -93,10 +93,12 @@ namespace CSMOO.Commands;
                     // Show result
                     if (!string.IsNullOrEmpty(result) && result != "null")
                     {
+                        // Note: Logging will be handled by the verb execution in VerbResolverInstance
                         _commandProcessor.SendToPlayer($"Script result: {result}");
                     }
                     else
                     {
+                        // Note: Logging will be handled by the verb execution in VerbResolverInstance
                         _commandProcessor.SendToPlayer("Script executed successfully.");
                     }
                 }

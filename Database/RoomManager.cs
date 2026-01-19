@@ -1,64 +1,32 @@
 using CSMOO.Logging;
 using CSMOO.Object;
+using CSMOO.Configuration;
 
 namespace CSMOO.Database;
 
 /// <summary>
-/// Manages room creation, navigation, and related utilities
+/// Static wrapper for RoomManager (backward compatibility)
+/// Delegates to RoomManagerInstance for dependency injection support
 /// </summary>
 public static class RoomManager
 {
+    private static IRoomManager? _instance;
+    
+    /// <summary>
+    /// Sets the room manager instance for static methods to delegate to
+    /// </summary>
+    public static void SetInstance(IRoomManager instance)
+    {
+        _instance = instance;
+    }
+    
+    private static IRoomManager Instance => _instance ?? throw new InvalidOperationException("RoomManager instance not set. Call RoomManager.SetInstance() first. Static access is no longer supported - use dependency injection.");
     /// <summary>
     /// Creates the starting room and some basic areas
     /// </summary>
     public static void CreateStartingRoom()
     {
-        // Check if starting room already exists
-        var existingStartingRoom = FindStartingRoom();
-        if (existingStartingRoom != null)
-        {
-            return;
-        }
-
-        Logger.Info("Creating starting room and basic world areas...");
-
-        var roomClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "Room");
-        if (roomClass == null)
-        {
-            Logger.Error("Room class not found. Core classes must be created first.");
-            return;
-        }
-
-        // Create the starting room
-        var startingRoom = ObjectManager.CreateInstance(roomClass.Id);
-        ObjectManager.SetProperty(startingRoom, "name", "The Nexus");
-        ObjectManager.SetProperty(startingRoom, "shortDescription", "the Nexus");
-        ObjectManager.SetProperty(startingRoom, "longDescription", 
-            "This is the central hub of the CSMOO world. A shimmering portal of energy " +
-            "connects this place to all other realms. New adventurers often find themselves " +
-            "here when they first enter the world.");
-        ObjectManager.SetProperty(startingRoom, "isStartingRoom", true);
-
-        // Create a simple connected room
-        var secondRoom = ObjectManager.CreateInstance(roomClass.Id);
-        ObjectManager.SetProperty(secondRoom, "name", "A Peaceful Grove");
-        ObjectManager.SetProperty(secondRoom, "shortDescription", "a peaceful grove");
-        ObjectManager.SetProperty(secondRoom, "longDescription",
-            "A tranquil grove surrounded by ancient oak trees. Sunlight filters through " +
-            "the canopy above, creating dancing patterns on the soft grass below. " +
-            "A gentle breeze carries the scent of wildflowers.");
-        // Set the location of the second room
-        ObjectManager.SetProperty(secondRoom, "location", null!);
-
-        // Create exits between the rooms
-        CreateExit(startingRoom, secondRoom, "north", "south");
-
-        // Create a simple item in the grove
-        CreateSimpleItem("A Wooden Staff", "a wooden staff", 
-            "A simple wooden staff, worn smooth by countless hands. It radiates a faint magical aura.",
-            secondRoom.Id);
-
-        Logger.Info("Starting room and basic areas created successfully");
+        Instance.CreateStartingRoom();
     }
 
     /// <summary>
@@ -66,32 +34,7 @@ public static class RoomManager
     /// </summary>
     public static void CreateExit(GameObject fromRoom, GameObject toRoom, string direction, string returnDirection)
     {
-        var exitClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "Exit");
-        if (exitClass == null)
-        {
-            Logger.Error("Exit class not found. Core classes must be created first.");
-            return;
-        }
-
-        // Create the forward exit
-        var forwardExit = ObjectManager.CreateInstance(exitClass.Id, fromRoom.Id);
-        ObjectManager.SetProperty(forwardExit, "name", direction);
-        ObjectManager.SetProperty(forwardExit, "shortDescription", direction);
-        ObjectManager.SetProperty(forwardExit, "longDescription", $"An exit leading {direction}.");
-        ObjectManager.SetProperty(forwardExit, "direction", direction);
-        ObjectManager.SetProperty(forwardExit, "destination", toRoom.Id);
-
-        // Create the return exit
-        var returnExit = ObjectManager.CreateInstance(exitClass.Id, toRoom.Id);
-        ObjectManager.SetProperty(returnExit, "name", returnDirection);
-        ObjectManager.SetProperty(returnExit, "shortDescription", returnDirection);
-        ObjectManager.SetProperty(returnExit, "longDescription", $"An exit leading {returnDirection}.");
-        ObjectManager.SetProperty(returnExit, "direction", returnDirection);
-        ObjectManager.SetProperty(returnExit, "destination", fromRoom.Id);
-        // Set location for both exits
-        ObjectManager.SetProperty(forwardExit, "location", fromRoom.Id);
-        ObjectManager.SetProperty(returnExit, "location", toRoom.Id);
-
+        Instance.CreateExit(fromRoom, toRoom, direction, returnDirection);
     }
 
     /// <summary>
@@ -99,17 +42,7 @@ public static class RoomManager
     /// </summary>
     public static GameObject CreateSimpleItem(string name, string shortDesc, string longDesc, string? locationId = null)
     {
-        var itemClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "Item");
-        if (itemClass == null)
-            throw new InvalidOperationException("Item class not found. Core classes must be created first.");
-
-        var item = ObjectManager.CreateInstance(itemClass.Id, locationId);
-        ObjectManager.SetProperty(item, "name", name);
-        ObjectManager.SetProperty(item, "shortDescription", shortDesc);
-        ObjectManager.SetProperty(item, "longDescription", longDesc);
-        ObjectManager.SetProperty(item, "location", locationId);
-
-        return item;
+        return Instance.CreateSimpleItem(name, shortDesc, longDesc, locationId);
     }
 
     /// <summary>
@@ -117,17 +50,7 @@ public static class RoomManager
     /// </summary>
     public static GameObject? GetStartingRoom()
     {
-        return FindStartingRoom();
-    }
-
-    /// <summary>
-    /// Finds the starting room
-    /// </summary>
-    private static GameObject? FindStartingRoom()
-    {
-        var allGameObjects = DbProvider.Instance.FindAll<GameObject>("gameobjects");
-        return allGameObjects.FirstOrDefault(obj => 
-            obj.Properties.ContainsKey("isStartingRoom") && obj.Properties["isStartingRoom"].AsBoolean == true);
+        return Instance.GetStartingRoom();
     }
 
     /// <summary>
@@ -135,10 +58,7 @@ public static class RoomManager
     /// </summary>
     public static List<GameObject> GetAllRooms()
     {
-        var roomClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "Room");
-        if (roomClass == null) return new List<GameObject>();
-
-        return ObjectManager.FindObjectsByClass(roomClass.Id);
+        return Instance.GetAllRooms();
     }
 
     /// <summary>
@@ -146,12 +66,7 @@ public static class RoomManager
     /// </summary>
     public static List<GameObject> GetExits(string roomId)
     {
-        var exitClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "Exit");
-        if (exitClass == null) return new List<GameObject>();
-
-        return ObjectManager.GetObjectsInLocation(roomId)
-            .Where(obj => obj.ClassId == exitClass.Id)
-            .ToList();
+        return Instance.GetExits(roomId);
     }
 
     /// <summary>
@@ -159,12 +74,7 @@ public static class RoomManager
     /// </summary>
     public static GameObject? FindExitInDirection(string roomId, string direction)
     {
-        var exits = GetExits(roomId);
-        return exits.FirstOrDefault(exit =>
-        {
-            var exitDirection = ObjectManager.GetProperty(exit, "direction")?.AsString?.ToLower();
-            return exitDirection == direction.ToLower();
-        });
+        return Instance.FindExitInDirection(roomId, direction);
     }
 
     /// <summary>
@@ -172,8 +82,7 @@ public static class RoomManager
     /// </summary>
     public static GameObject? GetExitDestination(GameObject exit)
     {
-        var destinationId = ObjectManager.GetProperty(exit, "destination")?.AsString;
-        return destinationId == null ? null : ObjectManager.GetObject(destinationId);
+        return Instance.GetExitDestination(exit);
     }
 
     /// <summary>
@@ -181,13 +90,7 @@ public static class RoomManager
     /// </summary>
     public static bool IsValidRoom(string? roomId)
     {
-        if (roomId == null) return false;
-        
-        var room = ObjectManager.GetObject(roomId);
-        if (room == null) return false;
-
-        var roomClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "Room");
-        return roomClass != null && ObjectManager.InheritsFrom(room.ClassId, roomClass.Id);
+        return Instance.IsValidRoom(roomId);
     }
 
     /// <summary>
@@ -195,12 +98,7 @@ public static class RoomManager
     /// </summary>
     public static List<dynamic> GetExits(GameObject room)
     {
-        var roomContents = ObjectManager.GetObjectsInLocation(room).Cast<dynamic>().ToList();;
-        var exitClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "Exit");
-        if (exitClass == null) return [];
-        return roomContents
-            .Where(obj => obj.ClassId == exitClass.Id)
-            .ToList();
+        return Instance.GetExits(room);
     }
     
     /// <summary>
@@ -208,12 +106,7 @@ public static class RoomManager
     /// </summary>
     public static List<dynamic> GetItems(GameObject room)
     {
-        var roomContents = ObjectManager.GetObjectsInLocation(room).Cast<dynamic>().ToList();;
-        var itemClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "Item");      
-        if (itemClass == null) return [];
-        return roomContents
-            .Where(obj => obj.ClassId == itemClass.Id)
-            .ToList();
+        return Instance.GetItems(room);
     }
     
     /// <summary>
@@ -221,12 +114,7 @@ public static class RoomManager
     /// </summary>
     public static List<dynamic> GetPlayers(GameObject room)
     {
-        var roomContents = ObjectManager.GetObjectsInLocation(room).Cast<dynamic>().ToList();
-        var playerClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "Player");
-        if (playerClass == null) return [];
-        return roomContents.Where(obj =>
-            ObjectManager.InheritsFrom(obj.ClassId, playerClass.Id)
-        ).ToList();
+        return Instance.GetPlayers(room);
     }
 
     /// <summary>
@@ -234,16 +122,7 @@ public static class RoomManager
     /// </summary>
     public static Dictionary<string, object> GetRoomStatistics()
     {
-        var allRooms = GetAllRooms();
-        var stats = new Dictionary<string, object>
-        {
-            ["TotalRooms"] = allRooms.Count,
-            ["RoomsWithItems"] = allRooms.Count(room => GetItems(room).Any()),
-            ["RoomsWithPlayers"] = allRooms.Count(room => GetPlayers(room).Any()),
-            ["TotalExits"] = allRooms.Sum(room => GetExits(room.Id).Count)
-        };
-
-        return stats;
+        return Instance.GetRoomStatistics();
     }
 }
 

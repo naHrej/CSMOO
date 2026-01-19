@@ -5,13 +5,24 @@ using CSMOO.Functions;
 
 namespace CSMOO.Database;
 
-public class GameDatabase : IDisposable
+public class GameDatabase : IGameDatabase
 {
     private readonly LiteDatabase _database;
     private static GameDatabase? _instance;
     private static readonly object _lock = new object();
 
-    private GameDatabase(string connectionString)
+    /// <summary>
+    /// Sets the static instance for backward compatibility
+    /// </summary>
+    public static void SetInstance(GameDatabase instance)
+    {
+        lock (_lock)
+        {
+            _instance = instance;
+        }
+    }
+
+    public GameDatabase(string connectionString)
     {
         _database = new LiteDatabase(connectionString);
         
@@ -57,7 +68,7 @@ public class GameDatabase : IDisposable
     /// <summary>
     /// Generic method to get any collection
     /// </summary>
-    internal ILiteCollection<T> GetCollection<T>(string name) => _database.GetCollection<T>(name);
+    public ILiteCollection<T> GetCollection<T>(string name) => _database.GetCollection<T>(name);
 
     public void Dispose()
     {

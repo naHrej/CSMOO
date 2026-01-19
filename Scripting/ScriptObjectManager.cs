@@ -1,4 +1,7 @@
 using CSMOO.Object;
+using CSMOO.Database;
+using CSMOO.Configuration;
+using CSMOO.Logging;
 using LiteDB;
 
 namespace CSMOO.Scripting;
@@ -8,30 +11,52 @@ namespace CSMOO.Scripting;
 /// </summary>
 public class ScriptObjectManager
 {
+    private readonly IObjectManager _objectManager;
+
+    // Primary constructor with DI dependencies
+    public ScriptObjectManager(IObjectManager objectManager)
+    {
+        _objectManager = objectManager ?? throw new ArgumentNullException(nameof(objectManager));
+    }
+
+    // Backward compatibility constructor
+    public ScriptObjectManager()
+        : this(CreateDefaultObjectManager())
+    {
+    }
+
+    private static IObjectManager CreateDefaultObjectManager()
+    {
+        var dbProvider = DbProvider.Instance;
+        var logger = new LoggerInstance(Config.Instance);
+        var classManager = new ClassManagerInstance(dbProvider, logger);
+        return new ObjectManagerInstance(dbProvider, classManager);
+    }
+
     public object? GetProperty(string objectId, string propertyName)
     {
-        var obj = ObjectManager.GetObject(objectId);
+        var obj = _objectManager.GetObject(objectId);
         if (obj == null) return null;
-        return ObjectManager.GetProperty(obj, propertyName)?.RawValue;
+        return _objectManager.GetProperty(obj, propertyName)?.RawValue;
     }
 
     public void SetProperty(string objectId, string propertyName, object value)
     {
-        var obj = ObjectManager.GetObject(objectId);
+        var obj = _objectManager.GetObject(objectId);
         if (obj != null)
         {
-            ObjectManager.SetProperty(obj, propertyName, new BsonValue(value));
+            _objectManager.SetProperty(obj, propertyName, new BsonValue(value));
         }
     }
 
     public void MoveObject(string objectId, string? newLocation)
     {
-        ObjectManager.MoveObject(objectId, newLocation);
+        _objectManager.MoveObject(objectId, newLocation);
     }
 
     public List<string> GetObjectsInLocation(string locationId)
     {
-        return [.. ObjectManager.GetObjectsInLocation(locationId).Select(obj => obj.Id)];
+        return [.. _objectManager.GetObjectsInLocation(locationId).Select(obj => obj.Id)];
     }
 }
 

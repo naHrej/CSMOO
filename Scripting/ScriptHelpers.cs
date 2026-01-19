@@ -2,6 +2,7 @@ using CSMOO.Database;
 using CSMOO.Commands;
 using CSMOO.Logging;
 using CSMOO.Verbs;
+using CSMOO.Configuration;
 using LiteDB;
 using CSMOO.Object;
 
@@ -15,11 +16,74 @@ public class ScriptHelpers
 {
     public readonly Player _player;
     public readonly CommandProcessor _commandProcessor;
+    private readonly IObjectManager _objectManager;
+    private readonly IPlayerManager _playerManager;
+    private readonly IDbProvider _dbProvider;
+    private readonly ILogger _logger;
+    private readonly IVerbManager _verbManager;
+    private readonly IRoomManager _roomManager;
 
-    public ScriptHelpers(Player player, CommandProcessor commandProcessor)
+    // Primary constructor with DI dependencies
+    public ScriptHelpers(
+        Player player, 
+        CommandProcessor commandProcessor,
+        IObjectManager objectManager,
+        IPlayerManager playerManager,
+        IDbProvider dbProvider,
+        ILogger logger,
+        IVerbManager verbManager,
+        IRoomManager roomManager)
     {
-        _player = player;
-        _commandProcessor = commandProcessor;
+        _player = player ?? throw new ArgumentNullException(nameof(player));
+        _commandProcessor = commandProcessor ?? throw new ArgumentNullException(nameof(commandProcessor));
+        _objectManager = objectManager ?? throw new ArgumentNullException(nameof(objectManager));
+        _playerManager = playerManager ?? throw new ArgumentNullException(nameof(playerManager));
+        _dbProvider = dbProvider ?? throw new ArgumentNullException(nameof(dbProvider));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _verbManager = verbManager ?? throw new ArgumentNullException(nameof(verbManager));
+        _roomManager = roomManager ?? throw new ArgumentNullException(nameof(roomManager));
+    }
+
+    // Backward compatibility constructor
+    public ScriptHelpers(Player player, CommandProcessor commandProcessor)
+        : this(player, commandProcessor,
+               CreateDefaultObjectManager(), CreateDefaultPlayerManager(), CreateDefaultDbProvider(),
+               CreateDefaultLogger(), CreateDefaultVerbManager(), CreateDefaultRoomManager())
+    {
+    }
+
+    // Helper methods for backward compatibility
+    private static IObjectManager CreateDefaultObjectManager()
+    {
+        var dbProvider = DbProvider.Instance;
+        var logger = new LoggerInstance(Config.Instance);
+        var classManager = new ClassManagerInstance(dbProvider, logger);
+        return new ObjectManagerInstance(dbProvider, classManager);
+    }
+
+    private static IPlayerManager CreateDefaultPlayerManager()
+    {
+        return new PlayerManagerInstance(DbProvider.Instance);
+    }
+
+    private static IDbProvider CreateDefaultDbProvider()
+    {
+        return DbProvider.Instance;
+    }
+
+    private static ILogger CreateDefaultLogger()
+    {
+        return new LoggerInstance(Config.Instance);
+    }
+
+    private static IVerbManager CreateDefaultVerbManager()
+    {
+        return new VerbManagerInstance(DbProvider.Instance);
+    }
+
+    private static IRoomManager CreateDefaultRoomManager()
+    {
+        return new RoomManagerInstance(DbProvider.Instance, CreateDefaultLogger(), CreateDefaultObjectManager());
     }
 
     #region Player and Session Management
@@ -49,7 +113,7 @@ public class ScriptHelpers
     public void notify(GameObject playerObj, string message)
     {
         // Convert GameObject to Player
-        var player = ObjectManager.GetObject<Player>(playerObj.Id);
+        var player = _objectManager.GetObject<Player>(playerObj.Id);
         if (player?.SessionGuid != null)
         {
             _commandProcessor.SendToPlayer(message, player.SessionGuid);
@@ -92,7 +156,7 @@ public class ScriptHelpers
     /// </summary>
     public List<Player> GetOnlinePlayers()
     {
-        return PlayerManager.GetOnlinePlayers();
+        return _playerManager.GetOnlinePlayers();
     }
 
     /// <summary>
@@ -102,7 +166,7 @@ public class ScriptHelpers
     {
         if (roomId == null) return new List<Player>();
         
-        return PlayerManager.GetOnlinePlayers()
+        return _playerManager.GetOnlinePlayers()
             .Where(p => p.Location?.Id == roomId)
             .ToList();
     }
@@ -113,7 +177,7 @@ public class ScriptHelpers
     public Player? FindPlayerByName(string name)
     {
         name = name.ToLower();
-        return PlayerManager.GetOnlinePlayers()
+        return _playerManager.GetOnlinePlayers()
             .FirstOrDefault(p => p.Name.ToLower().Contains(name));
     }
 
@@ -145,26 +209,26 @@ public class ScriptHelpers
                 // Check if it's a DBREF (starts with # followed by digits)
                 if (objectName.StartsWith("#") && int.TryParse(objectName.Substring(1), out int dbref))
                 {
-                    var obj = ObjectManager.GetObjectByDbRef(dbref);
+                    var obj = _objectManager.GetObjectByDbRef(dbref);
                     result = obj?.Id;
                 }
                 // Check if it's a class reference (starts with "class:" or ends with ".class")
                 else if (objectName.StartsWith("class:", StringComparison.OrdinalIgnoreCase))
                 {
                     var className = objectName.Substring(6); // Remove "class:" prefix
-                    var objectClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => 
+                    var objectClass = _dbProvider.FindOne<ObjectClass>("objectclasses", c => 
                         c.Name.Equals(className, StringComparison.OrdinalIgnoreCase));
                     result = objectClass?.Id;
                 }
                 else if (objectName.EndsWith(".class", StringComparison.OrdinalIgnoreCase))
                 {
                     var className = objectName.Substring(0, objectName.Length - 6); // Remove ".class" suffix
-                    var objectClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => 
+                    var objectClass = _dbProvider.FindOne<ObjectClass>("objectclasses", c => 
                         c.Name.Equals(className, StringComparison.OrdinalIgnoreCase));
                     result = objectClass?.Id;
                 }
                 // Check if it's a direct class ID (like "Room", "Exit", etc.)
-                else if (DbProvider.Instance.FindById<ObjectClass>("objectclasses", objectName) != null)
+                else if (_dbProvider.FindById<ObjectClass>("objectclasses", objectName) != null)
                 {
                     result = objectName; // The objectName itself is the class ID
                 }
@@ -176,7 +240,7 @@ public class ScriptHelpers
                     // If not found as an object, try as a class name
                     if (result == null)
                     {
-                        var objectClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => 
+                        var objectClass = _dbProvider.FindOne<ObjectClass>("objectclasses", c => 
                             c.Name.Equals(objectName, StringComparison.OrdinalIgnoreCase));
                         if (objectClass != null)
                         {
@@ -200,11 +264,11 @@ public class ScriptHelpers
         // First, search in current location (most common case)
         if (_player.Location != null)
         {
-            var localObjects = ObjectManager.GetObjectsInLocation(_player.Location);
+            var localObjects = _objectManager.GetObjectsInLocation(_player.Location);
             var localMatch = localObjects.FirstOrDefault(obj =>
             {
-                var objName = ObjectManager.GetProperty(obj, "name")?.AsString?.ToLower();
-                var shortDesc = ObjectManager.GetProperty(obj, "shortDescription")?.AsString?.ToLower();
+                var objName = _objectManager.GetProperty(obj, "name")?.AsString?.ToLower();
+                var shortDesc = _objectManager.GetProperty(obj, "shortDescription")?.AsString?.ToLower();
                 return objName?.Contains(name) == true || shortDesc?.Contains(name) == true;
             });
             
@@ -215,11 +279,11 @@ public class ScriptHelpers
         }
         
         // If not found locally, search all players (common for targeting players)
-        var players = PlayerManager.GetOnlinePlayers();
+        var players = _playerManager.GetOnlinePlayers();
         var playerMatch = players.FirstOrDefault(p => p.Name.ToLower().Contains(name));
         if (playerMatch != null)
         {
-            var playerObj = ObjectManager.GetObject(playerMatch.Id);
+            var playerObj = _objectManager.GetObject(playerMatch.Id);
             if (playerObj != null)
             {
                 return playerMatch.Id;
@@ -227,11 +291,11 @@ public class ScriptHelpers
         }
         
         // Finally, search globally (for admin/building purposes)
-        var allObjects = ObjectManager.GetAllObjects();
+        var allObjects = _objectManager.GetAllObjects();
         var globalMatch = allObjects.OfType<GameObject>().FirstOrDefault(obj =>
         {
-            var objName = ObjectManager.GetProperty(obj, "name")?.AsString?.ToLower();
-            var shortDesc = ObjectManager.GetProperty(obj, "shortDescription")?.AsString?.ToLower();
+            var objName = _objectManager.GetProperty(obj, "name")?.AsString?.ToLower();
+            var shortDesc = _objectManager.GetProperty(obj, "shortDescription")?.AsString?.ToLower();
             return objName?.Contains(name) == true || shortDesc?.Contains(name) == true;
         });
         
@@ -247,7 +311,7 @@ public class ScriptHelpers
     /// </summary>
     public GameObject? GetObject(string objectId)
     {
-        return ObjectManager.GetObject(objectId);
+        return _objectManager.GetObject(objectId);
     }
 
     /// <summary>
@@ -255,13 +319,13 @@ public class ScriptHelpers
     /// </summary>
     public string GetObjectName(string objectId)
     {
-        var obj = ObjectManager.GetObject(objectId);
+        var obj = _objectManager.GetObject(objectId);
         if (obj == null) return "unknown object";
         
-        var name = ObjectManager.GetProperty(obj, "name")?.AsString;
+        var name = _objectManager.GetProperty(obj, "name")?.AsString;
         if (!string.IsNullOrEmpty(name)) return name;
         
-        var shortDesc = ObjectManager.GetProperty(obj, "shortDescription")?.AsString;
+        var shortDesc = _objectManager.GetProperty(obj, "shortDescription")?.AsString;
         if (!string.IsNullOrEmpty(shortDesc)) return shortDesc;
         
         return $"object #{obj.DbRef}";
@@ -273,7 +337,7 @@ public class ScriptHelpers
     public string? GetSystemObjectId()
     {
         // Get all objects from ObjectManager cache
-        var allObjects = ObjectManager.GetAllObjects();
+        var allObjects = _objectManager.GetAllObjects();
         var systemObj = allObjects.OfType<GameObject>().FirstOrDefault(obj => 
             (obj.Properties.ContainsKey("name") && obj.Properties["name"].AsString == "system") ||
             (obj.Properties.ContainsKey("isSystemObject") && obj.Properties["isSystemObject"].AsBoolean == true));
@@ -281,22 +345,22 @@ public class ScriptHelpers
         if (systemObj == null)
         {
             // System object doesn't exist, create it
-            Logger.Warning("System object not found, creating it...");
+            _logger.Warning("System object not found, creating it...");
             // Use Container class instead of abstract Object class
-            var containerClass = DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "Container");
+            var containerClass = _dbProvider.FindOne<ObjectClass>("objectclasses", c => c.Name == "Container");
             if (containerClass != null)
             {
-                systemObj = ObjectManager.CreateInstance(containerClass.Id);
-                ObjectManager.SetProperty(systemObj, "name", "System");
-                ObjectManager.SetProperty(systemObj, "shortDescription", "the system object");
-                ObjectManager.SetProperty(systemObj, "longDescription", "This is the system object that holds global verbs and functions.");
-                ObjectManager.SetProperty(systemObj, "isSystemObject", true);
-                ObjectManager.SetProperty(systemObj, "gettable", false); // Don't allow players to pick up the system
-                Logger.Info($"Created system object with ID: {systemObj.Id}");
+                systemObj = _objectManager.CreateInstance(containerClass.Id);
+                _objectManager.SetProperty(systemObj, "name", "System");
+                _objectManager.SetProperty(systemObj, "shortDescription", "the system object");
+                _objectManager.SetProperty(systemObj, "longDescription", "This is the system object that holds global verbs and functions.");
+                _objectManager.SetProperty(systemObj, "isSystemObject", true);
+                _objectManager.SetProperty(systemObj, "gettable", false); // Don't allow players to pick up the system
+                _logger.Info($"Created system object with ID: {systemObj.Id}");
             }
             else
             {
-                Logger.Error("Could not find Container class to create system object!");
+                _logger.Error("Could not find Container class to create system object!");
                 return null;
             }
         }
@@ -313,7 +377,7 @@ public class ScriptHelpers
     public void UpdatePlayerProperty(Player player, string propertyName, object value)
     {
         // Update the database record
-        var playerRecord =ObjectManager.GetObject<Player>( player.Id);
+        var playerRecord = _objectManager.GetObject<Player>(player.Id);
         if (playerRecord != null)
         {
             // Use reflection to set the property on the database record
@@ -321,7 +385,7 @@ public class ScriptHelpers
             if (property != null && property.CanWrite)
             {
                 property.SetValue(playerRecord, value);
-                DbProvider.Instance.Update<Player>("players", playerRecord);
+                _dbProvider.Update<Player>("players", playerRecord);
                 
                 // Also update the in-memory object
                 property.SetValue(player, value);
@@ -329,12 +393,12 @@ public class ScriptHelpers
             }
             else
             {
-                Logger.Warning($"Property '{propertyName}' not found or not writable on Player class");
+                _logger.Warning($"Property '{propertyName}' not found or not writable on Player class");
             }
         }
         else
         {
-            Logger.Error($"Player record not found in database for ID: {player.Id}");
+            _logger.Error($"Player record not found in database for ID: {player.Id}");
         }
     }
 
@@ -361,38 +425,38 @@ public class ScriptHelpers
             return;
         }
 
-        var room = ObjectManager.GetObject(_player.Location.Id);
+        var room = _objectManager.GetObject(_player.Location.Id);
         if (room == null)
         {
             notify(_player, "You are in a void.");
             return;
         }
 
-        var name = ObjectManager.GetProperty(room, "name")?.AsString ?? "Unknown Room";
-        var longDesc = ObjectManager.GetProperty(room, "longDescription")?.AsString ?? "You see nothing special.";
+        var name = _objectManager.GetProperty(room, "name")?.AsString ?? "Unknown Room";
+        var longDesc = _objectManager.GetProperty(room, "longDescription")?.AsString ?? "You see nothing special.";
 
         notify(_player, $"=== {name} ===");
         notify(_player, longDesc);
 
         // Show exits
-        var exits = WorldManager.GetExits(_player.Location);
+        var exits = _roomManager.GetExits(_player.Location);
         if (exits.Any())
         {
-            var exitNames = exits.Select(e => ObjectManager.GetProperty(e, "direction")?.AsString).Where(d => d != null);
+            var exitNames = exits.Select(e => _objectManager.GetProperty(e, "direction")?.AsString).Where(d => d != null);
             notify(_player, $"Exits: {string.Join(", ", exitNames)}");
         }
 
         // Show objects
-        var objects = ObjectManager.GetObjectsInLocation(_player.Location)
-            .Where(obj => obj.ClassId != DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "Exit")?.Id)
-            .Where(obj => obj.ClassId != DbProvider.Instance.FindOne<ObjectClass>("objectclasses", c => c.Name == "Player")?.Id);
+        var objects = _objectManager.GetObjectsInLocation(_player.Location)
+            .Where(obj => obj.ClassId != _dbProvider.FindOne<ObjectClass>("objectclasses", c => c.Name == "Exit")?.Id)
+            .Where(obj => obj.ClassId != _dbProvider.FindOne<ObjectClass>("objectclasses", c => c.Name == "Player")?.Id);
 
         foreach (var obj in objects)
         {
-            var visible = ObjectManager.GetProperty(obj, "visible")?.AsBoolean ?? true;
+            var visible = _objectManager.GetProperty(obj, "visible")?.AsBoolean ?? true;
             if (visible)
             {
-                var shortDesc = ObjectManager.GetProperty(obj, "shortDescription")?.AsString ?? "something";
+                var shortDesc = _objectManager.GetProperty(obj, "shortDescription")?.AsString ?? "something";
                 notify(_player, $"You see {shortDesc} here.");
             }
         }
@@ -413,12 +477,12 @@ public class ScriptHelpers
         if (_player?.Location == null) return;
 
         target = target.ToLower();
-        var objects = ObjectManager.GetObjectsInLocation(_player.Location);
+        var objects = _objectManager.GetObjectsInLocation(_player.Location);
         
         var targetObject = objects.FirstOrDefault(obj =>
         {
-            var name = ObjectManager.GetProperty(obj, "name")?.AsString?.ToLower();
-            var shortDesc = ObjectManager.GetProperty(obj, "shortDescription")?.AsString?.ToLower();
+            var name = _objectManager.GetProperty(obj, "name")?.AsString?.ToLower();
+            var shortDesc = _objectManager.GetProperty(obj, "shortDescription")?.AsString?.ToLower();
             return name?.Contains(target) == true || shortDesc?.Contains(target) == true;
         });
 
@@ -428,16 +492,16 @@ public class ScriptHelpers
             return;
         }
 
-        var longDesc = ObjectManager.GetProperty(targetObject, "longDescription")?.AsString ?? "You see nothing special.";
+        var longDesc = _objectManager.GetProperty(targetObject, "longDescription")?.AsString ?? "You see nothing special.";
         notify(_player, longDesc);
     }
 
     /// <summary>
     /// Get all exits from a room
     /// </summary>
-    public List<dynamic> GetExits(string roomId)
+    public List<GameObject> GetExits(string roomId)
     {
-        return WorldManager.GetExits(roomId);
+        return _roomManager.GetExits(roomId);
     }
 
     /// <summary>
@@ -445,7 +509,7 @@ public class ScriptHelpers
     /// </summary>
     public List<GameObject> GetObjectsInLocation(string locationId)
     {
-        var gameObjects = ObjectManager.GetObjectsInLocation(locationId);
+        var gameObjects = _objectManager.GetObjectsInLocation(locationId);
         return gameObjects.ToList();
     }
 
@@ -456,12 +520,12 @@ public class ScriptHelpers
     {
         try
         {
-            ObjectManager.MoveObject(objectId, destinationId);
+            _objectManager.MoveObject(objectId, destinationId);
             return true;
         }
         catch (Exception ex)
         {
-            Logger.Error($"Failed to move object {objectId} to {destinationId}: {ex.Message}");
+            _logger.Error($"Failed to move object {objectId} to {destinationId}: {ex.Message}");
             return false;
         }
     }
@@ -509,7 +573,7 @@ public class ScriptHelpers
     /// </summary>
     public BsonValue? GetProperty(GameObject obj, string propertyName)
     {
-        return ObjectManager.GetProperty(obj, propertyName);
+        return _objectManager.GetProperty(obj, propertyName);
     }
 
     /// <summary>
@@ -518,7 +582,7 @@ public class ScriptHelpers
     public BsonValue? GetProperty(string objectId, string propertyName)
     {
         var obj = GetObject(objectId);
-        return obj != null ? ObjectManager.GetProperty(obj, propertyName) : null;
+        return obj != null ? _objectManager.GetProperty(obj, propertyName) : null;
     }
 
     /// <summary>
@@ -540,7 +604,7 @@ public class ScriptHelpers
             _ => new BsonValue(value.ToString() ?? "")
         };
         
-        ObjectManager.SetProperty(obj, propertyName, bsonValue);
+        _objectManager.SetProperty(obj, propertyName, bsonValue);
     }
 
     /// <summary>
@@ -566,7 +630,7 @@ public class ScriptHelpers
     {
         if (_player == null) return;
 
-        var playerGameObject = ObjectManager.GetObject(_player.Id);
+        var playerGameObject = _objectManager.GetObject(_player.Id);
         if (playerGameObject?.Contents == null || !playerGameObject.Contents.Any())
         {
             notify(_player, "You are carrying nothing.");
@@ -576,10 +640,10 @@ public class ScriptHelpers
         notify(_player, "You are carrying:");
         foreach (var itemId in playerGameObject.Contents)
         {
-            var item = ObjectManager.GetObject(itemId);
+            var item = _objectManager.GetObject(itemId);
             if (item != null)
             {
-                var name = ObjectManager.GetProperty(item, "shortDescription")?.AsString ?? "something";
+                var name = _objectManager.GetProperty(item, "shortDescription")?.AsString ?? "something";
                 notify(_player, $"  {name}");
             }
         }
@@ -593,16 +657,16 @@ public class ScriptHelpers
         if (_player == null) return null;
 
         itemName = itemName.ToLower();
-        var playerGameObject = ObjectManager.GetObject(_player.Id);
+        var playerGameObject = _objectManager.GetObject(_player.Id);
         if (playerGameObject?.Contents == null) return null;
 
         var foundObject = playerGameObject.Contents
-            .Select(id => ObjectManager.GetObject(id))
+            .Select(id => _objectManager.GetObject(id))
             .FirstOrDefault(obj =>
             {
                 if (obj == null) return false;
-                var name = ObjectManager.GetProperty(obj, "name")?.AsString?.ToLower();
-                var shortDesc = ObjectManager.GetProperty(obj, "shortDescription")?.AsString?.ToLower();
+                var name = _objectManager.GetProperty(obj, "name")?.AsString?.ToLower();
+                var shortDesc = _objectManager.GetProperty(obj, "shortDescription")?.AsString?.ToLower();
                 return name?.Contains(itemName) == true || shortDesc?.Contains(itemName) == true;
             });
             
@@ -617,12 +681,12 @@ public class ScriptHelpers
         if (_player?.Location == null) return null;
 
         itemName = itemName.ToLower();
-        var roomObjects = ObjectManager.GetObjectsInLocation(_player.Location);
+        var roomObjects = _objectManager.GetObjectsInLocation(_player.Location);
         
         var foundObject = roomObjects.FirstOrDefault(obj =>
         {
-            var name = ObjectManager.GetProperty(obj, "name")?.AsString?.ToLower();
-            var shortDesc = ObjectManager.GetProperty(obj, "shortDescription")?.AsString?.ToLower();
+            var name = _objectManager.GetProperty(obj, "name")?.AsString?.ToLower();
+            var shortDesc = _objectManager.GetProperty(obj, "shortDescription")?.AsString?.ToLower();
             return name?.Contains(itemName) == true || shortDesc?.Contains(itemName) == true;
         });
         
@@ -638,7 +702,7 @@ public class ScriptHelpers
     /// </summary>
     public bool IsGettable(GameObject obj)
     {
-        return ObjectManager.GetProperty(obj, "gettable")?.AsBoolean ?? false;
+        return _objectManager.GetProperty(obj, "gettable")?.AsBoolean ?? false;
     }
 
     /// <summary>
@@ -646,7 +710,7 @@ public class ScriptHelpers
     /// </summary>
     public bool IsVisible(GameObject obj)
     {
-        return ObjectManager.GetProperty(obj, "visible")?.AsBoolean ?? true;
+        return _objectManager.GetProperty(obj, "visible")?.AsBoolean ?? true;
     }
 
     /// <summary>
@@ -680,7 +744,7 @@ public class ScriptHelpers
             return null;
         }
 
-        var verb = VerbManager.GetVerbsOnObject(objectId)
+        var verb = _verbManager.GetVerbsOnObject(objectId)
             .FirstOrDefault(v => v.Name.ToLower() == verbName.ToLower());
 
         if (verb == null)

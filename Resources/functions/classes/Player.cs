@@ -9,17 +9,18 @@ public class Player
         desc.Append($"<section class='player' style='margin:0'>");
         
         // Player name
-        desc.Append($"<h3 style='color:lightblue;margin:0;font-weight:bold'>{This.Name}</h3>");
+        var playerName = Builtins.GetProperty(This, "name", "") ?? "someone";
+        desc.Append($"<h3 style='color:lightblue;margin:0;font-weight:bold'>{playerName}</h3>");
         
         // Player description
-        var playerDescription = Builtins.GetProperty(This, "description");
+        var playerDescription = Builtins.GetProperty(This, "description", "");
         if (!string.IsNullOrEmpty(playerDescription))
         {
             desc.Append($"<p style='margin:0.5em 0'>{playerDescription}</p>");
         }
         else
         {
-            desc.Append($"<p style='margin:0.5em 0'>You see nothing special about {This.Name}.</p>");
+            desc.Append($"<p style='margin:0.5em 0'>You see nothing special about {playerName}.</p>");
         }
         
         // Show what they're carrying (if visible)
@@ -29,11 +30,12 @@ public class Player
             var itemNames = new List<string>();
             foreach (var item in inventory)
             {
-                itemNames.Add($"<span class='object' style='color:lightgreen'>{item.Name}</span>");
+                var itemName = Builtins.GetProperty(item, "name", "") ?? "something";
+                itemNames.Add($"<span class='object' style='color:lightgreen'>{itemName}</span>");
             }
             if (itemNames.Count > 0)
             {
-                desc.Append($"<p style='margin:0.5em 0'>{This.Name} is carrying: {string.Join(", ", itemNames)}</p>");
+                desc.Append($"<p style='margin:0.5em 0'>{playerName} is carrying: {string.Join(", ", itemNames)}</p>");
             }
         }
         

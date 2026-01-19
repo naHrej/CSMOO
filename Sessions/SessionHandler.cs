@@ -1,92 +1,59 @@
 using System.Net.Sockets;
 using CSMOO.Object;
+using CSMOO.Configuration;
+using CSMOO.Database;
 
 namespace CSMOO.Sessions;
 
-    static class SessionHandler
+/// <summary>
+/// Static wrapper for SessionHandler with backward compatibility
+/// </summary>
+public static class SessionHandler
+{
+    private static ISessionHandler? _instance;
+    
+    public static void SetInstance(ISessionHandler instance)
     {
-        private static readonly object _lock = new object();
-        private static readonly List<SessionInfo> _activeSessions = new List<SessionInfo>();
-        
-        public static IReadOnlyList<SessionInfo> ActiveSessions 
-        { 
-            get 
-            { 
-                lock (_lock) 
-                { 
-                    return _activeSessions.ToList(); 
-                } 
-            } 
-        }
-        
-        public static void AddSession(Guid clientGuid, TcpClient client)
-        {
-            if (client == null) throw new ArgumentNullException(nameof(client));
-            
-            var connection = new TelnetConnection(clientGuid, client);
-            var sessionInfo = new SessionInfo(clientGuid, connection);
-            
-            lock (_lock)
-            {
-                _activeSessions.Add(sessionInfo);
-            }
-        }
-
-        public static void AddSession(Guid clientGuid, IClientConnection connection)
-        {
-            if (connection == null) throw new ArgumentNullException(nameof(connection));
-            
-            var sessionInfo = new SessionInfo(clientGuid, connection);
-            
-            lock (_lock)
-            {
-                _activeSessions.Add(sessionInfo);
-            }
-        }
-
-        public static bool RemoveSession(Guid clientGuid)
-        {
-            lock (_lock)
-            {
-                for (int i = 0; i < _activeSessions.Count; i++)
-                {
-                    if (_activeSessions[i].ClientGuid == clientGuid)
-                    {
-                        // Disconnect the player if they're logged in
-                        var player = PlayerManager.GetPlayerBySession(clientGuid);
-                        if (player != null)
-                        {
-                            PlayerManager.DisconnectPlayer(player.Id);
-                        }
-                        
-                        _activeSessions.RemoveAt(i);
-                        return true;
-                    }
-                }
-                return false;
-            }
-        }
-
-        /// <summary>
-        /// Gets the player associated with a session, if any
-        /// </summary>
-        public static Player? GetPlayerForSession(Guid sessionGuid)
-        {
-            return PlayerManager.GetPlayerBySession(sessionGuid);
-        }
-
-        /// <summary>
-        /// Authenticates and connects a player to a session
-        /// </summary>
-        public static bool LoginPlayer(Guid sessionGuid, string playerName, string password)
-        {
-            var player = PlayerManager.AuthenticatePlayer(playerName, password);
-            if (player == null)
-                return false;
-
-            PlayerManager.ConnectPlayerToSession(player.Id, sessionGuid);
-            return true;
-        }
+        _instance = instance;
     }
+    
+    private static ISessionHandler Instance => _instance ?? throw new InvalidOperationException("SessionHandler instance not set. Call SessionHandler.SetInstance() first.");
+    
+    public static IReadOnlyList<SessionInfo> ActiveSessions 
+    { 
+        get => Instance.ActiveSessions;
+    }
+    
+    public static void AddSession(Guid clientGuid, TcpClient client)
+    {
+        Instance.AddSession(clientGuid, client);
+    }
+
+    public static void AddSession(Guid clientGuid, IClientConnection connection)
+    {
+        Instance.AddSession(clientGuid, connection);
+    }
+
+    public static bool RemoveSession(Guid clientGuid)
+    {
+        return Instance.RemoveSession(clientGuid);
+    }
+
+    /// <summary>
+    /// Gets the player associated with a session, if any
+    /// </summary>
+    public static Player? GetPlayerForSession(Guid sessionGuid)
+    {
+        return Instance.GetPlayerForSession(sessionGuid);
+    }
+
+    /// <summary>
+    /// Authenticates and connects a player to a session
+    /// </summary>
+    public static bool LoginPlayer(Guid sessionGuid, string playerName, string password)
+    {
+        return Instance.LoginPlayer(sessionGuid, playerName, password);
+    }
+}
 
 

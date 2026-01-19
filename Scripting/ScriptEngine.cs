@@ -4,9 +4,11 @@ using Microsoft.CodeAnalysis.Scripting;
 using CSMOO.Logging;
 using CSMOO.Commands;
 using CSMOO.Configuration;
+using CSMOO.Database;
 using LiteDB;
 using CSMOO.Object;
 using CSMOO.Functions;
+using CSMOO.Verbs;
 using System.Runtime.CompilerServices;
 using CSMOO.Exceptions;
 using CSMOO.Core;
@@ -21,9 +23,41 @@ namespace CSMOO.Scripting;
 public class ScriptEngine
 {
     private readonly ScriptOptions _scriptOptions;
+    private readonly IObjectManager _objectManager;
+    private readonly ILogger _logger;
+    private readonly IConfig _config;
+    private readonly IObjectResolver _objectResolver;
+    private readonly IVerbResolver _verbResolver;
+    private readonly IFunctionResolver _functionResolver;
+    private readonly IDbProvider _dbProvider;
+    private readonly IPlayerManager _playerManager;
+    private readonly IVerbManager _verbManager;
+    private readonly IRoomManager _roomManager;
 
-    public ScriptEngine()
+    // Primary constructor with DI dependencies
+    public ScriptEngine(
+        IObjectManager objectManager,
+        ILogger logger,
+        IConfig config,
+        IObjectResolver objectResolver,
+        IVerbResolver verbResolver,
+        IFunctionResolver functionResolver,
+        IDbProvider dbProvider,
+        IPlayerManager playerManager,
+        IVerbManager verbManager,
+        IRoomManager roomManager)
     {
+        _objectManager = objectManager ?? throw new ArgumentNullException(nameof(objectManager));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _config = config ?? throw new ArgumentNullException(nameof(config));
+        _objectResolver = objectResolver ?? throw new ArgumentNullException(nameof(objectResolver));
+        _verbResolver = verbResolver ?? throw new ArgumentNullException(nameof(verbResolver));
+        _functionResolver = functionResolver ?? throw new ArgumentNullException(nameof(functionResolver));
+        _dbProvider = dbProvider ?? throw new ArgumentNullException(nameof(dbProvider));
+        _playerManager = playerManager ?? throw new ArgumentNullException(nameof(playerManager));
+        _verbManager = verbManager ?? throw new ArgumentNullException(nameof(verbManager));
+        _roomManager = roomManager ?? throw new ArgumentNullException(nameof(roomManager));
+        
         _scriptOptions = ScriptOptions.Default
             .WithLanguageVersion(Microsoft.CodeAnalysis.CSharp.LanguageVersion.Latest)
             .WithReferences(
@@ -37,6 +71,7 @@ public class ScriptEngine
                 Assembly.GetExecutingAssembly()             // Current assembly
             )
             .WithImports(
+                "System",
                 "CSMOO.Core",
                 "System.Dynamic",
                 "System.Linq",
@@ -45,6 +80,86 @@ public class ScriptEngine
                 "CSMOO.Exceptions",
                 "HtmlAgilityPack"
             );
+    }
+
+    // Backward compatibility constructor
+    public ScriptEngine()
+        : this(CreateDefaultObjectManager(), CreateDefaultLogger(), CreateDefaultConfig(), CreateDefaultObjectResolver(),
+               CreateDefaultVerbResolver(), CreateDefaultFunctionResolver(), CreateDefaultDbProvider(),
+               CreateDefaultPlayerManager(), CreateDefaultVerbManager(), CreateDefaultRoomManager())
+    {
+    }
+
+    private static IDbProvider CreateDefaultDbProvider()
+    {
+        return DbProvider.Instance;
+    }
+
+    private static IPlayerManager CreateDefaultPlayerManager()
+    {
+        return new PlayerManagerInstance(DbProvider.Instance);
+    }
+
+    private static IVerbManager CreateDefaultVerbManager()
+    {
+        return new VerbManagerInstance(DbProvider.Instance);
+    }
+
+    private static IRoomManager CreateDefaultRoomManager()
+    {
+        var dbProvider = DbProvider.Instance;
+        var logger = new LoggerInstance(Config.Instance);
+        var classManager = new ClassManagerInstance(dbProvider, logger);
+        var objectManager = new ObjectManagerInstance(dbProvider, classManager);
+        return new RoomManagerInstance(dbProvider, logger, objectManager);
+    }
+
+    // Helper methods for backward compatibility
+    private static IObjectManager CreateDefaultObjectManager()
+    {
+        var dbProvider = DbProvider.Instance;
+        var logger = new LoggerInstance(Config.Instance);
+        var classManager = new ClassManagerInstance(dbProvider, logger);
+        return new ObjectManagerInstance(dbProvider, classManager);
+    }
+
+    private static ILogger CreateDefaultLogger()
+    {
+        return new LoggerInstance(Config.Instance);
+    }
+
+    private static IConfig CreateDefaultConfig()
+    {
+        return Config.Instance;
+    }
+
+    private static IObjectResolver CreateDefaultObjectResolver()
+    {
+        var dbProvider = DbProvider.Instance;
+        var config = Config.Instance;
+        var logger = new LoggerInstance(config);
+        var classManager = new ClassManagerInstance(dbProvider, logger);
+        var objectManager = new ObjectManagerInstance(dbProvider, classManager);
+        var coreClassFactory = new CoreClassFactoryInstance(dbProvider, logger);
+        return new ObjectResolverInstance(objectManager, coreClassFactory);
+    }
+
+    private static IVerbResolver CreateDefaultVerbResolver()
+    {
+        var dbProvider = DbProvider.Instance;
+        var logger = new LoggerInstance(Config.Instance);
+        var classManager = new ClassManagerInstance(dbProvider, logger);
+        var objectManager = new ObjectManagerInstance(dbProvider, classManager);
+        return new VerbResolverInstance(dbProvider, objectManager, logger);
+    }
+
+    private static IFunctionResolver CreateDefaultFunctionResolver()
+    {
+        var dbProvider = DbProvider.Instance;
+        var logger = new LoggerInstance(Config.Instance);
+        var classManager = new ClassManagerInstance(dbProvider, logger);
+        var objectManager = new ObjectManagerInstance(dbProvider, classManager);
+        return new FunctionResolverInstance(dbProvider, objectManager);
     }
 
     /// <summary>
@@ -67,22 +182,24 @@ public class ScriptEngine
         try
         {
             var actualThisObjectId = thisObjectId ?? verb.ObjectId;
-            var thisObject = ObjectManager.GetObject(verb.ObjectId);
-            var playerObject = ObjectManager.GetObject(player.Id);
+            var thisObject = _objectManager.GetObject(verb.ObjectId);
+            var playerObject = _objectManager.GetObject(player.Id);
 
             // Debug logging to identify null objects
             if (thisObject == null)
             {
-                Logger.Warning($"ExecuteVerb: thisObject is null for ID '{actualThisObjectId}' (verb: {verb.Name})");
+                _logger.Warning($"ExecuteVerb: thisObject is null for ID '{actualThisObjectId}' (verb: {verb.Name})");
             }
             if (playerObject == null)
             {
-                Logger.Warning($"ExecuteVerb: playerObject is null for ID '{player.Id}' (verb: {verb.Name})");
+                _logger.Warning($"ExecuteVerb: playerObject is null for ID '{player.Id}' (verb: {verb.Name})");
             }
             // check if thisObject has an admin flag
             var isAdmin = (thisObject?.Permissions.Contains("admin") == true);
 
-            var globals = isAdmin ? new AdminScriptGlobals() : new ScriptGlobals();
+            var globals = isAdmin 
+                ? new AdminScriptGlobals(_objectManager, _objectResolver, _verbResolver, _functionResolver, _dbProvider)
+                : new ScriptGlobals(_objectManager, _verbResolver, _functionResolver, _dbProvider);
 
 
             globals.Player = player; // Always the Database.Player
@@ -97,9 +214,9 @@ public class ScriptEngine
 
 
             // Check for maximum call depth
-            if (globals.CallDepth > Config.Instance.Scripting.MaxCallDepth)
+            if (globals.CallDepth > _config.Scripting.MaxCallDepth)
             {
-                throw new InvalidOperationException($"Maximum script call depth exceeded: {globals.CallDepth} > {Config.Instance.Scripting.MaxCallDepth}");
+                throw new InvalidOperationException($"Maximum script call depth exceeded: {globals.CallDepth} > {_config.Scripting.MaxCallDepth}");
             }
 
             // If we have a previous context, inherit the Helpers to maintain consistency
@@ -109,7 +226,7 @@ public class ScriptEngine
             }
             else
             {
-                globals.Helpers = new ScriptHelpers(player, commandProcessor);
+                globals.Helpers = new ScriptHelpers(player, commandProcessor, _objectManager, _playerManager, _dbProvider, _logger, _verbManager, _roomManager);
             }
 
             // Set ThisObject to the same value as This (since it's an alias)
@@ -133,7 +250,7 @@ public class ScriptEngine
             var script = CSharpScript.Create(completeScript, _scriptOptions, typeof(ScriptGlobals));
 
             // Execute with timeout
-            using var cts = new CancellationTokenSource(Config.Instance.Scripting.MaxExecutionTimeMs);
+            using var cts = new CancellationTokenSource(_config.Scripting.MaxExecutionTimeMs);
             try
             {
                 var scriptResult = script.RunAsync(globals, cts.Token).Result;
@@ -156,7 +273,7 @@ public class ScriptEngine
             catch (AggregateException ex) when (ex.InnerException is OperationCanceledException)
             {
                 ScriptStackTrace.UpdateCurrentFrame(ex, verb.Code);
-                throw new ScriptExecutionException($"Script execution timed out after {Config.Instance.Scripting.MaxExecutionTimeMs}ms", ex);
+                throw new ScriptExecutionException($"Script execution timed out after {_config.Scripting.MaxExecutionTimeMs}ms", ex);
             }
             catch (AggregateException ex) when (ex.InnerException != null)
             {
@@ -176,7 +293,7 @@ public class ScriptEngine
             catch (OperationCanceledException ex)
             {
                 ScriptStackTrace.UpdateCurrentFrame(ex, verb.Code);
-                throw new ScriptExecutionException($"Script execution timed out after {Config.Instance.Scripting.MaxExecutionTimeMs}ms", ex);
+                throw new ScriptExecutionException($"Script execution timed out after {_config.Scripting.MaxExecutionTimeMs}ms", ex);
             }
             catch (Exception ex)
             {
@@ -218,23 +335,29 @@ public class ScriptEngine
 
         var actualThisObjectId = thisObjectId ?? function.ObjectId;
         var previousContext = Builtins.UnifiedContext; // Store previous context
-        var thisObject = ObjectManager.GetObject(actualThisObjectId);
-        var playerObject = ObjectManager.GetObject(player.Id);
+        var thisObject = _objectManager.GetObject(actualThisObjectId);
+        var playerObject = _objectManager.GetObject(player.Id);
 
         // Context validation
         if (thisObject == null)
             throw new ScriptExecutionException($"{function.Name} cannot be invoked due to a ScriptEngine context error");
 
-        if (thisObject?.Owner == null)
-                throw new ScriptExecutionException($"Function '{function.Name}' cannot be executed because its object ({thisObject?.Name}(#{thisObject?.DbRef}) has no owner.");
-
-        // Keyword logic
-        if (function.AccessModifiers.Contains(Keyword.Private) && actualThisObjectId != previousContext?.This?.Id ?? playerObject?.Id)
+        // Keyword logic - check access modifiers
+        // Note: Owner check is only required for Internal functions, not for Public functions
+        if (function.AccessModifiers.Contains(Keyword.Private) && actualThisObjectId != (previousContext?.This?.Id ?? playerObject?.Id))
             throw new ScriptExecutionException($"Function '{function.Name}' is private to {thisObject?.Name}({thisObject?.Id}).");
-        if (function.AccessModifiers.Contains(Keyword.Internal) && thisObject?.Owner?.Id != previousContext?.This?.Owner.Id ?? playerObject?.Id)
-             throw new ScriptExecutionException($"Function '{function.Name}' is internal to {thisObject?.Owner?.Name}({thisObject?.Owner?.Id}).");
+        
+        // Internal functions require an owner to check ownership
+        if (function.AccessModifiers.Contains(Keyword.Internal))
+        {
+            if (thisObject?.Owner == null)
+                throw new ScriptExecutionException($"Function '{function.Name}' cannot be executed because its object ({thisObject?.Name}(#{thisObject?.DbRef}) has no owner (required for Internal access).");
+            if (thisObject.Owner.Id != (previousContext?.This?.Owner?.Id ?? playerObject?.Id))
+                throw new ScriptExecutionException($"Function '{function.Name}' is internal to {thisObject.Owner.Name}({thisObject.Owner.Id}).");
+        }
+        
         if (function.AccessModifiers.Contains(Keyword.Protected) && thisObject?.ClassId != previousContext?.This?.ClassId)
-            throw new ScriptExecutionException($"Function '{function.Name}' is protected and {previousContext?.This?.Name}(#{previousContext?.This?.Dbref}) has a different class to {thisObject?.Name}(#{thisObject?.DbRef})");
+            throw new ScriptExecutionException($"Function '{function.Name}' is protected and {previousContext?.This?.Name}(#{previousContext?.This?.DbRef}) has a different class to {thisObject?.Name}(#{thisObject?.DbRef})");
         
 
         try
@@ -260,15 +383,15 @@ public class ScriptEngine
             // Debug logging to identify null objects
             if (thisObject == null)
             {
-                Logger.Warning($"ExecuteFunction: thisObject is null for ID '{actualThisObjectId}' (function: {function.Name})");
+                _logger.Warning($"ExecuteFunction: thisObject is null for ID '{actualThisObjectId}' (function: {function.Name})");
             }
             if (playerObject == null)
             {
-                Logger.Warning($"ExecuteFunction: playerObject is null for ID '{player.Id}' (function: {function.Name})");
+                _logger.Warning($"ExecuteFunction: playerObject is null for ID '{player.Id}' (function: {function.Name})");
             }
 
             // Create globals for function execution
-            var globals = new ScriptGlobals
+            var globals = new ScriptGlobals(_objectManager, _verbResolver, _functionResolver, _dbProvider)
             {
                 Player = player, // Always the Database.Player
                 This = thisObject ?? CreateNullGameObject(actualThisObjectId),
@@ -280,9 +403,9 @@ public class ScriptEngine
             };
 
             // Check for maximum call depth
-            if (globals.CallDepth > Config.Instance.Scripting.MaxCallDepth)
+            if (globals.CallDepth > _config.Scripting.MaxCallDepth)
             {
-                throw new InvalidOperationException($"Maximum script call depth exceeded: {globals.CallDepth} > {Config.Instance.Scripting.MaxCallDepth}");
+                throw new InvalidOperationException($"Maximum script call depth exceeded: {globals.CallDepth} > {_config.Scripting.MaxCallDepth}");
             }
 
             // If we have a previous context, inherit the Helpers to maintain consistency
@@ -292,7 +415,7 @@ public class ScriptEngine
             }
             else if (commandProcessor != null)
             {
-                globals.Helpers = new ScriptHelpers(player, commandProcessor);
+                globals.Helpers = new ScriptHelpers(player, commandProcessor, _objectManager, _playerManager, _dbProvider, _logger, _verbManager, _roomManager);
             }
 
             // Set ThisObject to the same value as This (since it's an alias)
@@ -342,7 +465,7 @@ public class ScriptEngine
             var script = CSharpScript.Create(finalCode, _scriptOptions, typeof(ScriptGlobals));
 
             // Execute with timeout
-            using var cts = new CancellationTokenSource(Config.Instance.Scripting.MaxExecutionTimeMs);
+            using var cts = new CancellationTokenSource(_config.Scripting.MaxExecutionTimeMs);
             ScriptState<object> result;
             try
             {
@@ -351,7 +474,7 @@ public class ScriptEngine
             catch (AggregateException ex) when (ex.InnerException is OperationCanceledException)
             {
                 ScriptStackTrace.UpdateCurrentFrame(ex, function.Code);
-                throw new ScriptExecutionException($"Function '{function.Name}' execution timed out after {Config.Instance.Scripting.MaxExecutionTimeMs}ms", ex);
+                throw new ScriptExecutionException($"Function '{function.Name}' execution timed out after {_config.Scripting.MaxExecutionTimeMs}ms", ex);
             }
             catch (AggregateException ex) when (ex.InnerException != null)
             {
@@ -371,7 +494,7 @@ public class ScriptEngine
             catch (OperationCanceledException ex)
             {
                 ScriptStackTrace.UpdateCurrentFrame(ex, function.Code);
-                throw new ScriptExecutionException($"Function '{function.Name}' execution timed out after {Config.Instance.Scripting.MaxExecutionTimeMs}ms", ex);
+                throw new ScriptExecutionException($"Function '{function.Name}' execution timed out after {_config.Scripting.MaxExecutionTimeMs}ms", ex);
             }
             catch (Exception ex)
             {
@@ -392,7 +515,7 @@ public class ScriptEngine
             var returnValue = result.ReturnValue;
             if (!ValidateReturnType(returnValue, function.ReturnType))
             {
-                Logger.Warning($"Function '{function.Name}' returned unexpected type. Expected '{function.ReturnType}', got '{returnValue?.GetType().Name ?? "null"}'.");
+                _logger.Warning($"Function '{function.Name}' returned unexpected type. Expected '{function.ReturnType}', got '{returnValue?.GetType().Name ?? "null"}'.");
             }
 
             // Don't clear the stack trace here - let the top-level caller handle it

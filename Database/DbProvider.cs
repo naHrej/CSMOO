@@ -7,19 +7,38 @@ namespace CSMOO.Database;
 /// Centralized provider for all database operations (CRUD) on collections.
 /// All DB access should go through this class.
 /// </summary>
-public class DbProvider
+public class DbProvider : IDbProvider
 {
+    private static DbProvider? _instance;
+    public static DbProvider Instance => _instance ?? throw new InvalidOperationException("DbProvider instance not set. Call DbProvider.SetInstance() first.");
+    private readonly IGameDatabase _db;
+    private IObjectManager? _objectManager;
+    
+    public DbProvider(IGameDatabase db)
+    {
+        _db = db;
+    }
+    
+    /// <summary>
+    /// Sets the static instance for backward compatibility (used by GameObject data class)
+    /// </summary>
+    public static void SetInstance(DbProvider instance)
+    {
+        _instance = instance;
+    }
+    
+    /// <summary>
+    /// Sets the object manager (used to resolve circular dependency)
+    /// </summary>
+    public void SetObjectManager(IObjectManager objectManager)
+    {
+        _objectManager = objectManager;
+    }
+    
     // Expose: find all verbs for an object
     public IEnumerable<Verb> FindVerbsByObjectId(string objectId)
     {
         return Find<Verb>("verbs", v => v.ObjectId == objectId);
-    }
-    private static DbProvider? _instance;
-    public static DbProvider Instance => _instance ??= new DbProvider(GameDatabase.Instance);
-    private readonly GameDatabase _db;
-    public DbProvider(GameDatabase db)
-    {
-        _db = db;
     }
 
     // Generic Insert
@@ -53,7 +72,10 @@ public class DbProvider
                 var go = obj as GameObject;
                 if (go != null)
                 {
-                    ObjectManager.CacheGameObject(go);
+                    if (_objectManager != null)
+                    {
+                        _objectManager.CacheGameObject(go);
+                    }
                     list.Add(obj);
                 }
             }
@@ -74,7 +96,10 @@ public class DbProvider
                 var go = obj as GameObject;
                 if (go != null)
                 {
-                    ObjectManager.CacheGameObject(go);
+                    if (_objectManager != null)
+                    {
+                        _objectManager.CacheGameObject(go);
+                    }
                     list.Add(obj);
                 }
             }
@@ -89,8 +114,11 @@ public class DbProvider
         var result = GetCollection<T>(collectionName).FindOne(predicate);
         if (typeof(T) == typeof(GameObject) && result is GameObject go)
         {
-            var cached = ObjectManager.CacheGameObject(go);
-            return cached is T t ? t : default;
+            if (_objectManager != null)
+            {
+                var cached = _objectManager.CacheGameObject(go);
+                return cached is T t ? t : default;
+            }
         }
         return result;
     }
@@ -101,8 +129,11 @@ public class DbProvider
         var result = GetCollection<T>(collectionName).FindById(id);
         if (typeof(T) == typeof(GameObject) && result is GameObject go)
         {
-            var cached = ObjectManager.CacheGameObject(go);
-            return cached is T t ? t : default;
+            if (_objectManager != null)
+            {
+                var cached = _objectManager.CacheGameObject(go);
+                return cached is T t ? t : default;
+            }
         }
         return result;
     }

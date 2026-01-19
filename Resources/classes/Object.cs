@@ -1,31 +1,28 @@
-public class GameObject
+// ============================================================================
+// IMPORTANT: VERBS AND SUPPORTING CODE ONLY
+// ============================================================================
+// This file is for VERBS (commands) and supporting code ONLY.
+// 
+// DO NOT PUT FUNCTIONS HERE. Functions belong in:
+//   Resources/functions/classes/Object.cs
+//
+// The system automatically combines verbs from this file with functions
+// from Resources/functions/classes/Object.cs by class name. Both files
+// represent the same logical class, but are separated by file system
+// location for organizational purposes.
+//
+// WARNING: Do NOT duplicate code between this file and the functions file.
+// If you need helper methods that are used by both verbs and functions,
+// they should go in the functions file (since functions can call them,
+// and verbs can call functions).
+// ============================================================================
+
+public class Object
 {
-    /// <summary>
-    /// Returns a formatted description of any object
-    /// </summary>
-    public string Description()
-    {
-        var desc = new StringBuilder();
-        desc.Append($"<section class='object' style='margin:0'>");
-        
-        // Object name
-        desc.Append($"<h3 style='color:lightgreen;margin:0;font-weight:bold'>{This.Name}</h3>");
-        
-        // Object description
-        var objectDescription = Builtins.GetProperty(This, "description");
-        if (!string.IsNullOrEmpty(objectDescription))
-        {
-            desc.Append($"<p style='margin:0.5em 0'>{objectDescription}</p>");
-        }
-        else
-        {
-            desc.Append($"<p style='margin:0.5em 0'>You see nothing special about the {This.Name}.</p>");
-        }
-        
-        // Show object class info
-        desc.Append($"<p style='margin:0.5em 0;color:gray;font-size:0.9em'>Type: {This.ClassId}</p>");
-        
-        desc.Append("</section>");
-        return desc.ToString();
-    }
+    // Add verbs (commands) here using the format:
+    // public verb VerbName(string parameter) { ... }
+    
+    // Example:
+    // public verb Get(string objectName) { ... }
+    // public verb Drop(string objectName) { ... }
 }

@@ -1,31 +1,33 @@
 using LiteDB;
 using CSMOO.Logging;
 using CSMOO.Object;
+using CSMOO.Configuration;
 
 namespace CSMOO.Database;
 
 /// <summary>
-/// Manages object class definitions and inheritance relationships
+/// Static wrapper for ClassManager (backward compatibility)
+/// Delegates to ClassManagerInstance for dependency injection support
 /// </summary>
 public static class ClassManager
 {
+    private static IClassManager? _instance;
+    
+    /// <summary>
+    /// Sets the class manager instance for static methods to delegate to
+    /// </summary>
+    public static void SetInstance(IClassManager instance)
+    {
+        _instance = instance;
+    }
+    
+    private static IClassManager Instance => _instance ?? throw new InvalidOperationException("ClassManager instance not set. Call ClassManager.SetInstance() first. Static access is no longer supported - use dependency injection.");
     /// <summary>
     /// Creates a new object class definition
     /// </summary>
     public static ObjectClass CreateClass(string name, string? parentClassId = null, string description = "")
     {
-        var objectClass = new ObjectClass
-        {
-            Id = Guid.NewGuid().ToString(),
-            Name = name,
-            ParentClassId = parentClassId,
-            Description = description,
-            Properties = new BsonDocument(),
-            Methods = new BsonDocument()
-        };
-
-        DbProvider.Instance.Insert("objectclasses", objectClass);
-        return objectClass;
+        return Instance.CreateClass(name, parentClassId, description);
     }
 
     /// <summary>
@@ -33,20 +35,7 @@ public static class ClassManager
     /// </summary>
     public static List<ObjectClass> GetInheritanceChain(string classId)
     {
-        var chain = new List<ObjectClass>();
-        var currentClass = DbProvider.Instance.FindById<ObjectClass>("objectclasses", classId);
-        
-        while (currentClass != null)
-        {
-            chain.Insert(0, currentClass); // Insert at beginning to maintain parent->child order
-            
-            if (currentClass.ParentClassId == null)
-                break;
-                
-            currentClass = DbProvider.Instance.FindById<ObjectClass>("objectclasses", currentClass.ParentClassId);
-        }
-
-        return chain;
+        return Instance.GetInheritanceChain(classId);
     }
 
     /// <summary>
@@ -54,8 +43,7 @@ public static class ClassManager
     /// </summary>
     public static bool InheritsFrom(string childClassId, string parentClassId)
     {
-        var chain = GetInheritanceChain(childClassId);
-        return chain.Any(c => c.Id == parentClassId);
+        return Instance.InheritsFrom(childClassId, parentClassId);
     }
 
     /// <summary>
@@ -63,34 +51,7 @@ public static class ClassManager
     /// </summary>
     public static List<ObjectClass> GetSubclasses(string parentClassId, bool recursive = true)
     {
-        var allClasses = DbProvider.Instance.FindAll<ObjectClass>("objectclasses").ToList();
-        var subclasses = new List<ObjectClass>();
-
-        if (!recursive)
-        {
-            return allClasses.Where(c => c.ParentClassId == parentClassId).ToList();
-        }
-
-        // Recursive: find all descendants
-        var toProcess = new Queue<string>();
-        toProcess.Enqueue(parentClassId);
-        var processed = new HashSet<string>();
-
-        while (toProcess.Count > 0)
-        {
-            var currentClassId = toProcess.Dequeue();
-            if (processed.Contains(currentClassId)) continue;
-            processed.Add(currentClassId);
-
-            var directChildren = allClasses.Where(c => c.ParentClassId == currentClassId);
-            foreach (var child in directChildren)
-            {
-                subclasses.Add(child);
-                toProcess.Enqueue(child.Id);
-            }
-        }
-
-        return subclasses;
+        return Instance.GetSubclasses(parentClassId, recursive);
     }
 
     /// <summary>
@@ -98,36 +59,7 @@ public static class ClassManager
     /// </summary>
     public static bool DeleteClass(string classId, bool deleteSubclasses = false)
     {
-        var objectClass = DbProvider.Instance.FindById<ObjectClass>("objectclasses", classId);
-        if (objectClass == null) return false;
-
-        // Check if there are any instances of this class
-        var instances = DbProvider.Instance.Find<GameObject>("gameobjects", obj => obj.ClassId == classId);
-        if (instances.Any())
-        {
-            Logger.Warning($"Cannot delete class {objectClass.Name} - it has {instances.Count()} instances");
-            return false;
-        }
-
-        // Handle subclasses
-        var subclasses = GetSubclasses(classId, false);
-        if (subclasses.Any() && !deleteSubclasses)
-        {
-            Logger.Warning($"Cannot delete class {objectClass.Name} - it has subclasses. Use deleteSubclasses=true to force deletion");
-            return false;
-        }
-
-        if (deleteSubclasses)
-        {
-            foreach (var subclass in GetSubclasses(classId, true))
-            {
-                DeleteClass(subclass.Id, true);
-            }
-        }
-
-        DbProvider.Instance.Delete<ObjectClass>("objectclasses", classId);
-        Logger.Info($"Deleted class {objectClass.Name}");
-        return true;
+        return Instance.DeleteClass(classId, deleteSubclasses);
     }
 
     /// <summary>
@@ -135,8 +67,7 @@ public static class ClassManager
     /// </summary>
     public static bool UpdateClass(ObjectClass objectClass)
     {
-        objectClass.ModifiedAt = DateTime.UtcNow;
-        return DbProvider.Instance.Update("objectclasses", objectClass);
+        return Instance.UpdateClass(objectClass);
     }
 
     /// <summary>
@@ -144,16 +75,7 @@ public static class ClassManager
     /// </summary>
     public static List<ObjectClass> FindClassesByName(string name, bool exactMatch = false)
     {
-        var allClasses = DbProvider.Instance.FindAll<ObjectClass>("objectclasses");
-        
-        if (exactMatch)
-        {
-            return allClasses.Where(c => c.Name.Equals(name, StringComparison.OrdinalIgnoreCase)).ToList();
-        }
-        else
-        {
-            return allClasses.Where(c => c.Name.Contains(name, StringComparison.OrdinalIgnoreCase)).ToList();
-        }
+        return Instance.FindClassesByName(name, exactMatch);
     }
 }
 

@@ -1,34 +1,33 @@
 using LiteDB;
 using CSMOO.Logging;
 using CSMOO.Object;
+using CSMOO.Configuration;
 
 namespace CSMOO.Database;
 
 /// <summary>
-/// Manages object properties and their inheritance
+/// Static wrapper for PropertyManager (backward compatibility)
+/// Delegates to PropertyManagerInstance for dependency injection support
 /// </summary>
 public static class PropertyManager
 {
+    private static IPropertyManager? _instance;
+    
+    /// <summary>
+    /// Sets the property manager instance for static methods to delegate to
+    /// </summary>
+    public static void SetInstance(IPropertyManager instance)
+    {
+        _instance = instance;
+    }
+    
+    private static IPropertyManager Instance => _instance ?? throw new InvalidOperationException("PropertyManager instance not set. Call PropertyManager.SetInstance() first. Static access is no longer supported - use dependency injection.");
     /// <summary>
     /// Gets a property value from an object, checking inheritance chain if not found on instance
     /// </summary>
     public static BsonValue? GetProperty(GameObject gameObject, string propertyName)
     {
-        // First check if the property exists on the instance itself
-        if (gameObject.Properties.ContainsKey(propertyName))
-            return gameObject.Properties[propertyName];
-
-        // If not found on instance, check the inheritance chain
-        var inheritanceChain = ClassManager.GetInheritanceChain(gameObject.ClassId);
-        
-        // Walk the chain from most specific to least specific (reverse order)
-        foreach (var objectClass in inheritanceChain.AsEnumerable().Reverse())
-        {
-            if (objectClass.Properties.ContainsKey(propertyName))
-                return objectClass.Properties[propertyName];
-        }
-
-        return null; // Property not found anywhere in the chain
+        return Instance.GetProperty(gameObject, propertyName);
     }
 
     /// <summary>
@@ -36,8 +35,7 @@ public static class PropertyManager
     /// </summary>
     public static void SetProperty(GameObject gameObject, string propertyName, BsonValue value)
     {
-        gameObject.Properties[propertyName] = value;
-        DbProvider.Instance.Update("gameobjects", gameObject);
+        Instance.SetProperty(gameObject, propertyName, value);
     }
 
     /// <summary>
@@ -45,11 +43,7 @@ public static class PropertyManager
     /// </summary>
     public static bool SetProperty(string objectId, string propertyName, BsonValue value)
     {
-        var gameObject = ObjectManager.GetObject(objectId);
-        if (gameObject == null) return false;
-
-        SetProperty(gameObject, propertyName, value);
-        return true;
+        return Instance.SetProperty(objectId, propertyName, value);
     }
 
     /// <summary>
@@ -57,12 +51,7 @@ public static class PropertyManager
     /// </summary>
     public static bool RemoveProperty(GameObject gameObject, string propertyName)
     {
-        if (!gameObject.Properties.ContainsKey(propertyName))
-            return false;
-
-        gameObject.Properties.Remove(propertyName);
-        DbProvider.Instance.Update("gameobjects", gameObject);
-        return true;
+        return Instance.RemoveProperty(gameObject, propertyName);
     }
 
     /// <summary>
@@ -70,10 +59,7 @@ public static class PropertyManager
     /// </summary>
     public static bool RemoveProperty(string objectId, string propertyName)
     {
-        var gameObject = ObjectManager.GetObject(objectId);
-        if (gameObject == null) return false;
-
-        return RemoveProperty(gameObject, propertyName);
+        return Instance.RemoveProperty(objectId, propertyName);
     }
 
     /// <summary>
@@ -81,7 +67,7 @@ public static class PropertyManager
     /// </summary>
     public static bool HasProperty(GameObject gameObject, string propertyName)
     {
-        return GetProperty(gameObject, propertyName) != null;
+        return Instance.HasProperty(gameObject, propertyName);
     }
 
     /// <summary>
@@ -89,25 +75,7 @@ public static class PropertyManager
     /// </summary>
     public static string[] GetAllPropertyNames(GameObject gameObject)
     {
-        var allProperties = new System.Collections.Generic.HashSet<string>();
-
-        // Add instance properties
-        foreach (var key in gameObject.Properties.Keys)
-        {
-            allProperties.Add(key);
-        }
-
-        // Add inherited properties
-        var inheritanceChain = ClassManager.GetInheritanceChain(gameObject.ClassId);
-        foreach (var objectClass in inheritanceChain)
-        {
-            foreach (var key in objectClass.Properties.Keys)
-            {
-                allProperties.Add(key);
-            }
-        }
-
-        return allProperties.ToArray();
+        return Instance.GetAllPropertyNames(gameObject);
     }
 
     /// <summary>
@@ -115,10 +83,7 @@ public static class PropertyManager
     /// </summary>
     public static void MergeProperties(BsonDocument target, BsonDocument source)
     {
-        foreach (var element in source)
-        {
-            target[element.Key] = element.Value;
-        }
+        Instance.MergeProperties(target, source);
     }
 
     /// <summary>
@@ -126,15 +91,7 @@ public static class PropertyManager
     /// </summary>
     public static void CopyProperties(GameObject source, GameObject target, bool overwriteExisting = true)
     {
-        foreach (var property in source.Properties)
-        {
-            if (overwriteExisting || !target.Properties.ContainsKey(property.Key))
-            {
-                target.Properties[property.Key] = property.Value;
-            }
-        }
-
-        DbProvider.Instance.Update("gameobjects", target);
+        Instance.CopyProperties(source, target, overwriteExisting);
     }
 
     /// <summary>
@@ -142,28 +99,7 @@ public static class PropertyManager
     /// </summary>
     public static T? GetPropertyValue<T>(GameObject gameObject, string propertyName, T? defaultValue = default)
     {
-        var value = GetProperty(gameObject, propertyName);
-        if (value == null) return defaultValue;
-
-        try
-        {
-            if (typeof(T) == typeof(string))
-                return (T)(object)value.AsString;
-            if (typeof(T) == typeof(int))
-                return (T)(object)value.AsInt32;
-            if (typeof(T) == typeof(bool))
-                return (T)(object)value.AsBoolean;
-            if (typeof(T) == typeof(double))
-                return (T)(object)value.AsDouble;
-            if (typeof(T) == typeof(DateTime))
-                return (T)(object)value.AsDateTime;
-
-            return defaultValue;
-        }
-        catch
-        {
-            return defaultValue;
-        }
+        return Instance.GetPropertyValue(gameObject, propertyName, defaultValue);
     }
 
     /// <summary>
@@ -171,17 +107,7 @@ public static class PropertyManager
     /// </summary>
     public static void SetPropertyValue<T>(GameObject gameObject, string propertyName, T value)
     {
-        BsonValue bsonValue = value switch
-        {
-            string s => new BsonValue(s),
-            int i => new BsonValue(i),
-            bool b => new BsonValue(b),
-            double d => new BsonValue(d),
-            DateTime dt => new BsonValue(dt),
-            _ => new BsonValue(value?.ToString() ?? "")
-        };
-
-        SetProperty(gameObject, propertyName, bsonValue);
+        Instance.SetPropertyValue(gameObject, propertyName, value);
     }
 }
 

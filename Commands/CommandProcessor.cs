@@ -12,6 +12,8 @@ using LiteDB;
 using CSMOO.Object;
 using CSMOO.Exceptions;
 using CSMOO.Core;
+using CSMOO.Configuration;
+using CSMOO.Init;
 
 namespace CSMOO.Commands;
 
@@ -22,36 +24,198 @@ public class CommandProcessor
 {
     private readonly Guid _sessionGuid;
     private readonly IClientConnection _connection;
+    private readonly IPlayerManager _playerManager;
+    private readonly IVerbResolver _verbResolver;
+    private readonly IPermissionManager _permissionManager;
+    private readonly IObjectManager _objectManager;
+    private readonly IFunctionResolver _functionResolver;
+    private readonly IDbProvider _dbProvider;
+    private readonly IGameDatabase _gameDatabase;
+    private readonly ILogger _logger;
+    private readonly IRoomManager _roomManager;
+    private readonly IScriptEngineFactory _scriptEngineFactory;
+    private readonly IVerbManager _verbManager;
+    private readonly IFunctionManager _functionManager;
+    private readonly IHotReloadManager? _hotReloadManager;
+    private readonly ICoreHotReloadManager? _coreHotReloadManager;
+    private readonly IFunctionInitializer? _functionInitializer;
+    private readonly IPropertyInitializer? _propertyInitializer;
     private Player? _player;
     private ProgrammingCommands? _programmingCommands;
+    private bool _stylesheetSent = false; // Track if stylesheet has been sent to this session
 
     // Multiline property editor state
     private string? _editTargetObjectId;
     private string? _editTargetPropName;
     private List<string>? _editBuffer;
 
-    public CommandProcessor(Guid sessionGuid, TcpClient client)
-    {
-        _sessionGuid = sessionGuid;
-        _connection = new TelnetConnection(sessionGuid, client);
-        _player = PlayerManager.GetPlayerBySession(sessionGuid);
-        
-        if (_player != null)
-        {
-            _programmingCommands = new ProgrammingCommands(this, _player);
-        }
-    }
-
-    public CommandProcessor(Guid sessionGuid, IClientConnection connection)
+    // Constructor for DI - accepts all dependencies
+    public CommandProcessor(
+        Guid sessionGuid,
+        IClientConnection connection,
+        IPlayerManager playerManager,
+        IVerbResolver verbResolver,
+        IPermissionManager permissionManager,
+        IObjectManager objectManager,
+        IFunctionResolver functionResolver,
+        IDbProvider dbProvider,
+        IGameDatabase gameDatabase,
+        ILogger logger,
+        IRoomManager roomManager,
+        IScriptEngineFactory scriptEngineFactory,
+        IVerbManager verbManager,
+        IFunctionManager functionManager,
+        IHotReloadManager? hotReloadManager = null,
+        ICoreHotReloadManager? coreHotReloadManager = null,
+        IFunctionInitializer? functionInitializer = null,
+        IPropertyInitializer? propertyInitializer = null)
     {
         _sessionGuid = sessionGuid;
         _connection = connection ?? throw new ArgumentNullException(nameof(connection));
-        _player = PlayerManager.GetPlayerBySession(sessionGuid);
+        _playerManager = playerManager ?? throw new ArgumentNullException(nameof(playerManager));
+        _verbResolver = verbResolver ?? throw new ArgumentNullException(nameof(verbResolver));
+        _permissionManager = permissionManager ?? throw new ArgumentNullException(nameof(permissionManager));
+        _objectManager = objectManager ?? throw new ArgumentNullException(nameof(objectManager));
+        _functionResolver = functionResolver ?? throw new ArgumentNullException(nameof(functionResolver));
+        _dbProvider = dbProvider ?? throw new ArgumentNullException(nameof(dbProvider));
+        _gameDatabase = gameDatabase ?? throw new ArgumentNullException(nameof(gameDatabase));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _roomManager = roomManager ?? throw new ArgumentNullException(nameof(roomManager));
+        _scriptEngineFactory = scriptEngineFactory ?? throw new ArgumentNullException(nameof(scriptEngineFactory));
+        _verbManager = verbManager ?? throw new ArgumentNullException(nameof(verbManager));
+        _functionManager = functionManager ?? throw new ArgumentNullException(nameof(functionManager));
+        _hotReloadManager = hotReloadManager;
+        _coreHotReloadManager = coreHotReloadManager;
+        _functionInitializer = functionInitializer;
+        _propertyInitializer = propertyInitializer;
+        
+        _player = _playerManager.GetPlayerBySession(sessionGuid);
         
         if (_player != null)
         {
-            _programmingCommands = new ProgrammingCommands(this, _player);
+            _programmingCommands = new ProgrammingCommands(this, _player, _permissionManager, _verbManager, _functionResolver, _objectManager, _playerManager, _dbProvider, _gameDatabase, _logger, _roomManager, _functionManager, _hotReloadManager, _coreHotReloadManager, _functionInitializer, _propertyInitializer);
         }
+    }
+
+    // Backward compatibility constructor for Telnet
+    public CommandProcessor(Guid sessionGuid, TcpClient client)
+        : this(sessionGuid, new TelnetConnection(sessionGuid, client), 
+               CreateDefaultPlayerManager(), CreateDefaultVerbResolver(), CreateDefaultPermissionManager(), 
+               CreateDefaultObjectManager(), CreateDefaultFunctionResolver(), CreateDefaultDbProvider(), 
+               CreateDefaultGameDatabase(), CreateDefaultLogger(), CreateDefaultRoomManager(), new ScriptEngineFactory(),
+               CreateDefaultVerbManager(), CreateDefaultFunctionManager(), CreateDefaultHotReloadManager(), CreateDefaultCoreHotReloadManager(), CreateDefaultFunctionInitializer(), CreateDefaultPropertyInitializer())
+    {
+    }
+
+    // Backward compatibility constructor for WebSocket
+    public CommandProcessor(Guid sessionGuid, IClientConnection connection)
+        : this(sessionGuid, connection,
+               CreateDefaultPlayerManager(), CreateDefaultVerbResolver(), CreateDefaultPermissionManager(),
+               CreateDefaultObjectManager(), CreateDefaultFunctionResolver(), CreateDefaultDbProvider(),
+               CreateDefaultGameDatabase(), CreateDefaultLogger(), CreateDefaultRoomManager(), new ScriptEngineFactory(),
+               CreateDefaultVerbManager(), CreateDefaultFunctionManager(), CreateDefaultHotReloadManager(), CreateDefaultCoreHotReloadManager(), CreateDefaultFunctionInitializer(), CreateDefaultPropertyInitializer())
+    {
+    }
+
+    // Helper methods for backward compatibility - create default instances
+    private static IPlayerManager CreateDefaultPlayerManager()
+    {
+        return new PlayerManagerInstance(DbProvider.Instance);
+    }
+
+    private static IVerbResolver CreateDefaultVerbResolver()
+    {
+        return new VerbResolverInstance(DbProvider.Instance, CreateDefaultObjectManager(), CreateDefaultLogger());
+    }
+
+    private static IPermissionManager CreateDefaultPermissionManager()
+    {
+        return new PermissionManagerInstance(DbProvider.Instance, CreateDefaultLogger());
+    }
+
+    private static IObjectManager CreateDefaultObjectManager()
+    {
+        var dbProvider = DbProvider.Instance;
+        var logger = new LoggerInstance(Config.Instance);
+        var classManager = new ClassManagerInstance(dbProvider, logger);
+        return new ObjectManagerInstance(dbProvider, classManager);
+    }
+
+    private static IFunctionResolver CreateDefaultFunctionResolver()
+    {
+        return new FunctionResolverInstance(DbProvider.Instance, CreateDefaultObjectManager());
+    }
+
+    private static IDbProvider CreateDefaultDbProvider()
+    {
+        return DbProvider.Instance;
+    }
+
+    private static ILogger CreateDefaultLogger()
+    {
+        return new LoggerInstance(Config.Instance);
+    }
+
+    private static IRoomManager CreateDefaultRoomManager()
+    {
+        return new RoomManagerInstance(DbProvider.Instance, CreateDefaultLogger(), CreateDefaultObjectManager());
+    }
+
+    private static IVerbManager CreateDefaultVerbManager()
+    {
+        return new VerbManagerInstance(DbProvider.Instance);
+    }
+
+    private static IGameDatabase CreateDefaultGameDatabase()
+    {
+        return GameDatabase.Instance;
+    }
+
+    private static IFunctionManager CreateDefaultFunctionManager()
+    {
+        return new FunctionManagerInstance(new GameDatabase(Config.Instance.Database.GameDataFile));
+    }
+
+    private static IHotReloadManager? CreateDefaultHotReloadManager()
+    {
+        // Create default instance using the same pattern as EnsureInstance
+        var config = Config.Instance;
+        var logger = new LoggerInstance(config);
+        var dbProvider = DbProvider.Instance;
+        var classManager = new ClassManagerInstance(dbProvider, logger);
+        var objectManager = new ObjectManagerInstance(dbProvider, classManager);
+        var playerManager = new PlayerManagerInstance(dbProvider);
+        var verbInitializer = new VerbInitializerInstance(dbProvider, logger, objectManager);
+        var functionManager = CreateDefaultFunctionManager();
+        var functionInitializer = new FunctionInitializerInstance(dbProvider, logger, objectManager, functionManager);
+        return new HotReloadManagerInstance(logger, config, verbInitializer, functionInitializer, playerManager);
+    }
+
+    private static ICoreHotReloadManager? CreateDefaultCoreHotReloadManager()
+    {
+        var logger = new LoggerInstance(Config.Instance);
+        var playerManager = new PlayerManagerInstance(DbProvider.Instance);
+        var permissionManager = new PermissionManagerInstance(DbProvider.Instance, logger);
+        return new CoreHotReloadManagerInstance(logger, playerManager, permissionManager);
+    }
+
+    private static IFunctionInitializer? CreateDefaultFunctionInitializer()
+    {
+        var dbProvider = DbProvider.Instance;
+        var logger = new LoggerInstance(Config.Instance);
+        var classManager = new ClassManagerInstance(dbProvider, logger);
+        var objectManager = new ObjectManagerInstance(dbProvider, classManager);
+        var functionManager = CreateDefaultFunctionManager();
+        return new FunctionInitializerInstance(dbProvider, logger, objectManager, functionManager);
+    }
+
+    private static IPropertyInitializer? CreateDefaultPropertyInitializer()
+    {
+        var dbProvider = DbProvider.Instance;
+        var logger = new LoggerInstance(Config.Instance);
+        var classManager = new ClassManagerInstance(dbProvider, logger);
+        var objectManager = new ObjectManagerInstance(dbProvider, classManager);
+        return new PropertyInitializerInstance(dbProvider, logger, objectManager);
     }
 
     /// <summary>
@@ -76,10 +240,12 @@ public class CommandProcessor
             // If player is not logged in, handle login/creation commands
             if (_player == null)
             {
+                _logger.Info($"[PRE-LOGIN] Command: '{input}' (Session: {_sessionGuid})");
                 HandlePreLoginCommand(input);
             }
             else
             {
+                _logger.Info($"[COMMAND] Player '{_player.Name}' (ID: {_player.Id}): '{input}'");
                 HandleGameCommand(input);
             }
         }
@@ -87,14 +253,14 @@ public class CommandProcessor
         {
             SendToPlayer($"Null reference error: {ex.Message}");
             SendToPlayer($"Stack trace: {ex.StackTrace}");
-            Logger.Error($"Null reference error in command processing: {ex.Message}");
-            Logger.Error($"Stack trace: {ex.StackTrace}");
+            _logger.Error($"Null reference error in command processing: {ex.Message}");
+            _logger.Error($"Stack trace: {ex.StackTrace}");
         }
         catch (Exception ex)
         {
             SendToPlayer($"Error processing command: {ex.Message}");
-            Logger.Error($"Error in command processing: {ex.Message}");
-            Logger.Error($"Stack trace: {ex.StackTrace}");
+            _logger.Error($"Error in command processing: {ex.Message}");
+            _logger.Error($"Stack trace: {ex.StackTrace}");
         }
     }
 
@@ -148,8 +314,23 @@ public class CommandProcessor
         var success = SessionHandler.LoginPlayer(_sessionGuid, username, password);
         if (success)
         {
-            _player = PlayerManager.GetPlayerBySession(_sessionGuid);
-            _programmingCommands = new ProgrammingCommands(this, _player!);
+            _player = _playerManager.GetPlayerBySession(_sessionGuid);
+            if (_player != null)
+            {
+                _programmingCommands = new ProgrammingCommands(this, _player, _permissionManager, _verbManager, _functionResolver, _objectManager, _playerManager, _dbProvider, _gameDatabase, _logger, _roomManager, _functionManager, _hotReloadManager, _coreHotReloadManager, _functionInitializer, _propertyInitializer);
+                
+                // Log player connection and check for admin flag
+                var hasAdmin = _permissionManager.HasFlag(_player, PermissionManager.Flag.Admin);
+                var flags = _permissionManager.GetFlagsString(_player);
+                _logger.Info($"[LOGIN] Player '{_player.Name}' (ID: {_player.Id}) connected. Admin flag: {hasAdmin}, Flags: {flags}");
+                
+                if (hasAdmin)
+                {
+                    _logger.Info($"[ADMIN] Admin player '{_player.Name}' has logged in with admin privileges.");
+                }
+            }
+            // Reset stylesheet flag so it gets sent after login
+            _stylesheetSent = false;
             SendToPlayer($"Welcome back, {_player?.Name}!");
             SendToPlayer("");
             SendToPlayer("Type 'look' to see your surroundings.");
@@ -173,14 +354,26 @@ public class CommandProcessor
 
         try
         {
-            var startingRoom = WorldManager.GetStartingRoom();
-            var newPlayer = PlayerManager.CreatePlayer(username, password, startingRoom?.Id);
+            var startingRoom = _roomManager.GetStartingRoom();
+            var newPlayer = _playerManager.CreatePlayer(username, password, startingRoom?.Id);
             
             // Auto-login the new player
-            PlayerManager.ConnectPlayerToSession(newPlayer.Id, _sessionGuid);
+            _playerManager.ConnectPlayerToSession(newPlayer.Id, _sessionGuid);
             _player = newPlayer;
-            _programmingCommands = new ProgrammingCommands(this, _player);
+            _programmingCommands = new ProgrammingCommands(this, _player, _permissionManager, _verbManager, _functionResolver, _objectManager, _playerManager, _dbProvider, _gameDatabase, _logger, _roomManager, _functionManager, _hotReloadManager, _coreHotReloadManager, _functionInitializer, _propertyInitializer);
             
+            // Log player creation and check for admin flag
+            var hasAdmin = _permissionManager.HasFlag(_player, PermissionManager.Flag.Admin);
+            var flags = _permissionManager.GetFlagsString(_player);
+            _logger.Info($"[CREATE] New player '{_player.Name}' (ID: {_player.Id}) created. Admin flag: {hasAdmin}, Flags: {flags}");
+            
+            if (hasAdmin)
+            {
+                _logger.Info($"[ADMIN] New admin player '{_player.Name}' created with admin privileges.");
+            }
+            
+            // Reset stylesheet flag so it gets sent after login
+            _stylesheetSent = false;
             SendToPlayer($"Welcome to CSMOO, {username}! Your character has been created.");
             SendToPlayer("");
             SendToPlayer("Type 'look' to see your surroundings.");
@@ -198,10 +391,10 @@ public class CommandProcessor
             // Ensure player is still valid (might have been updated after login)
             if (_player == null)
             {
-                _player = PlayerManager.GetPlayerBySession(_sessionGuid);
+                _player = _playerManager.GetPlayerBySession(_sessionGuid);
                 if (_player != null && _programmingCommands == null)
                 {
-                    _programmingCommands = new ProgrammingCommands(this, _player);
+                    _programmingCommands = new ProgrammingCommands(this, _player, _permissionManager, _verbManager, _functionResolver, _objectManager, _playerManager, _dbProvider, _gameDatabase, _logger, _roomManager, _functionManager, _hotReloadManager, _coreHotReloadManager, _functionInitializer, _propertyInitializer);
                 }
             }
 
@@ -214,6 +407,7 @@ public class CommandProcessor
             // First check if we're in programming mode
             if (_programmingCommands?.IsInProgrammingMode == true)
             {
+                _logger.Info($"[HANDLED] Command '{input}' handled by: Programming Mode");
                 _programmingCommands.HandleProgrammingCommand(input);
                 return;
             }
@@ -221,6 +415,7 @@ public class CommandProcessor
             // Check for programming commands
             if (input.StartsWith("@") && _programmingCommands?.HandleProgrammingCommand(input) == true)
             {
+                _logger.Info($"[HANDLED] Command '{input}' handled by: Programming Command");
                 return;
             }
 
@@ -235,16 +430,40 @@ public class CommandProcessor
                 }
             }
 
-            // Try to execute as a verb first
-            if (VerbResolver.TryExecuteVerb(input, _player, this))
+            // Check for explicit "go" command first (before verb resolution)
+            if (input.Equals("go", StringComparison.OrdinalIgnoreCase) || 
+                input.StartsWith("go ", StringComparison.OrdinalIgnoreCase))
             {
+                if (TryExecuteGoCommand(input))
+                {
+                    _logger.Info($"[HANDLED] Command '{input}' handled by: Go Command (explicit)");
+                    return;
+                }
+                // If explicit "go" command didn't match an exit, fall through to verb resolution
+                // (in case there's a "go" verb defined somewhere)
+            }
+
+            // Try to execute as a verb first
+            if (_verbResolver.TryExecuteVerb(input, _player, this))
+            {
+                // Verb logging is done inside VerbResolverInstance with verb name and object details
                 return;
             }
 
-            // Try to execute as a "go" command for movement
-            if (TryExecuteGoCommand(input))
+            // After verb resolution fails, check for implicit "go" command (direct exit name/abbreviation)
+            // Only check if input is NOT an explicit "go" command (already handled above)
+            if (!input.Equals("go", StringComparison.OrdinalIgnoreCase) && 
+                !input.StartsWith("go ", StringComparison.OrdinalIgnoreCase))
             {
-                return;
+                var exit = FindExitByNameOrAbbreviation(input, _player);
+                if (exit != null)
+                {
+                    if (TryExecuteExit(exit, _player))
+                    {
+                        _logger.Info($"[HANDLED] Command '{input}' handled by: Exit (implicit)");
+                        return;
+                    }
+                }
             }
 
             // Fall back to essential built-in commands only
@@ -256,12 +475,15 @@ public class CommandProcessor
             switch (command)
             {
                 case "script":
+                    _logger.Info($"[HANDLED] Command '{input}' handled by: Built-in Command (script)");
                     HandleScript(input);
                     break;
                 case "@password":
+                    _logger.Info($"[HANDLED] Command '{input}' handled by: Built-in Command (@password)");
                     HandlePasswordCommand(parts);
                     break;
                 case "@name":
+                    _logger.Info($"[HANDLED] Command '{input}' handled by: Built-in Command (@name)");
                     HandleNameCommand(parts);
                     break;
                 // case "help":
@@ -269,9 +491,11 @@ public class CommandProcessor
                 //     break;
                 case "quit":
                 case "exit":
+                    _logger.Info($"[HANDLED] Command '{input}' handled by: Built-in Command (quit/exit)");
                     HandleQuit();
                     break;
                 default:
+                    _logger.Warning($"[UNHANDLED] Command '{input}' not recognized - sending 'Unknown command' message to player");
                     SendToPlayer($"Unknown command: {command}. Type 'help' for available commands.");
                     break;
             }
@@ -279,27 +503,243 @@ public class CommandProcessor
         catch (Exception ex)
         {
             SendToPlayer($"Error processing command \"{input.ToUpperInvariant()}\": {ex.Message}");
-            Logger.Error($"Error in command processing: {ex.Message}");
-            Logger.Error($"Stack trace: {ex.StackTrace}");
+            _logger.Error($"Error in command processing: {ex.Message}");
+            _logger.Error($"Stack trace: {ex.StackTrace}");
+        }
+    }
+
+    /// <summary>
+    /// Extracts all capitalized letters and numbers from an exit name to create an abbreviation
+    /// </summary>
+    private static string ExtractAbbreviation(string exitName)
+    {
+        if (string.IsNullOrEmpty(exitName))
+            return string.Empty;
+
+        var abbreviation = new System.Text.StringBuilder();
+        foreach (char c in exitName)
+        {
+            if (char.IsUpper(c) || char.IsDigit(c))
+            {
+                abbreviation.Append(c);
+            }
+        }
+        return abbreviation.ToString();
+    }
+
+    /// <summary>
+    /// Finds an exit in the player's current room matching the input (by exact name or abbreviation)
+    /// </summary>
+    private GameObject? FindExitByNameOrAbbreviation(string input, Player player)
+    {
+        if (player?.Location == null || string.IsNullOrWhiteSpace(input))
+            return null;
+
+        var exits = _roomManager.GetExits(player.Location.Id);
+        if (exits.Count == 0)
+            return null;
+
+        var lowerInput = input.Trim().ToLowerInvariant();
+        var upperInput = input.Trim().ToUpperInvariant();
+
+        foreach (var exit in exits)
+        {
+            var exitDirection = _objectManager.GetProperty(exit, "direction")?.AsString;
+            if (string.IsNullOrEmpty(exitDirection))
+                continue;
+
+            // Check exact name match (case-insensitive)
+            if (exitDirection.Equals(input, StringComparison.OrdinalIgnoreCase) ||
+                exitDirection.Trim('"').Equals(lowerInput, StringComparison.OrdinalIgnoreCase))
+            {
+                return exit;
+            }
+
+            // Check abbreviation match
+            // Extract abbreviation from exit name only, then compare with literal user input (uppercased)
+            var exitAbbreviation = ExtractAbbreviation(exitDirection).ToUpperInvariant();
+            if (!string.IsNullOrEmpty(exitAbbreviation))
+            {
+                // Compare the literal user input (uppercased) with the exit abbreviation
+                // e.g., user types "n" -> "N" should match "N" from "North"
+                if (exitAbbreviation.Equals(upperInput, StringComparison.OrdinalIgnoreCase))
+                {
+                    return exit;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Attempts to move the player through the matched exit
+    /// </summary>
+    private bool TryExecuteExit(GameObject exit, Player player)
+    {
+        if (exit == null || player == null)
+            return false;
+
+        var destination = _roomManager.GetExitDestination(exit);
+        if (destination == null)
+        {
+            SendToPlayer("<p class='error' style='color:red'>That exit doesn't lead anywhere.</p>");
+            return true; // Exit exists but broken - we handled the command
+        }
+
+        // Move the player
+        if (_objectManager.MoveObject(player, destination))
+        {
+            var exitDirection = _objectManager.GetProperty(exit, "direction")?.AsString ?? "that way";
+            SendToPlayer($"<p class='success' style='color:dodgerblue'>You go <span class='param' style='color:yellow'>{exitDirection}</span>.</p>");
+            
+            // Show destination description using the room's Description() function
+            try
+            {
+                // Try to call the Description() function on the destination room
+                var scriptEngine = _scriptEngineFactory.Create();
+                var descriptionFunction = _functionResolver.FindFunction(destination.Id, "Description");
+                if (descriptionFunction != null)
+                {
+                    var description = scriptEngine.ExecuteFunction(descriptionFunction, Array.Empty<object>(), player, this, destination.Id);
+                    if (description != null && !string.IsNullOrEmpty(description.ToString()))
+                    {
+                        SendToPlayer(description.ToString()!);
+                    }
+                    else
+                    {
+                        // Fallback to property access if Description() returns null/empty
+                        var destinationName = _objectManager.GetProperty(destination, "name")?.AsString ?? destination.Id;
+                        var destinationDesc = _objectManager.GetProperty(destination, "description")?.AsString ?? "You see nothing special.";
+                        SendToPlayer($"<h3 style='color:dodgerblue;margin:0;font-weight:bold'>{destinationName}</h3>");
+                        if (!string.IsNullOrEmpty(destinationDesc))
+                        {
+                            SendToPlayer($"<p style='margin:0.5em 0'>{destinationDesc}</p>");
+                        }
+                    }
+                }
+                else
+                {
+                    // No Description() function, use property access as fallback
+                    var destinationName = _objectManager.GetProperty(destination, "name")?.AsString ?? destination.Id;
+                    var destinationDesc = _objectManager.GetProperty(destination, "description")?.AsString ?? "You see nothing special.";
+                    SendToPlayer($"<h3 style='color:dodgerblue;margin:0;font-weight:bold'>{destinationName}</h3>");
+                    if (!string.IsNullOrEmpty(destinationDesc))
+                    {
+                        SendToPlayer($"<p style='margin:0.5em 0'>{destinationDesc}</p>");
+                    }
+                }
+            }
+            catch
+            {
+                // If function execution fails, fall back to property access
+                try
+                {
+                    var name = _objectManager.GetProperty(destination, "name")?.AsString ?? destination.Id;
+                    var desc = _objectManager.GetProperty(destination, "description")?.AsString ?? "You see nothing special.";
+                    SendToPlayer($"<h3 style='color:dodgerblue;margin:0;font-weight:bold'>{name}</h3>");
+                    if (!string.IsNullOrEmpty(desc))
+                    {
+                        SendToPlayer($"<p style='margin:0.5em 0'>{desc}</p>");
+                    }
+                }
+                catch
+                {
+                    // Last resort fallback
+                    var name = _objectManager.GetProperty(destination, "name")?.AsString ?? destination.Id;
+                    SendToPlayer($"<h3>{name}</h3>");
+                }
+            }
+            
+            return true;
+        }
+        else
+        {
+            SendToPlayer("<p class='error' style='color:red'>You can't go that way.</p>");
+            return true; // We handled the command, but movement failed
         }
     }
 
     /// <summary>
     /// Tries to execute the input as a "go" command for movement
     /// </summary>
-private bool TryExecuteGoCommand(string input)
-{
+    private bool TryExecuteGoCommand(string input)
+    {
+        if (_player == null) return false;
 
-    if (_player == null) return false;
+        // Handle explicit "go" command - extract parameter
+        string parameter;
+        if (input.Equals("go", StringComparison.OrdinalIgnoreCase))
+        {
+            // Just "go" with no parameter - show available exits
+            if (_player.Location == null) return false;
+            var availableExits = _roomManager.GetExits(_player.Location.Id);
+            if (availableExits.Count == 0)
+            {
+                SendToPlayer("<p class='error' style='color:red'>There are no exits from here.</p>");
+                return true;
+            }
 
-        var goCommand = $"go {input}";
+            var exitNames = new List<string>();
+            foreach (var exitObj in availableExits)
+            {
+                var dir = _objectManager.GetProperty(exitObj, "direction")?.AsString;
+                if (!string.IsNullOrEmpty(dir))
+                {
+                    exitNames.Add(dir);
+                }
+            }
+            var exitsList = $"Available exits: <span class='param' style='color:yellow'>{string.Join(", ", exitNames)}</span>";
+            SendToPlayer(exitsList);
+            SendToPlayer("<p class='usage' style='color:green'>Usage: <span class='command' style='color:yellow'>go <span class='param' style='color:gray'>&lt;direction&gt;</span></span></p>");
+            return true;
+        }
+        else if (input.StartsWith("go ", StringComparison.OrdinalIgnoreCase))
+        {
+            parameter = input.Substring(3).Trim();
+        }
+        else
+        {
+            // Not a "go" command
+            return false;
+        }
 
-        
-        var result = VerbResolver.TryExecuteVerb(goCommand, _player, this);
+        if (string.IsNullOrWhiteSpace(parameter))
+        {
+            // "go " with no parameter - show available exits
+            if (_player.Location == null) return false;
+            var availableExitsList = _roomManager.GetExits(_player.Location.Id);
+            if (availableExitsList.Count == 0)
+            {
+                SendToPlayer("<p class='error' style='color:red'>There are no exits from here.</p>");
+                return true;
+            }
 
-        return result;
+            var exitNamesList = new List<string>();
+            foreach (var exitObj in availableExitsList)
+            {
+                var dir = _objectManager.GetProperty(exitObj, "direction")?.AsString;
+                if (!string.IsNullOrEmpty(dir))
+                {
+                    exitNamesList.Add(dir);
+                }
+            }
+            var exitsDisplay = $"Available exits: <span class='param' style='color:yellow'>{string.Join(", ", exitNamesList)}</span>";
+            SendToPlayer(exitsDisplay);
+            SendToPlayer("<p class='usage' style='color:green'>Usage: <span class='command' style='color:yellow'>go <span class='param' style='color:gray'>&lt;direction&gt;</span></span></p>");
+            return true;
+        }
 
-}
+        // Find exit by name or abbreviation
+        var exit = FindExitByNameOrAbbreviation(parameter, _player);
+        if (exit == null)
+        {
+            SendToPlayer("<p class='error' style='color:red'>You can't go that way.</p>");
+            return true; // We handled the command, but no exit matched
+        }
+
+        return TryExecuteExit(exit, _player);
+    }
 
     private void HandleScript(string input)
     {
@@ -313,13 +753,18 @@ private bool TryExecuteGoCommand(string input)
 
         try
         {
-            var scriptEngine = new Scripting.ScriptEngine();
+            var scriptEngine = _scriptEngineFactory.Create();
             var result = scriptEngine.ExecuteVerb(
                 new Verb { Name = "script", Code = scriptCode, ObjectId = _player?.Id ?? "system" },
                 scriptCode, _player!, this);
             if (!string.IsNullOrEmpty(result))
             {
+                _logger.Info($"[SCRIPT RESULT] Player '{_player?.Name}' (ID: {_player?.Id}): Script result: {result}");
                 SendToPlayer($"Script result: {result}");
+            }
+            else
+            {
+                _logger.Info($"[SCRIPT RESULT] Player '{_player?.Name}' (ID: {_player?.Id}): Script executed successfully (no result)");
             }
         }
         catch (Exception ex)
@@ -344,7 +789,7 @@ private bool TryExecuteGoCommand(string input)
         SendToPlayer("Goodbye!");
         if (_player != null)
         {
-            PlayerManager.DisconnectPlayer(_player.Id);
+            _playerManager.DisconnectPlayer(_player.Id);
         }
         _connection.Disconnect();
     }
@@ -360,7 +805,7 @@ private bool TryExecuteGoCommand(string input)
         {
             // Change own password
             var newPassword = parts[1];
-            PlayerManager.ChangePassword(_player.Id, newPassword);
+            _playerManager.ChangePassword(_player.Id, newPassword);
             SendToPlayer("Your password has been changed.");
         }
         else if (parts.Length == 3)
@@ -368,18 +813,18 @@ private bool TryExecuteGoCommand(string input)
             // Admin changing another player's password
             var targetName = parts[1];
             var newPassword = parts[2];
-            if (!PermissionManager.HasFlag(_player, PermissionManager.Flag.Admin))
+            if (!_permissionManager.HasFlag(_player, PermissionManager.Flag.Admin))
             {
                 SendToPlayer("You do not have permission to change other players' passwords.");
                 return;
             }
-            var targetPlayer = PlayerManager.FindPlayerByName(targetName);
+            var targetPlayer = _playerManager.FindPlayerByName(targetName);
             if (targetPlayer == null)
             {
                 SendToPlayer($"Player '{targetName}' not found.");
                 return;
             }
-            PlayerManager.ChangePassword(targetPlayer.Id, newPassword);
+            _playerManager.ChangePassword(targetPlayer.Id, newPassword);
             SendToPlayer($"Password for '{targetName}' has been changed.");
         }
         else
@@ -406,8 +851,8 @@ private bool TryExecuteGoCommand(string input)
             }
             _player.Name = newName;
             _player.Properties["name"] = new BsonValue(newName);
-            DbProvider.Instance.Update("gameobjects", _player);
-            DbProvider.Instance.Update("players", _player);
+            _dbProvider.Update("gameobjects", _player);
+            _dbProvider.Update("players", _player);
             SendToPlayer($"Your name has been changed to '{newName}'.");
         }
         else if (parts.Length == 3)
@@ -415,12 +860,12 @@ private bool TryExecuteGoCommand(string input)
             // Admin changing another player's name
             var targetName = parts[1];
             var newName = parts[2];
-            if (!PermissionManager.HasFlag(_player, PermissionManager.Flag.Admin))
+            if (!_permissionManager.HasFlag(_player, PermissionManager.Flag.Admin))
             {
                 SendToPlayer("You do not have permission to change other players' names.");
                 return;
             }
-            var targetPlayer = PlayerManager.FindPlayerByName(targetName);
+            var targetPlayer = _playerManager.FindPlayerByName(targetName);
             if (targetPlayer == null)
             {
                 SendToPlayer($"Player '{targetName}' not found.");
@@ -432,8 +877,8 @@ private bool TryExecuteGoCommand(string input)
                 return;
             }
             targetPlayer.Name = newName;
-            DbProvider.Instance.Update("gameobjects", targetPlayer);
-            DbProvider.Instance.Update("players", targetPlayer);
+            _dbProvider.Update("gameobjects", targetPlayer);
+            _dbProvider.Update("players", targetPlayer);
             SendToPlayer($"Name for '{targetName}' has been changed to '{newName}'.");
         }
         else
@@ -449,6 +894,8 @@ private bool TryExecuteGoCommand(string input)
     {
         try
         {
+            _logger.Info("DisplayLoginBanner: Starting login banner display");
+            
             // send static Stylesheet.less as css to client
             string css = Html.GetStylesheet();
             if (string.IsNullOrEmpty(css))
@@ -457,22 +904,51 @@ private bool TryExecuteGoCommand(string input)
             }
             SendToPlayer($"<style type='text/css'>{css}</style><hr/>");
 
-
-            // Find the system object first
-            var allObjects = ObjectManager.GetAllObjects();
-            var systemObj = allObjects.OfType<GameObject>().FirstOrDefault(obj => 
-                (obj.Properties.ContainsKey("name") && obj.Properties["name"].AsString == "system") ||
-                (obj.Properties.ContainsKey("isSystemObject") && obj.Properties["isSystemObject"].AsBoolean == true));
+            // Find all system objects (there might be multiple)
+            var allObjects = _objectManager.GetAllObjects();
+            _logger.Info($"DisplayLoginBanner: Found {allObjects.Count} total objects");
             
-            if (systemObj != null)
+            var systemObjects = allObjects.OfType<GameObject>().Where(obj => 
+                (obj.Properties.ContainsKey("name") && obj.Properties["name"].AsString == "system") ||
+                (obj.Properties.ContainsKey("isSystemObject") && obj.Properties["isSystemObject"].AsBoolean == true)).ToList();
+            
+            _logger.Info($"DisplayLoginBanner: Found {systemObjects.Count} system object(s)");
+            
+            if (systemObjects.Count > 0)
             {
-                // Try to find and execute the system:display_login function
-                var function = FunctionResolver.FindFunction(systemObj.Id, "display_login");
-                if (function is not null)
+                // Try to find the display_login function on any system object
+                Function? function = null;
+                GameObject? systemObj = null;
+                
+                foreach (var sysObj in systemObjects)
                 {
+                    var objName = sysObj.Properties.ContainsKey("name") ? sysObj.Properties["name"].AsString : "null";
+                    _logger.Info($"DisplayLoginBanner: Checking system object {sysObj.Id} (name: {objName})");
+                    
+                    // Get all functions on this system object for debugging
+                    var allFunctions = _functionResolver.GetFunctionsForObject(sysObj.Id, includeSystemFunctions: true);
+                    _logger.Info($"DisplayLoginBanner: System object {sysObj.Id} has {allFunctions.Count} function(s): {string.Join(", ", allFunctions.Select(f => f.Name))}");
+                    
+                    var foundFunction = _functionResolver.FindFunction(sysObj.Id, "display_login");
+                    if (foundFunction != null)
+                    {
+                        _logger.Info($"DisplayLoginBanner: Found display_login function on system object {sysObj.Id}");
+                        function = foundFunction;
+                        systemObj = sysObj;
+                        break;
+                    }
+                    else
+                    {
+                        _logger.Warning($"DisplayLoginBanner: display_login function NOT found on system object {sysObj.Id}");
+                    }
+                }
+                
+                if (function != null && systemObj != null)
+                {
+                    _logger.Info($"DisplayLoginBanner: Executing display_login function (ID: {function.Id}, ObjectId: {function.ObjectId})");
                     try
                     {
-                        var functionEngine = new Scripting.ScriptEngine();
+                        var functionEngine = _scriptEngineFactory.Create();
                         
                         // Create a minimal system player context for login banner
                         var systemPlayer = new Player
@@ -481,38 +957,54 @@ private bool TryExecuteGoCommand(string input)
                             Name = "System"
                         };
                         
+                        _logger.Info("DisplayLoginBanner: Calling ExecuteFunction...");
                         var result = functionEngine.ExecuteFunction(function, new object[0], systemPlayer, this, systemObj.Id);
+                        _logger.Info($"DisplayLoginBanner: ExecuteFunction returned: {(result != null ? result.GetType().Name : "null")}");
+                        
                         if (result != null)
                         {
                             var output = result.ToString();
+                            _logger.Info($"DisplayLoginBanner: Function output length: {output?.Length ?? 0}");
                             if (!string.IsNullOrEmpty(output))
                             {                                
                                 SendToPlayer(output);
+                                _logger.Info("DisplayLoginBanner: Successfully sent login banner to player");
                                 return;
                             }
+                            else
+                            {
+                                _logger.Warning("DisplayLoginBanner: Function returned empty output");
+                            }
+                        }
+                        else
+                        {
+                            _logger.Warning("DisplayLoginBanner: Function returned null");
                         }
                     }
                     catch (Exception funcEx)
                     {
-                        Logger.Warning($"Error executing display_login function: {funcEx.Message}");
+                        _logger.Error($"DisplayLoginBanner: Error executing display_login function: {funcEx.Message}");
+                        _logger.Error($"DisplayLoginBanner: Stack trace: {funcEx.StackTrace}");
                     }
                 }
                 else
                 {
-                    Logger.Warning("display_login function not found on system object");
+                    _logger.Warning($"DisplayLoginBanner: display_login function not found on any of {systemObjects.Count} system object(s)");
                 }
             }
             else
             {
-                Logger.Warning("System object not found for login banner");
+                _logger.Warning("DisplayLoginBanner: No system objects found for login banner");
             }
         }
         catch (Exception ex)
         {
-            Logger.Error($"Error displaying login banner from function: {ex.Message}");
+            _logger.Error($"DisplayLoginBanner: Error displaying login banner from function: {ex.Message}");
+            _logger.Error($"DisplayLoginBanner: Stack trace: {ex.StackTrace}");
         }
 
         // Fallback to static banner if function fails or doesn't exist
+        _logger.Info("DisplayLoginBanner: Falling back to static banner");
         SendToPlayer("=== Welcome to CSMOO ===");
         SendToPlayer("A Multi-User Shared Object-Oriented Environment");
         SendToPlayer("");
@@ -530,6 +1022,24 @@ private bool TryExecuteGoCommand(string input)
         {
             try
             {
+                // Send stylesheet once per session when player is logged in
+                if (_player != null && !_stylesheetSent)
+                {
+                    try
+                    {
+                        string css = Html.GetStylesheet();
+                        if (!string.IsNullOrEmpty(css))
+                        {
+                            _ = session.Connection.SendMessageAsync($"<style type='text/css'>{css}</style>\r\n");
+                        }
+                    }
+                    catch
+                    {
+                        // Stylesheet not available, continue without it
+                    }
+                    _stylesheetSent = true;
+                }
+                
                 _ = session.Connection.SendMessageAsync(message + "\r\n");
             }
             catch
@@ -570,11 +1080,11 @@ private bool TryExecuteGoCommand(string input)
         }
         if (input.Trim() == ".")
         {
-            var obj = ObjectManager.GetObject(_editTargetObjectId!);
+            var obj = _objectManager.GetObject(_editTargetObjectId!);
             if (obj != null && _editTargetPropName != null)
             {
                 obj.Properties[_editTargetPropName] = new BsonArray(_editBuffer.Select(line => new BsonValue(line)));
-                DbProvider.Instance.Update("gameobjects", obj);
+                _dbProvider.Update("gameobjects", obj);
                 SendToPlayer($"Property '{_editTargetPropName}' updated with {_editBuffer.Count} lines.");
             }
             else

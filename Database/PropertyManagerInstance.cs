@@ -1,0 +1,196 @@
+using LiteDB;
+using CSMOO.Object;
+
+namespace CSMOO.Database;
+
+/// <summary>
+/// Instance-based property manager implementation for dependency injection
+/// </summary>
+public class PropertyManagerInstance : IPropertyManager
+{
+    private readonly IDbProvider _dbProvider;
+    private readonly IClassManager _classManager;
+    private readonly IObjectManager _objectManager;
+    
+    public PropertyManagerInstance(IDbProvider dbProvider, IClassManager classManager, IObjectManager objectManager)
+    {
+        _dbProvider = dbProvider;
+        _classManager = classManager;
+        _objectManager = objectManager;
+    }
+    
+    /// <summary>
+    /// Gets a property value from an object, checking inheritance chain if not found on instance
+    /// </summary>
+    public BsonValue? GetProperty(GameObject gameObject, string propertyName)
+    {
+        // First check if the property exists on the instance itself
+        if (gameObject.Properties.ContainsKey(propertyName))
+            return gameObject.Properties[propertyName];
+
+        // If not found on instance, check the inheritance chain
+        var inheritanceChain = _classManager.GetInheritanceChain(gameObject.ClassId);
+        
+        // Walk the chain from most specific to least specific (reverse order)
+        foreach (var objectClass in inheritanceChain.AsEnumerable().Reverse())
+        {
+            if (objectClass.Properties.ContainsKey(propertyName))
+                return objectClass.Properties[propertyName];
+        }
+
+        return null; // Property not found anywhere in the chain
+    }
+
+    /// <summary>
+    /// Sets a property value on an object instance
+    /// </summary>
+    public void SetProperty(GameObject gameObject, string propertyName, BsonValue value)
+    {
+        gameObject.Properties[propertyName] = value;
+        _dbProvider.Update("gameobjects", gameObject);
+    }
+
+    /// <summary>
+    /// Sets a property value by object ID
+    /// </summary>
+    public bool SetProperty(string objectId, string propertyName, BsonValue value)
+    {
+        var gameObject = _objectManager.GetObject(objectId);
+        if (gameObject == null) return false;
+
+        SetProperty(gameObject, propertyName, value);
+        return true;
+    }
+
+    /// <summary>
+    /// Removes a property from an object instance
+    /// </summary>
+    public bool RemoveProperty(GameObject gameObject, string propertyName)
+    {
+        if (!gameObject.Properties.ContainsKey(propertyName))
+            return false;
+
+        gameObject.Properties.Remove(propertyName);
+        _dbProvider.Update("gameobjects", gameObject);
+        return true;
+    }
+
+    /// <summary>
+    /// Removes a property by object ID
+    /// </summary>
+    public bool RemoveProperty(string objectId, string propertyName)
+    {
+        var gameObject = _objectManager.GetObject(objectId);
+        if (gameObject == null) return false;
+
+        return RemoveProperty(gameObject, propertyName);
+    }
+
+    /// <summary>
+    /// Checks if an object has a property (including inherited properties)
+    /// </summary>
+    public bool HasProperty(GameObject gameObject, string propertyName)
+    {
+        return GetProperty(gameObject, propertyName) != null;
+    }
+
+    /// <summary>
+    /// Gets all property names from an object (including inherited properties)
+    /// </summary>
+    public string[] GetAllPropertyNames(GameObject gameObject)
+    {
+        var allProperties = new System.Collections.Generic.HashSet<string>();
+
+        // Add instance properties
+        foreach (var key in gameObject.Properties.Keys)
+        {
+            allProperties.Add(key);
+        }
+
+        // Add inherited properties
+        var inheritanceChain = _classManager.GetInheritanceChain(gameObject.ClassId);
+        foreach (var objectClass in inheritanceChain)
+        {
+            foreach (var key in objectClass.Properties.Keys)
+            {
+                allProperties.Add(key);
+            }
+        }
+
+        return allProperties.ToArray();
+    }
+
+    /// <summary>
+    /// Merges properties from source into target, with source taking priority
+    /// </summary>
+    public void MergeProperties(BsonDocument target, BsonDocument source)
+    {
+        foreach (var element in source)
+        {
+            target[element.Key] = element.Value;
+        }
+    }
+
+    /// <summary>
+    /// Copies all properties from one object to another
+    /// </summary>
+    public void CopyProperties(GameObject source, GameObject target, bool overwriteExisting = true)
+    {
+        foreach (var property in source.Properties)
+        {
+            if (overwriteExisting || !target.Properties.ContainsKey(property.Key))
+            {
+                target.Properties[property.Key] = property.Value;
+            }
+        }
+
+        _dbProvider.Update("gameobjects", target);
+    }
+
+    /// <summary>
+    /// Gets the effective value of a property (resolved through inheritance)
+    /// </summary>
+    public T? GetPropertyValue<T>(GameObject gameObject, string propertyName, T? defaultValue = default)
+    {
+        var value = GetProperty(gameObject, propertyName);
+        if (value == null) return defaultValue;
+
+        try
+        {
+            if (typeof(T) == typeof(string))
+                return (T)(object)value.AsString;
+            if (typeof(T) == typeof(int))
+                return (T)(object)value.AsInt32;
+            if (typeof(T) == typeof(bool))
+                return (T)(object)value.AsBoolean;
+            if (typeof(T) == typeof(double))
+                return (T)(object)value.AsDouble;
+            if (typeof(T) == typeof(DateTime))
+                return (T)(object)value.AsDateTime;
+
+            return defaultValue;
+        }
+        catch
+        {
+            return defaultValue;
+        }
+    }
+
+    /// <summary>
+    /// Sets a strongly-typed property value
+    /// </summary>
+    public void SetPropertyValue<T>(GameObject gameObject, string propertyName, T value)
+    {
+        BsonValue bsonValue = value switch
+        {
+            string s => new BsonValue(s),
+            int i => new BsonValue(i),
+            bool b => new BsonValue(b),
+            double d => new BsonValue(d),
+            DateTime dt => new BsonValue(dt),
+            _ => new BsonValue(value?.ToString() ?? "")
+        };
+
+        SetProperty(gameObject, propertyName, bsonValue);
+    }
+}
