@@ -369,3 +369,9 @@ config/
 data/
 logs/
 temp/
+
+# NuGet folders and cache
+.nuget/
+.nuget
+.dotnet/
+packages/
