@@ -422,6 +422,40 @@ internal class Program
             return new FunctionResolverInstance(dbProvider, objectManager);
         });
         
+        // CompilationCache - singleton (one cache instance for the entire application)
+        services.AddSingleton<CSMOO.Scripting.ICompilationCache>(sp => new CSMOO.Scripting.CompilationCache());
+        
+        // ScriptPrecompiler - singleton (one precompiler instance for the entire application)
+        services.AddSingleton<CSMOO.Scripting.IScriptPrecompiler>(sp =>
+        {
+            // Force InstanceManager to be created first to ensure it's set on ObjectManager
+            var _ = sp.GetRequiredService<IInstanceManager>();
+            
+            var objectManager = sp.GetRequiredService<IObjectManager>();
+            var logger = sp.GetRequiredService<ILogger>();
+            var config = sp.GetRequiredService<IConfig>();
+            var objectResolver = sp.GetRequiredService<IObjectResolver>();
+            var verbResolver = sp.GetRequiredService<IVerbResolver>();
+            var functionResolver = sp.GetRequiredService<IFunctionResolver>();
+            var dbProvider = sp.GetRequiredService<IDbProvider>();
+            var playerManager = sp.GetRequiredService<IPlayerManager>();
+            var verbManager = sp.GetRequiredService<IVerbManager>();
+            var roomManager = sp.GetRequiredService<IRoomManager>();
+            return new CSMOO.Scripting.ScriptPrecompiler(objectManager, logger, config, objectResolver, verbResolver, functionResolver, dbProvider, playerManager, verbManager, roomManager);
+        });
+        
+        // CompilationInitializer - singleton (one initializer instance for the entire application)
+        services.AddSingleton<CSMOO.Scripting.ICompilationInitializer>(sp =>
+        {
+            var precompiler = sp.GetRequiredService<CSMOO.Scripting.IScriptPrecompiler>();
+            var cache = sp.GetRequiredService<CSMOO.Scripting.ICompilationCache>();
+            var verbManager = sp.GetRequiredService<IVerbManager>();
+            var functionManager = sp.GetRequiredService<IFunctionManager>();
+            var logger = sp.GetRequiredService<ILogger>();
+            var dbProvider = sp.GetRequiredService<IDbProvider>();
+            return new CSMOO.Scripting.CompilationInitializer(precompiler, cache, verbManager, functionManager, logger, dbProvider);
+        });
+        
         // ScriptEngineFactory - singleton (one factory instance for the entire application)
         services.AddSingleton<IScriptEngineFactory>(sp =>
         {
@@ -438,7 +472,8 @@ internal class Program
             var playerManager = sp.GetRequiredService<IPlayerManager>();
             var verbManager = sp.GetRequiredService<IVerbManager>();
             var roomManager = sp.GetRequiredService<IRoomManager>();
-            return new ScriptEngineFactory(objectManager, logger, config, objectResolver, verbResolver, functionResolver, dbProvider, playerManager, verbManager, roomManager);
+            var compilationCache = sp.GetRequiredService<CSMOO.Scripting.ICompilationCache>();
+            return new ScriptEngineFactory(objectManager, logger, config, objectResolver, verbResolver, functionResolver, dbProvider, playerManager, verbManager, roomManager, compilationCache);
         });
         
         // SessionHandler - singleton (one session handler instance for the entire application)

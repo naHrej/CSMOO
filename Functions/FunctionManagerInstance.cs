@@ -224,4 +224,13 @@ public class FunctionManagerInstance : IFunctionManager
         function.AccessModifiers = permissions;
         return UpdateFunction(function);
     }
+
+    /// <summary>
+    /// Gets all functions from the database
+    /// </summary>
+    public List<Function> GetAllFunctions()
+    {
+        var functionCollection = _gameDatabase.GetCollection<Function>("functions");
+        return functionCollection.FindAll().ToList();
+    }
 }

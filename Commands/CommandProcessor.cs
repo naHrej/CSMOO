@@ -40,6 +40,8 @@ public class CommandProcessor
     private readonly ICoreHotReloadManager? _coreHotReloadManager;
     private readonly IFunctionInitializer? _functionInitializer;
     private readonly IPropertyInitializer? _propertyInitializer;
+    private readonly CSMOO.Scripting.IScriptPrecompiler _scriptPrecompiler;
+    private readonly CSMOO.Scripting.ICompilationCache _compilationCache;
     private Player? _player;
     private ProgrammingCommands? _programmingCommands;
     private bool _stylesheetSent = false; // Track if stylesheet has been sent to this session
@@ -65,6 +67,8 @@ public class CommandProcessor
         IScriptEngineFactory scriptEngineFactory,
         IVerbManager verbManager,
         IFunctionManager functionManager,
+        CSMOO.Scripting.IScriptPrecompiler scriptPrecompiler,
+        CSMOO.Scripting.ICompilationCache compilationCache,
         IHotReloadManager? hotReloadManager = null,
         ICoreHotReloadManager? coreHotReloadManager = null,
         IFunctionInitializer? functionInitializer = null,
@@ -84,6 +88,8 @@ public class CommandProcessor
         _scriptEngineFactory = scriptEngineFactory ?? throw new ArgumentNullException(nameof(scriptEngineFactory));
         _verbManager = verbManager ?? throw new ArgumentNullException(nameof(verbManager));
         _functionManager = functionManager ?? throw new ArgumentNullException(nameof(functionManager));
+        _scriptPrecompiler = scriptPrecompiler ?? throw new ArgumentNullException(nameof(scriptPrecompiler));
+        _compilationCache = compilationCache ?? throw new ArgumentNullException(nameof(compilationCache));
         _hotReloadManager = hotReloadManager;
         _coreHotReloadManager = coreHotReloadManager;
         _functionInitializer = functionInitializer;
@@ -93,7 +99,7 @@ public class CommandProcessor
         
         if (_player != null)
         {
-            _programmingCommands = new ProgrammingCommands(this, _player, _permissionManager, _verbManager, _functionResolver, _objectManager, _playerManager, _dbProvider, _gameDatabase, _logger, _roomManager, _functionManager, _hotReloadManager, _coreHotReloadManager, _functionInitializer, _propertyInitializer);
+            _programmingCommands = new ProgrammingCommands(this, _player, _permissionManager, _verbManager, _functionResolver, _objectManager, _playerManager, _dbProvider, _gameDatabase, _logger, _roomManager, _functionManager, _scriptPrecompiler, _compilationCache, _hotReloadManager, _coreHotReloadManager, _functionInitializer, _propertyInitializer);
         }
     }
 
@@ -103,7 +109,7 @@ public class CommandProcessor
                CreateDefaultPlayerManager(), CreateDefaultVerbResolver(), CreateDefaultPermissionManager(), 
                CreateDefaultObjectManager(), CreateDefaultFunctionResolver(), CreateDefaultDbProvider(), 
                CreateDefaultGameDatabase(), CreateDefaultLogger(), CreateDefaultRoomManager(), new ScriptEngineFactory(),
-               CreateDefaultVerbManager(), CreateDefaultFunctionManager(), CreateDefaultHotReloadManager(), CreateDefaultCoreHotReloadManager(), CreateDefaultFunctionInitializer(), CreateDefaultPropertyInitializer())
+               CreateDefaultVerbManager(), CreateDefaultFunctionManager(), CreateDefaultScriptPrecompiler(), CreateDefaultCompilationCache(), CreateDefaultHotReloadManager(), CreateDefaultCoreHotReloadManager(), CreateDefaultFunctionInitializer(), CreateDefaultPropertyInitializer())
     {
     }
 
@@ -113,7 +119,7 @@ public class CommandProcessor
                CreateDefaultPlayerManager(), CreateDefaultVerbResolver(), CreateDefaultPermissionManager(),
                CreateDefaultObjectManager(), CreateDefaultFunctionResolver(), CreateDefaultDbProvider(),
                CreateDefaultGameDatabase(), CreateDefaultLogger(), CreateDefaultRoomManager(), new ScriptEngineFactory(),
-               CreateDefaultVerbManager(), CreateDefaultFunctionManager(), CreateDefaultHotReloadManager(), CreateDefaultCoreHotReloadManager(), CreateDefaultFunctionInitializer(), CreateDefaultPropertyInitializer())
+               CreateDefaultVerbManager(), CreateDefaultFunctionManager(), CreateDefaultScriptPrecompiler(), CreateDefaultCompilationCache(), CreateDefaultHotReloadManager(), CreateDefaultCoreHotReloadManager(), CreateDefaultFunctionInitializer(), CreateDefaultPropertyInitializer())
     {
     }
 
@@ -218,6 +224,28 @@ public class CommandProcessor
         return new PropertyInitializerInstance(dbProvider, logger, objectManager);
     }
 
+    private static CSMOO.Scripting.IScriptPrecompiler CreateDefaultScriptPrecompiler()
+    {
+        var dbProvider = DbProvider.Instance;
+        var logger = new LoggerInstance(Config.Instance);
+        var config = Config.Instance;
+        var classManager = new ClassManagerInstance(dbProvider, logger);
+        var objectManager = new ObjectManagerInstance(dbProvider, classManager);
+        var coreClassFactory = new CoreClassFactoryInstance(dbProvider, logger);
+        var objectResolver = new ObjectResolverInstance(objectManager, coreClassFactory);
+        var verbResolver = new VerbResolverInstance(dbProvider, objectManager, logger);
+        var functionResolver = new FunctionResolverInstance(dbProvider, objectManager);
+        var playerManager = new PlayerManagerInstance(dbProvider);
+        var verbManager = new VerbManagerInstance(dbProvider);
+        var roomManager = new RoomManagerInstance(dbProvider, logger, objectManager);
+        return new CSMOO.Scripting.ScriptPrecompiler(objectManager, logger, config, objectResolver, verbResolver, functionResolver, dbProvider, playerManager, verbManager, roomManager);
+    }
+
+    private static CSMOO.Scripting.ICompilationCache CreateDefaultCompilationCache()
+    {
+        return new CSMOO.Scripting.CompilationCache();
+    }
+
     /// <summary>
     /// Processes a command from the player
     /// </summary>
@@ -317,7 +345,7 @@ public class CommandProcessor
             _player = _playerManager.GetPlayerBySession(_sessionGuid);
             if (_player != null)
             {
-                _programmingCommands = new ProgrammingCommands(this, _player, _permissionManager, _verbManager, _functionResolver, _objectManager, _playerManager, _dbProvider, _gameDatabase, _logger, _roomManager, _functionManager, _hotReloadManager, _coreHotReloadManager, _functionInitializer, _propertyInitializer);
+                _programmingCommands = new ProgrammingCommands(this, _player, _permissionManager, _verbManager, _functionResolver, _objectManager, _playerManager, _dbProvider, _gameDatabase, _logger, _roomManager, _functionManager, _scriptPrecompiler, _compilationCache, _hotReloadManager, _coreHotReloadManager, _functionInitializer, _propertyInitializer);
                 
                 // Log player connection and check for admin flag
                 var hasAdmin = _permissionManager.HasFlag(_player, PermissionManager.Flag.Admin);
@@ -360,7 +388,7 @@ public class CommandProcessor
             // Auto-login the new player
             _playerManager.ConnectPlayerToSession(newPlayer.Id, _sessionGuid);
             _player = newPlayer;
-            _programmingCommands = new ProgrammingCommands(this, _player, _permissionManager, _verbManager, _functionResolver, _objectManager, _playerManager, _dbProvider, _gameDatabase, _logger, _roomManager, _functionManager, _hotReloadManager, _coreHotReloadManager, _functionInitializer, _propertyInitializer);
+            _programmingCommands = new ProgrammingCommands(this, _player, _permissionManager, _verbManager, _functionResolver, _objectManager, _playerManager, _dbProvider, _gameDatabase, _logger, _roomManager, _functionManager, _scriptPrecompiler, _compilationCache, _hotReloadManager, _coreHotReloadManager, _functionInitializer, _propertyInitializer);
             
             // Log player creation and check for admin flag
             var hasAdmin = _permissionManager.HasFlag(_player, PermissionManager.Flag.Admin);
@@ -394,7 +422,7 @@ public class CommandProcessor
                 _player = _playerManager.GetPlayerBySession(_sessionGuid);
                 if (_player != null && _programmingCommands == null)
                 {
-                    _programmingCommands = new ProgrammingCommands(this, _player, _permissionManager, _verbManager, _functionResolver, _objectManager, _playerManager, _dbProvider, _gameDatabase, _logger, _roomManager, _functionManager, _hotReloadManager, _coreHotReloadManager, _functionInitializer, _propertyInitializer);
+                    _programmingCommands = new ProgrammingCommands(this, _player, _permissionManager, _verbManager, _functionResolver, _objectManager, _playerManager, _dbProvider, _gameDatabase, _logger, _roomManager, _functionManager, _scriptPrecompiler, _compilationCache, _hotReloadManager, _coreHotReloadManager, _functionInitializer, _propertyInitializer);
                 }
             }
 

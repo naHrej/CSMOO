@@ -6,6 +6,7 @@ using CSMOO.Object;
 using CSMOO.Init;
 using CSMOO.Core;
 using CSMOO.Configuration;
+using CSMOO.Scripting;
 using System.Text;
 
 namespace CSMOO.Commands;
@@ -31,6 +32,8 @@ public class ProgrammingCommands
     private readonly IFunctionManager _functionManager;
     private readonly IFunctionInitializer? _functionInitializer;
     private readonly IPropertyInitializer? _propertyInitializer;
+    private readonly IScriptPrecompiler _scriptPrecompiler;
+    private readonly ICompilationCache _compilationCache;
     
     // For multi-line programming
     private bool _isInProgrammingMode = false;
@@ -52,6 +55,8 @@ public class ProgrammingCommands
         ILogger logger,
         IRoomManager roomManager,
         IFunctionManager functionManager,
+        IScriptPrecompiler scriptPrecompiler,
+        ICompilationCache compilationCache,
         IHotReloadManager? hotReloadManager = null,
         ICoreHotReloadManager? coreHotReloadManager = null,
         IFunctionInitializer? functionInitializer = null,
@@ -69,6 +74,8 @@ public class ProgrammingCommands
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _roomManager = roomManager ?? throw new ArgumentNullException(nameof(roomManager));
         _functionManager = functionManager ?? throw new ArgumentNullException(nameof(functionManager));
+        _scriptPrecompiler = scriptPrecompiler ?? throw new ArgumentNullException(nameof(scriptPrecompiler));
+        _compilationCache = compilationCache ?? throw new ArgumentNullException(nameof(compilationCache));
         _hotReloadManager = hotReloadManager;
         _coreHotReloadManager = coreHotReloadManager;
         _functionInitializer = functionInitializer;
@@ -81,6 +88,7 @@ public class ProgrammingCommands
                CreateDefaultPermissionManager(), CreateDefaultVerbManager(), CreateDefaultFunctionResolver(),
                CreateDefaultObjectManager(), CreateDefaultPlayerManager(), CreateDefaultDbProvider(),
                CreateDefaultGameDatabase(), CreateDefaultLogger(), CreateDefaultRoomManager(), CreateDefaultFunctionManager(),
+               CreateDefaultScriptPrecompiler(), CreateDefaultCompilationCache(),
                CreateDefaultHotReloadManager(), CreateDefaultCoreHotReloadManager(),
                CreateDefaultFunctionInitializer(), CreateDefaultPropertyInitializer())
     {
@@ -180,6 +188,28 @@ public class ProgrammingCommands
         var classManager = new ClassManagerInstance(dbProvider, logger);
         var objectManager = new ObjectManagerInstance(dbProvider, classManager);
         return new PropertyInitializerInstance(dbProvider, logger, objectManager);
+    }
+
+    private static IScriptPrecompiler CreateDefaultScriptPrecompiler()
+    {
+        var dbProvider = DbProvider.Instance;
+        var logger = new LoggerInstance(Config.Instance);
+        var config = Config.Instance;
+        var classManager = new ClassManagerInstance(dbProvider, logger);
+        var objectManager = new ObjectManagerInstance(dbProvider, classManager);
+        var coreClassFactory = new CoreClassFactoryInstance(dbProvider, logger);
+        var objectResolver = new ObjectResolverInstance(objectManager, coreClassFactory);
+        var verbResolver = new VerbResolverInstance(dbProvider, objectManager, logger);
+        var functionResolver = new FunctionResolverInstance(dbProvider, objectManager);
+        var playerManager = new PlayerManagerInstance(dbProvider);
+        var verbManager = new VerbManagerInstance(dbProvider);
+        var roomManager = new RoomManagerInstance(dbProvider, logger, objectManager);
+        return new ScriptPrecompiler(objectManager, logger, config, objectResolver, verbResolver, functionResolver, dbProvider, playerManager, verbManager, roomManager);
+    }
+
+    private static ICompilationCache CreateDefaultCompilationCache()
+    {
+        return new CompilationCache();
     }
 
     public bool IsInProgrammingMode => _isInProgrammingMode;
@@ -522,20 +552,50 @@ public class ProgrammingCommands
     {
         if (input.Trim() == ".")
         {
-            // Finish programming or execute script
+            // Finish programming or execute script - precompile first
             var code = _currentCode.ToString();
             
             if (!string.IsNullOrEmpty(_currentVerbId))
             {
-                // Verb programming mode - save the code
+                // Verb programming mode - precompile before saving
+                var verb = _dbProvider.FindById<Verb>("verbs", _currentVerbId);
+                if (verb == null)
+                {
+                    _commandProcessor.SendToPlayer("ERROR: Could not find verb to save code to!");
+                    _isInProgrammingMode = false;
+                    _currentCode.Clear();
+                    _currentVerbId = string.Empty;
+                    return true;
+                }
+
+                // Precompile the code (pass pattern to extract variables)
+                var compileResult = _scriptPrecompiler.PrecompileVerb(code, verb.ObjectId, verb.Pattern);
+
+                // Check for errors or warnings (warnings treated as errors)
+                if (!compileResult.Success || compileResult.Errors.Count > 0 || compileResult.Warnings.Count > 0)
+                {
+                    // Show compilation errors/warnings
+                    ShowCompilationResult(compileResult, code);
+                    _commandProcessor.SendToPlayer("\n⚠️ Code NOT saved. Fix errors and try again.");
+                    // Stay in programming mode - don't exit
+                    return true;
+                }
+
+                // Success - save code and cache compiled script
                 _verbManager.UpdateVerbCode(_currentVerbId, code);
-                // Verify the code was saved using DbProvider
+                
+                // Cache the compiled script
+                if (compileResult.CompiledScript != null)
+                {
+                    _compilationCache.SetVerb(_currentVerbId, compileResult.CompiledScript, compileResult.CodeHash);
+                }
+
+                // Verify the code was saved
                 var savedVerb = _dbProvider.FindById<Verb>("verbs", _currentVerbId);
                 if (savedVerb != null)
                 {
-                    _commandProcessor.SendToPlayer("Verb programming complete.");
+                    _commandProcessor.SendToPlayer("✓ Code compiled and saved successfully!");
                     _commandProcessor.SendToPlayer($"Code saved ({code.Split('\n').Length} lines).");
-                    _commandProcessor.SendToPlayer($"Verified: Code length is {savedVerb.Code?.Length ?? 0} characters.");
                 }
                 else
                 {
@@ -544,36 +604,67 @@ public class ProgrammingCommands
             }
             else if (!string.IsNullOrEmpty(_currentFunctionId))
             {
-                // Function programming mode - save the code
+                // Function programming mode - precompile before saving
                 var function = _dbProvider.FindById<Function>("functions", _currentFunctionId);
-                if (function != null)
+                if (function == null)
                 {
-                    function.Code = code;
-                    var updateResult = _functionManager.UpdateFunction(function);
-                    if (updateResult)
+                    _commandProcessor.SendToPlayer("ERROR: Could not find function to save code to!");
+                    _isInProgrammingMode = false;
+                    _currentCode.Clear();
+                    _currentFunctionId = string.Empty;
+                    return true;
+                }
+
+                // Precompile the code
+                var compileResult = _scriptPrecompiler.PrecompileFunction(code, function.ObjectId, function.ParameterTypes, function.ReturnType);
+
+                // Check for errors or warnings (warnings treated as errors)
+                if (!compileResult.Success || compileResult.Errors.Count > 0 || compileResult.Warnings.Count > 0)
+                {
+                    // Show compilation errors/warnings
+                    ShowCompilationResult(compileResult, code);
+                    _commandProcessor.SendToPlayer("\n⚠️ Code NOT saved. Fix errors and try again.");
+                    // Stay in programming mode - don't exit
+                    return true;
+                }
+
+                // Success - save code and cache compiled script
+                function.Code = code;
+                var updateResult = _functionManager.UpdateFunction(function);
+                if (updateResult)
+                {
+                    // Cache the compiled script
+                    if (compileResult.CompiledScript != null)
                     {
-                        _commandProcessor.SendToPlayer("Function programming complete.");
-                        _commandProcessor.SendToPlayer($"Code saved ({code.Split('\n').Length} lines).");
-                        // Re-fetch to verify
-                        var verifyFunction = _dbProvider.FindById<Function>("functions", _currentFunctionId);
-                        if (verifyFunction != null)
-                        {
-                            _commandProcessor.SendToPlayer($"Verified: Code length is {verifyFunction.Code?.Length ?? 0} characters.");
-                        }
+                        _compilationCache.SetFunction(_currentFunctionId, compileResult.CompiledScript, compileResult.CodeHash);
                     }
-                    else
-                    {
-                        _commandProcessor.SendToPlayer("ERROR: Failed to save function code.");
-                    }
+
+                    _commandProcessor.SendToPlayer("✓ Code compiled and saved successfully!");
+                    _commandProcessor.SendToPlayer($"Code saved ({code.Split('\n').Length} lines).");
                 }
                 else
                 {
-                    _commandProcessor.SendToPlayer("ERROR: Could not find function to save code to!");
+                    _commandProcessor.SendToPlayer("ERROR: Failed to save function code.");
                 }
             }
             else
             {
-                // Script mode - execute the code immediately
+                // Script mode - precompile but don't save, just execute
+                var compileResult = _scriptPrecompiler.PrecompileScript(code);
+
+                // Check for errors or warnings (warnings treated as errors)
+                if (!compileResult.Success || compileResult.Errors.Count > 0 || compileResult.Warnings.Count > 0)
+                {
+                    // Show compilation errors/warnings
+                    ShowCompilationResult(compileResult, code);
+                    _commandProcessor.SendToPlayer("\n⚠️ Script compilation failed. Fix errors and try again.");
+                    // Exit script mode
+                    _isInProgrammingMode = false;
+                    _currentCode.Clear();
+                    return true;
+                }
+
+                // Success - execute the script
                 try
                 {
                     var result = Builtins.ExecuteScript(code, _player, _commandProcessor, _player.Location!, "");
@@ -723,84 +814,139 @@ public class ProgrammingCommands
     /// </summary>
     private bool HandleListVerb(string verbSpec)
     {
-        const string progStartPrefix = "ProgStart > ";
-        const string progDataPrefix = "ProgData > ";
-        const string progEditPrefix = "ProgEdit > ";
-        const string progEndPrefix = "ProgEnd > ";
-
-        // Split from the right to handle class:Object:verb syntax
-        var lastColonIndex = verbSpec.LastIndexOf(':');
-        var objectName = verbSpec.Substring(0, lastColonIndex);
-        var verbName = verbSpec.Substring(lastColonIndex + 1);
-
-        var objectId = ResolveObject(objectName);
-
-        if (objectId == null)
+        try
         {
-            // Optionally prepare for creating a new verb
-            _commandProcessor.SendToPlayer($"{progStartPrefix}@verb {objectName} {verbName}");
-            _commandProcessor.SendToPlayer($"{progEndPrefix}.");
-            return true;
-        }
+            const string progStartPrefix = "ProgStart > ";
+            const string progDataPrefix = "ProgData > ";
+            const string progEditPrefix = "ProgEdit > ";
+            const string progEndPrefix = "ProgEnd > ";
 
-        // Retrieve the object using its objectId
-        var gameObject = _objectManager.GetObject(objectId);
-        var dbref = gameObject != null ? $"#{gameObject.DbRef}" : objectId;
-
-        if (dbref.StartsWith("class"))
-        {
-            dbref = $"class:{dbref.Substring(6)}";
-        }
-
-        var verb = _verbManager.GetVerbsOnObject(objectId)
-            .FirstOrDefault(v => v.Name.ToLower() == verbName.ToLower());
-
-        if (verb == null)
-        {
-            // Optionally prepare for creating a new verb
-            _commandProcessor.SendToPlayer($"{progStartPrefix}@verb {objectName} {verbName}");
-            _commandProcessor.SendToPlayer($"{progEndPrefix}.");
-            return true;
-        }
-
-        // Start of the listing
-        // we need to output the verb in the format of class:classname:verbname if it's a class
-        // or just object:verbname if it's a regular object
-        // This allows the player to copy the verb command directly
-
-        _commandProcessor.SendToPlayer($"{progStartPrefix}@program {dbref}:{verb.Name}");
-
-        // Verb metadata
-        _commandProcessor.SendToPlayer($"{progDataPrefix}{GetObjectName(objectId)}:{verb.Name}");
-        if (!string.IsNullOrEmpty(verb.Aliases))
-            _commandProcessor.SendToPlayer($"{progDataPrefix}Aliases: {verb.Aliases}");
-        if (!string.IsNullOrEmpty(verb.Pattern))
-            _commandProcessor.SendToPlayer($"{progDataPrefix}Pattern: {verb.Pattern}");
-        if (!string.IsNullOrEmpty(verb.Description))
-            _commandProcessor.SendToPlayer($"{progDataPrefix}Description: {verb.Description}");
-
-        _commandProcessor.SendToPlayer($"{progDataPrefix}Created by: {verb.CreatedBy} on {verb.CreatedAt:yyyy-MM-dd HH:mm}");
-
-        // Verb code
-        if (string.IsNullOrEmpty(verb.Code))
-        {
-            _commandProcessor.SendToPlayer($"{progEditPrefix}(no code)");
-        }
-        else
-        {
-            // Normalize line endings and trim each line
-            var normalizedCode = verb.Code.Replace("\r\n", "\n").Replace("\r", "\n");
-            var lines = normalizedCode.Split('\n');
-            foreach (var line in lines)
+            // Split from the right to handle class:Object:verb syntax
+            var lastColonIndex = verbSpec.LastIndexOf(':');
+            if (lastColonIndex < 0)
             {
-                _commandProcessor.SendToPlayer($"{progEditPrefix}{line.TrimEnd()}");
+                _commandProcessor.SendToPlayer("Error: Invalid verb specification format. Use <object>:<verb>");
+                return true;
             }
+            
+            var objectName = verbSpec.Substring(0, lastColonIndex);
+            var verbName = verbSpec.Substring(lastColonIndex + 1);
+
+            var objectId = ResolveObject(objectName);
+
+            if (objectId == null)
+            {
+                // Optionally prepare for creating a new verb
+                _commandProcessor.SendToPlayer($"{progStartPrefix}@verb {objectName} {verbName}");
+                _commandProcessor.SendToPlayer($"{progEndPrefix}.");
+                return true;
+            }
+
+            // Retrieve the object using its objectId
+            var gameObject = _objectManager.GetObject(objectId);
+            
+            // Check if objectId is a class ID (not an object instance)
+            var isClassId = gameObject == null && _dbProvider.FindById<ObjectClass>("objectclasses", objectId) != null;
+            
+            // Get verbs including inherited ones from classes
+            // First try direct verbs on the object/class
+            var verb = _verbManager.GetVerbsOnObject(objectId)
+                .FirstOrDefault(v => v.Name.ToLower() == verbName.ToLower());
+
+            // If not found and it's an object instance, check inherited verbs from class hierarchy
+            if (verb == null && gameObject != null)
+            {
+                var inheritanceChain = _objectManager.GetInheritanceChain(gameObject.ClassId);
+                foreach (var objectClass in inheritanceChain.AsEnumerable().Reverse()) // Child to parent order
+                {
+                    var classVerbs = _verbManager.GetVerbsOnObject(objectClass.Id);
+                    verb = classVerbs.FirstOrDefault(v => v.Name.ToLower() == verbName.ToLower());
+                    if (verb != null)
+                    {
+                        // Found it on a class, update objectId to show the class in the output
+                        objectId = objectClass.Id;
+                        gameObject = null; // It's now a class, not an object
+                        break;
+                    }
+                }
+            }
+            
+            // If still not found and objectId is a class, check if verb is on that class directly
+            if (verb == null && isClassId)
+            {
+                var classVerbs = _verbManager.GetVerbsOnObject(objectId);
+                verb = classVerbs.FirstOrDefault(v => v.Name.ToLower() == verbName.ToLower());
+            }
+
+            var dbref = gameObject != null ? $"#{gameObject.DbRef}" : objectId;
+
+            if (dbref.StartsWith("class"))
+            {
+                dbref = $"class:{dbref.Substring(6)}";
+            }
+            else if (isClassId || gameObject == null)
+            {
+                // If it's a class ID, format it properly
+                var objectClass = _dbProvider.FindById<ObjectClass>("objectclasses", objectId);
+                if (objectClass != null)
+                {
+                    dbref = $"class:{objectClass.Name}";
+                }
+            }
+
+            if (verb == null)
+            {
+                // Optionally prepare for creating a new verb
+                _commandProcessor.SendToPlayer($"{progStartPrefix}@verb {objectName} {verbName}");
+                _commandProcessor.SendToPlayer($"{progEndPrefix}.");
+                return true;
+            }
+
+            // Start of the listing
+            // we need to output the verb in the format of class:classname:verbname if it's a class
+            // or just object:verbname if it's a regular object
+            // This allows the player to copy the verb command directly
+
+            _commandProcessor.SendToPlayer($"{progStartPrefix}@program {dbref}:{verb.Name}");
+
+            // Verb metadata
+            _commandProcessor.SendToPlayer($"{progDataPrefix}{GetObjectName(objectId)}:{verb.Name}");
+            if (!string.IsNullOrEmpty(verb.Aliases))
+                _commandProcessor.SendToPlayer($"{progDataPrefix}Aliases: {verb.Aliases}");
+            if (!string.IsNullOrEmpty(verb.Pattern))
+                _commandProcessor.SendToPlayer($"{progDataPrefix}Pattern: {verb.Pattern}");
+            if (!string.IsNullOrEmpty(verb.Description))
+                _commandProcessor.SendToPlayer($"{progDataPrefix}Description: {verb.Description}");
+
+            _commandProcessor.SendToPlayer($"{progDataPrefix}Created by: {verb.CreatedBy} on {verb.CreatedAt:yyyy-MM-dd HH:mm}");
+
+            // Verb code
+            if (string.IsNullOrEmpty(verb.Code))
+            {
+                _commandProcessor.SendToPlayer($"{progEditPrefix}(no code)");
+            }
+            else
+            {
+                // Normalize line endings and trim each line
+                var normalizedCode = verb.Code.Replace("\r\n", "\n").Replace("\r", "\n");
+                var lines = normalizedCode.Split('\n');
+                foreach (var line in lines)
+                {
+                    _commandProcessor.SendToPlayer($"{progEditPrefix}{line.TrimEnd()}");
+                }
+            }
+
+            // End of the listing
+            _commandProcessor.SendToPlayer($"{progEndPrefix}.");
+
+            return true;
         }
-
-        // End of the listing
-        _commandProcessor.SendToPlayer($"{progEndPrefix}.");
-
-        return true;
+        catch (Exception ex)
+        {
+            _logger.Error($"HandleListVerb: Exception listing verb '{verbSpec}': {ex.Message}", ex);
+            _commandProcessor.SendToPlayer($"Error listing verb: {ex.Message}");
+            return true;
+        }
     }
 
     /// <summary>
@@ -1347,6 +1493,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
                 result = _player.Location?.Id;
                 break;
             case "system":
+                // "system" always resolves to the system object, not the System class
                 result = GetSystemObjectId();
                 break;
             default:
@@ -1371,25 +1518,25 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
                         c.Name.Equals(className, StringComparison.OrdinalIgnoreCase));
                     result = objectClass?.Id;
                 }
-                // Check if it's a direct class ID (like "Room", "Exit", etc.)
+                // Check if it's a direct class ID (like "Room", "Exit", "Player", etc.)
+                // This should be checked BEFORE trying to find objects by name
                 else if (_dbProvider.FindById<ObjectClass>("objectclasses", objectName) != null)
                 {
                     result = objectName; // The objectName itself is the class ID
                 }
+                // Try as a class name (case-insensitive match for common class names)
                 else
                 {
-                    // Try to find by name in current location, then globally, then as a class
-                    result = FindObjectByName(objectName);
-                    
-                    // If not found as an object, try as a class name
-                    if (result == null)
+                    var objectClass = _dbProvider.FindOne<ObjectClass>("objectclasses", c => 
+                        c.Name.Equals(objectName, StringComparison.OrdinalIgnoreCase));
+                    if (objectClass != null)
                     {
-                        var objectClass = _dbProvider.FindOne<ObjectClass>("objectclasses", c => 
-                            c.Name.Equals(objectName, StringComparison.OrdinalIgnoreCase));
-                        if (objectClass != null)
-                        {
-                            result = objectClass.Id;
-                        }
+                        result = objectClass.Id;
+                    }
+                    // If not found as a class, try to find by name in current location, then globally
+                    else
+                    {
+                        result = FindObjectByName(objectName);
                     }
                 }
                 break;
@@ -2431,6 +2578,24 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
         }
 
         return true;
+    }
+
+    /// <summary>
+    /// Shows compilation result (errors/warnings) to the player
+    /// </summary>
+    private void ShowCompilationResult(CompilationResult result, string code)
+    {
+        if (result.Errors.Count > 0)
+        {
+            var errorMessage = DiagnosticFormatter.FormatCompilationErrors(result.Errors, code);
+            _commandProcessor.SendToPlayer(errorMessage);
+        }
+
+        if (result.Warnings.Count > 0)
+        {
+            var warningMessage = DiagnosticFormatter.FormatCompilationWarnings(result.Warnings, code);
+            _commandProcessor.SendToPlayer(warningMessage);
+        }
     }
 }
 

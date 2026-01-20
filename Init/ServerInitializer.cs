@@ -107,6 +107,21 @@ public static class ServerInitializer
             var coreHotReloadManager = serviceProvider.GetRequiredService<ICoreHotReloadManager>();
             coreHotReloadManager.Initialize();
             
+            // Recompile all scripts on startup
+            logger.Info("Recompiling all scripts...");
+            var compilationInitializer = serviceProvider.GetRequiredService<CSMOO.Scripting.ICompilationInitializer>();
+            try
+            {
+                compilationInitializer.RecompileAllAsync().Wait();
+                var stats = compilationInitializer.GetStatistics();
+                logger.Info($"Script recompilation complete: {stats.VerbsCompiled} verbs, {stats.FunctionsCompiled} functions compiled. {stats.VerbsFailed} verbs, {stats.FunctionsFailed} functions failed.");
+            }
+            catch (Exception ex)
+            {
+                logger.Warning($"Script recompilation had errors: {ex.Message}");
+                // Don't fail startup if recompilation fails
+            }
+            
             logger.Info("Server initialization complete!");
             worldInitializer.PrintWorldStatistics();
         }

@@ -102,4 +102,9 @@ public interface IVerbManager
     /// Updates the code of an existing verb
     /// </summary>
     bool UpdateVerbCode(string verbId, string code);
+    
+    /// <summary>
+    /// Gets all verbs from the database
+    /// </summary>
+    List<Verb> GetAllVerbs();
 }

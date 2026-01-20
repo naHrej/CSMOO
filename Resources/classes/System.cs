@@ -102,7 +102,9 @@ public class System
         if (helpCategories.ContainsKey(searchTerm))
         {
             var output = new StringBuilder();
-            output.AppendLine($"=== {char.ToUpper(searchTerm[0])}{searchTerm.Substring(1)} Help ===");
+            var firstChar = searchTerm[0];
+            var capitalized = char.ToUpper(firstChar) + searchTerm.Substring(1);
+            output.AppendLine($"=== {capitalized} Help ===");
             foreach (var topic in helpCategories[searchTerm])
             {
                 output.AppendLine($"• <span class='command' style='color:yellow'>{topic}</span>");
@@ -119,8 +121,14 @@ public class System
 
         if (!foundInCategory.Equals(default(KeyValuePair<string, List<string>>)))
         {
-            // Provide specific help for the topic
-            var helpText = his.GetTopicHelp(searchTerm);
+            // Provide specific help for the topic (inlined to avoid private method access issues)
+            var helpText = searchTerm.ToLower() switch
+            {
+                "movement" => "Movement commands: <span class='command' style='color:yellow'>go</span>, <span class='command' style='color:yellow'>north</span>, <span class='command' style='color:yellow'>south</span>, <span class='command' style='color:yellow'>east</span>, <span class='command' style='color:yellow'>west</span>, etc.\nUse <span class='command' style='color:yellow'>look</span> to see available exits.",
+                "communication" => "Communication: <span class='command' style='color:yellow'>say</span> (or <span class='command' style='color:yellow'>\"</span>), <span class='command' style='color:yellow'>tell</span>, <span class='command' style='color:yellow'>ooc</span>",
+                "objects" => "Object commands: <span class='command' style='color:yellow'>look</span>, <span class='command' style='color:yellow'>examine</span>, <span class='command' style='color:yellow'>get</span>, <span class='command' style='color:yellow'>drop</span>, <span class='command' style='color:yellow'>inventory</span>",
+                _ => $"Help for '{searchTerm}' is not yet available."
+            };
             notify(Player, helpText);
         }
         else
@@ -183,14 +191,14 @@ public class System
         var chosenDirection = direction.ToLowerInvariant();
         dynamic chosenExit = null;
         
-        // Helper function to extract abbreviation (capitalized letters and numbers)
+        // Extract abbreviation (capitalized letters and numbers) - inlined to avoid local function issues
         string ExtractAbbreviation(string text)
         {
             if (string.IsNullOrEmpty(text)) return "";
             var result = new System.Text.StringBuilder();
             foreach (char c in text)
             {
-                if (char.IsUpper(c) || char.IsDigit(c))
+                if (System.Char.IsUpper(c) || System.Char.IsDigit(c))
                 {
                     result.Append(c);
                 }
@@ -265,25 +273,26 @@ public class System
     {
         // Look command - shows room or looks at specific object.
         // This is a test
-        var target = "";
+        string targetName;
         if (Args.Count == 0)
         {
-            target = "here";
+            targetName = "here";
         }
         else if (Args.Count >= 2 && Args[0].ToLower() == "at")
         {
             // 'look at something'
-            target = string.Join(" ", Args.Skip(1));
+            targetName = string.Join(" ", Args.Skip(1));
         }
         else
         {
             // 'look something'
-            target = string.Join(" ", Args);
+            targetName = string.Join(" ", Args);
         }
-        var resolved = ObjectResolver.ResolveObject(target, Player);
+        // Use typed resolution - ObjectResolver.ResolveObject returns GameObject?
+        GameObject? resolved = ObjectResolver.ResolveObject(targetName, Player);
         if (resolved == null)
         {
-            notify(player, $"You don't see '{target}' here.");
+            notify(Player, $"You don't see '{targetName}' here.");
             return true; // Return true to indicate we handled the command (even if object not found)
         }
         
@@ -291,18 +300,19 @@ public class System
         string description;
         try
         {
-            // Cast to dynamic to call Description() method
+            // Try calling Description() via dynamic (for backward compatibility with function calls)
             description = ((dynamic)resolved).Description();
         }
         catch (Exception ex)
         {
-            // Object has no owner or Description() function failed, use property access instead
+            // Object has no owner or Description() function failed, use typed property access
             try
             {
-                var name = Builtins.GetProperty(resolved, "name", "") ?? "something";
+                // Use typed access where possible - resolved is GameObject?, can access properties directly
+                var name = resolved.Name ?? Builtins.GetProperty(resolved, "name", "") ?? "something";
                 var longDesc = Builtins.GetProperty(resolved, "longDescription", "") ?? Builtins.GetProperty(resolved, "description", "") ?? "";
                 var shortDesc = Builtins.GetProperty(resolved, "shortDescription", "") ?? "";
-                var classId = Builtins.GetProperty(resolved, "classId", "") ?? "object";
+                var classId = resolved.ClassId ?? "object";
                 
                 if (!string.IsNullOrEmpty(longDesc))
                 {
@@ -324,7 +334,7 @@ public class System
             }
         }
         
-        notify(player, description);
+        notify(Player, description);
         return true;
     }
 
@@ -684,7 +694,8 @@ public class System
                 // Get properties from class hierarchy (excluding those overridden in instance)
                 if (objectClass != null)
                 {
-                    var inheritanceChain = CSMOO.Object.ObjectManager.GetInheritanceChain(objectClass.Id);
+                    // Use Builtins wrapper to avoid namespace auto-resolution issues
+                    var inheritanceChain = Builtins.GetInheritanceChain(objectClass.Id);
                     foreach (var classInChain in inheritanceChain)
                     {
                         if (classInChain.Properties?.Count > 0)

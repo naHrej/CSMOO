@@ -12,6 +12,7 @@ using CSMOO.Verbs;
 using System.Runtime.CompilerServices;
 using CSMOO.Exceptions;
 using CSMOO.Core;
+using CSMOO.Scripting;
 using System.Text;
 using System.Text.RegularExpressions;
 
@@ -33,6 +34,7 @@ public class ScriptEngine
     private readonly IPlayerManager _playerManager;
     private readonly IVerbManager _verbManager;
     private readonly IRoomManager _roomManager;
+    private readonly ICompilationCache _compilationCache;
 
     // Primary constructor with DI dependencies
     public ScriptEngine(
@@ -45,7 +47,8 @@ public class ScriptEngine
         IDbProvider dbProvider,
         IPlayerManager playerManager,
         IVerbManager verbManager,
-        IRoomManager roomManager)
+        IRoomManager roomManager,
+        ICompilationCache compilationCache)
     {
         _objectManager = objectManager ?? throw new ArgumentNullException(nameof(objectManager));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -57,6 +60,7 @@ public class ScriptEngine
         _playerManager = playerManager ?? throw new ArgumentNullException(nameof(playerManager));
         _verbManager = verbManager ?? throw new ArgumentNullException(nameof(verbManager));
         _roomManager = roomManager ?? throw new ArgumentNullException(nameof(roomManager));
+        _compilationCache = compilationCache ?? throw new ArgumentNullException(nameof(compilationCache));
         
         _scriptOptions = ScriptOptions.Default
             .WithLanguageVersion(Microsoft.CodeAnalysis.CSharp.LanguageVersion.Latest)
@@ -86,7 +90,7 @@ public class ScriptEngine
     public ScriptEngine()
         : this(CreateDefaultObjectManager(), CreateDefaultLogger(), CreateDefaultConfig(), CreateDefaultObjectResolver(),
                CreateDefaultVerbResolver(), CreateDefaultFunctionResolver(), CreateDefaultDbProvider(),
-               CreateDefaultPlayerManager(), CreateDefaultVerbManager(), CreateDefaultRoomManager())
+               CreateDefaultPlayerManager(), CreateDefaultVerbManager(), CreateDefaultRoomManager(), CreateDefaultCompilationCache())
     {
     }
 
@@ -112,6 +116,11 @@ public class ScriptEngine
         var classManager = new ClassManagerInstance(dbProvider, logger);
         var objectManager = new ObjectManagerInstance(dbProvider, classManager);
         return new RoomManagerInstance(dbProvider, logger, objectManager);
+    }
+
+    private static ICompilationCache CreateDefaultCompilationCache()
+    {
+        return new CompilationCache();
     }
 
     // Helper methods for backward compatibility
@@ -204,7 +213,9 @@ public class ScriptEngine
 
             globals.Player = player; // Always the Database.Player
             globals.This = thisObject;
+            globals.ThisGameObject = thisObject; // Set typed version
             globals.Caller = previousContext?.This ?? playerObject; // The object that called this verb (or Player if no previous context)
+            globals.CallerGameObject = previousContext?.ThisGameObject ?? playerObject; // Set typed version
             globals.CallDepth = (previousContext?.CallDepth ?? 0) + 1; // Track call depth
             globals.CommandProcessor = commandProcessor;
             globals.Input = input;
@@ -235,19 +246,40 @@ public class ScriptEngine
             // Initialize the object factory for enhanced script support
             globals.InitializeObjectFactory();
 
-            // Build the complete script with automatic variable declarations and DBref/ID preprocessing
-            var preprocessedCode = PreprocessObjectReferenceSyntax(verb.Code);
-            var collectionFixedCode = PreprocessCollectionExpressions(preprocessedCode);
-            var completeScript = BuildScriptWithVariables(collectionFixedCode, variables);
+            // Check cache first
+            var cachedScript = _compilationCache.GetVerb(verb.Id);
+            var currentHash = ComputeCodeHash(verb.Code);
+            var cachedHash = _compilationCache.GetVerbCodeHash(verb.Id);
+
+            Script<object> script;
+            bool useCache = cachedScript != null && cachedHash != null && currentHash == cachedHash;
+
+            if (useCache)
+            {
+                // Use cached compiled script (fast!)
+                script = cachedScript;
+                _logger.Debug($"Using cached compiled script for verb '{verb.Name}' (ID: {verb.Id})");
+            }
+            else
+            {
+                // Need to compile (first time or code changed)
+                // Build the complete script with automatic variable declarations and DBref/ID preprocessing
+                var preprocessedCode = PreprocessObjectReferenceSyntax(verb.Code);
+                var collectionFixedCode = PreprocessCollectionExpressions(preprocessedCode);
+                var completeScript = BuildScriptWithVariables(collectionFixedCode, variables);
+
+                // Create script
+                script = CSharpScript.Create(completeScript, _scriptOptions, typeof(ScriptGlobals));
+                
+                // Cache for next time (only if compilation succeeded)
+                // We'll cache after successful execution to ensure it works
+            }
 
             // Set Builtins context for script execution
             Builtins.UnifiedContext = globals;
 
             // Push this verb onto the script call stack
             ScriptStackTrace.PushVerbFrame(verb, thisObject);
-
-            // Create script with timeout protection
-            var script = CSharpScript.Create(completeScript, _scriptOptions, typeof(ScriptGlobals));
 
             // Execute with timeout
             using var cts = new CancellationTokenSource(_config.Scripting.MaxExecutionTimeMs);
@@ -264,6 +296,14 @@ public class ScriptEngine
 
                 // If not a boolean, assume success and return the string representation
                 var stringResult = returnValue?.ToString() ?? "";
+
+                // Cache the compiled script if not already cached (successful execution)
+                if (!useCache)
+                {
+                    var codeHash = ComputeCodeHash(verb.Code);
+                    _compilationCache.SetVerb(verb.Id, script, codeHash);
+                    _logger.Debug($"Cached compiled script for verb '{verb.Name}' (ID: {verb.Id})");
+                }
 
                 // Don't clear the stack trace here - let the top-level caller handle it
                 // ScriptStackTrace.Clear();
@@ -395,7 +435,9 @@ public class ScriptEngine
             {
                 Player = player, // Always the Database.Player
                 This = thisObject ?? CreateNullGameObject(actualThisObjectId),
+                ThisGameObject = thisObject ?? CreateNullGameObject(actualThisObjectId), // Set typed version
                 Caller = previousContext?.This ?? playerObject, // The object that called this function (or Player if no previous context)
+                CallerGameObject = previousContext?.ThisGameObject ?? playerObject, // Set typed version
                 CallDepth = (previousContext?.CallDepth ?? 0) + 1, // Track call depth
                 CommandProcessor = commandProcessor,
                 CallingObjectId = actualThisObjectId,
@@ -434,35 +476,53 @@ public class ScriptEngine
             // Initialize the object factory for enhanced script support
             globals.InitializeObjectFactory();
 
-            // Build script code that declares the parameters as variables
-            var scriptCode = new System.Text.StringBuilder();
+            // Check cache first
+            var cachedScript = _compilationCache.GetFunction(function.Id);
+            var currentHash = ComputeCodeHash(function.Code);
+            var cachedHash = _compilationCache.GetFunctionCodeHash(function.Id);
 
-            // Declare each parameter as a local variable
-            for (int i = 0; i < function.ParameterNames.Length && i < parameters.Length; i++)
+            Script<object> script;
+            bool useCache = cachedScript != null && cachedHash != null && currentHash == cachedHash;
+
+            if (useCache)
             {
-                var paramName = function.ParameterNames[i];
-                var paramType = function.ParameterTypes[i];
-                if (!string.IsNullOrEmpty(paramName))
-                {
-                    scriptCode.AppendLine($"{paramType} {paramName} = ({paramType})GetParameter(\"{paramName}\");");
-                }
+                // Use cached compiled script (fast!)
+                script = cachedScript;
+                _logger.Debug($"Using cached compiled script for function '{function.Name}' (ID: {function.Id})");
             }
+            else
+            {
+                // Need to compile (first time or code changed)
+                // Build script code that declares the parameters as variables
+                var scriptCode = new System.Text.StringBuilder();
 
-            // Add the actual function code with DBref/ID preprocessing
-            var preprocessedFunctionCode = PreprocessObjectReferenceSyntax(function.Code);
-            var collectionFixedFunctionCode = PreprocessCollectionExpressions(preprocessedFunctionCode);
-            scriptCode.AppendLine(collectionFixedFunctionCode);
+                // Declare each parameter as a local variable
+                for (int i = 0; i < function.ParameterNames.Length && i < parameters.Length; i++)
+                {
+                    var paramName = function.ParameterNames[i];
+                    var paramType = function.ParameterTypes[i];
+                    if (!string.IsNullOrEmpty(paramName))
+                    {
+                        scriptCode.AppendLine($"{paramType} {paramName} = ({paramType})GetParameter(\"{paramName}\");");
+                    }
+                }
 
-            var finalCode = scriptCode.ToString();
+                // Add the actual function code with DBref/ID preprocessing
+                var preprocessedFunctionCode = PreprocessObjectReferenceSyntax(function.Code);
+                var collectionFixedFunctionCode = PreprocessCollectionExpressions(preprocessedFunctionCode);
+                scriptCode.AppendLine(collectionFixedFunctionCode);
+
+                var finalCode = scriptCode.ToString();
+
+                // Create script
+                script = CSharpScript.Create(finalCode, _scriptOptions, typeof(ScriptGlobals));
+            }
 
             // Set Builtins context for script execution
             Builtins.UnifiedContext = globals;
 
             // Push this function onto the script call stack
             ScriptStackTrace.PushFunctionFrame(function, thisObject);
-
-            // Create and execute script with timeout protection
-            var script = CSharpScript.Create(finalCode, _scriptOptions, typeof(ScriptGlobals));
 
             // Execute with timeout
             using var cts = new CancellationTokenSource(_config.Scripting.MaxExecutionTimeMs);
@@ -516,6 +576,14 @@ public class ScriptEngine
             if (!ValidateReturnType(returnValue, function.ReturnType))
             {
                 _logger.Warning($"Function '{function.Name}' returned unexpected type. Expected '{function.ReturnType}', got '{returnValue?.GetType().Name ?? "null"}'.");
+            }
+
+            // Cache the compiled script if not already cached (successful execution)
+            if (!useCache)
+            {
+                var codeHash = ComputeCodeHash(function.Code);
+                _compilationCache.SetFunction(function.Id, script, codeHash);
+                _logger.Debug($"Cached compiled script for function '{function.Name}' (ID: {function.Id})");
             }
 
             // Don't clear the stack trace here - let the top-level caller handle it
@@ -720,10 +788,12 @@ public class ScriptEngine
         var objectVariables = ExtractPotentialObjectReferences(originalCode);
         if (objectVariables.Count > 0)
         {
-            scriptBuilder.AppendLine("// Auto-resolved object variables");
+            scriptBuilder.AppendLine("// Auto-resolved object variables (typed)");
             foreach (var objectVar in objectVariables)
             {
-                scriptBuilder.AppendLine($"dynamic {objectVar} = ObjectResolver.ResolveObject(\"{objectVar}\", This) ?? throw new ScriptExecutionException(\"Object '{objectVar}' not found\");");
+                // Infer type based on variable name
+                var inferredType = InferObjectType(objectVar);
+                scriptBuilder.AppendLine($"{inferredType} {objectVar} = ObjectResolver.ResolveObject(\"{objectVar}\", This) ?? throw new ScriptExecutionException(\"Object '{objectVar}' not found\");");
             }
             scriptBuilder.AppendLine();
         }
@@ -751,6 +821,16 @@ public class ScriptEngine
         // Remove string literals to avoid matching content inside strings
         var codeWithoutStrings = RemoveStringLiterals(codeWithoutComments);
 
+        // Known type/class names that should not be auto-resolved (they're static types, not object instances)
+        var knownStaticTypes = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "StringComparer", "StringComparison", "System", "Console", "Math", "DateTime",
+            "TimeSpan", "Guid", "Regex", "Encoding", "Convert", "Environment", "AppDomain",
+            "Type", "Assembly", "Activator", "Task", "Thread", "ThreadPool", "Linq",
+            "Enumerable", "List", "Dictionary", "HashSet", "Array", "StringBuilder",
+            "Object", "Char", "Int32", "Int64", "Double", "Single", "Boolean", "Decimal"
+        };
+
         // Look for patterns like: identifier.something (property access or method call)
         // But not string endings like "word." or punctuation
         var objectAccessPattern = @"\b([a-zA-Z_][a-zA-Z0-9_]*)\s*\.\s*[a-zA-Z_]";
@@ -760,7 +840,12 @@ public class ScriptEngine
         var candidateIdentifiers = new HashSet<string>();
         foreach (Match match in matches)
         {
-            candidateIdentifiers.Add(match.Groups[1].Value);
+            var identifier = match.Groups[1].Value;
+            // Skip if it's a known static type (like StringComparer, StringComparison, etc.)
+            if (!knownStaticTypes.Contains(identifier))
+            {
+                candidateIdentifiers.Add(identifier);
+            }
         }
 
         // Also check for variable declarations in the user's code to avoid conflicts
@@ -784,11 +869,80 @@ public class ScriptEngine
     }
 
     /// <summary>
+    /// Infers the C# type for an object variable based on its name
+    /// </summary>
+    private string InferObjectType(string variableName)
+    {
+        var lowerName = variableName.ToLower();
+        
+        // Common patterns for player references
+        if (lowerName == "player" || lowerName == "me" || lowerName == "caller" && variableName.ToLower() == "caller")
+        {
+            return "Player?";
+        }
+        
+        // Common patterns for room references
+        if (lowerName == "room" || lowerName == "here" || lowerName == "location")
+        {
+            return "Room?";
+        }
+        
+        // Common patterns for exit references
+        if (lowerName == "exit" || lowerName == "door")
+        {
+            return "Exit?";
+        }
+        
+        // System object
+        if (lowerName == "system")
+        {
+            return "GameObject?";
+        }
+        
+        // Default to GameObject? for unknown types
+        return "GameObject?";
+    }
+
+    /// <summary>
     /// Checks if an identifier is already defined in the script context
     /// </summary>
     private bool IsIdentifierAlreadyDefined(string identifier)
     {
-        // Create a simple test script to see if the identifier resolves
+        // Check against known ScriptGlobals properties and methods
+        var knownIdentifiers = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            // ScriptGlobals properties
+            "Player", "This", "ThisGameObject", "ThisPlayer", "ThisRoom", "ThisExit",
+            "ThisObject", "Caller", "CallerGameObject", "CallerPlayer", "CallDepth",
+            "ThisObjectId", "CommandProcessor", "ObjectManager", "WorldManager",
+            "PlayerManager", "Helpers", "Location", "Input", "Args", "Verb", "Variables",
+            "Parameters", "CallingObjectId", "me", "player", "here",
+            // ScriptGlobals methods
+            "obj", "objById", "GetObject", "GetObjectById", "GetGameObjectById",
+            "GetObjectByDbRef", "GetGameObjectByDbRef", "Say", "notify", "SayToRoom",
+            "GetThisGameObject", "GetPlayerGameObject", "GetPlayerLocation",
+            "GetThisProperty", "SetThisProperty", "GetPlayer", "FindObjectInRoom",
+            "CallVerb", "CallFunction", "ThisVerb", "Me", "Here", "System", "Object", "Class",
+            // Builtins static methods (commonly used)
+            "Builtins", "ObjectResolver",
+            // Common types
+            "string", "int", "bool", "var", "dynamic", "object", "void",
+            // Known static types and their members
+            "StringComparer", "StringComparison", "Console", "Math", "DateTime",
+            "TimeSpan", "Guid", "Regex", "Encoding", "Convert", "Environment", "AppDomain",
+            "Type", "Assembly", "Activator", "Task", "Thread", "ThreadPool", "Linq",
+            "Enumerable", "List", "Dictionary", "HashSet", "Array", "StringBuilder",
+            "Char", "Int32", "Int64", "Double", "Single", "Boolean", "Decimal",
+            // Common enum values
+            "OrdinalIgnoreCase", "CurrentCulture", "InvariantCulture", "Ordinal",
+            // Namespace-qualified types (to avoid matching partial names)
+            "ObjectManager", "ObjectResolver", "Builtins"
+        };
+        
+        if (knownIdentifiers.Contains(identifier))
+            return true;
+        
+        // Also check with a test script compilation
         var testScript = $"var test = {identifier};";
         
         try
@@ -1075,6 +1229,17 @@ public class ScriptEngine
             "objectclass" => actualType == typeof(ObjectClass),
             _ => true // For unknown types, allow anything
         };
+    }
+
+    /// <summary>
+    /// Computes SHA256 hash of code for cache invalidation
+    /// </summary>
+    private string ComputeCodeHash(string code)
+    {
+        using var sha256 = System.Security.Cryptography.SHA256.Create();
+        var bytes = System.Text.Encoding.UTF8.GetBytes(code);
+        var hash = sha256.ComputeHash(bytes);
+        return Convert.ToHexString(hash).ToLowerInvariant();
     }
 }
 

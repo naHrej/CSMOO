@@ -13,7 +13,7 @@ public interface IObjectResolver
     /// If a location is specified, it will be used as if the looker is in that location even if they are not.
     /// The objectType can be used to filter results by class or type.
     /// </summary>
-    List<dynamic> ResolveObjects(
+    List<GameObject> ResolveObjects(
         string name,
         GameObject looker,
         GameObject? location = null,

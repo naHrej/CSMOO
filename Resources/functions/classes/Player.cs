@@ -24,7 +24,7 @@ public class Player
         }
         
         // Show what they're carrying (if visible)
-        var inventory = Builtins.GetInventory(This);
+        var inventory = Builtins.GetObjectsInLocation(This.Id);
         if (inventory.Count > 0)
         {
             var itemNames = new List<string>();

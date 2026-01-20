@@ -31,7 +31,7 @@ public static class ObjectResolver
     /// If a location is specified, it will be used as if the looker is in that location even if they are not.
     /// The objectType can be used to filter results by class or type.
     /// </summary>
-    public static List<dynamic> ResolveObjects(
+    public static List<GameObject> ResolveObjects(
         string name,
         GameObject looker,
         GameObject? location = null,

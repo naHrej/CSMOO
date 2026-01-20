@@ -97,13 +97,59 @@ public class ScriptGlobals
     {
         return DbProvider.Instance;
     }
+    /// <summary>
+    /// Get an object by reference - dynamic version for backward compatibility
+    /// </summary>
     public dynamic? obj(string objectReference)
     {
         return _objectFactory?.GetObject(objectReference);
     }
+
+    /// <summary>
+    /// Get an object by reference - typed version returns GameObject?
+    /// </summary>
+    public GameObject? GetObject(string objectReference)
+    {
+        var scriptObj = _objectFactory?.GetObject(objectReference);
+        // ScriptObject wraps a GameObject, so we need to extract it
+        // For now, resolve directly using ObjectResolver
+        if (Player != null)
+        {
+            return CSMOO.Core.ObjectResolver.ResolveObject(objectReference, Player);
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Get an object by reference with type casting - typed version with generic type parameter
+    /// </summary>
+    public T? obj<T>(string objectReference) where T : GameObject
+    {
+        return GetObject(objectReference) as T;
+    }
+
+    /// <summary>
+    /// Get an object by ID - dynamic version for backward compatibility
+    /// </summary>
     public dynamic? objById(string objectId)
     {
         return _objectFactory?.GetObjectById(objectId);
+    }
+
+    /// <summary>
+    /// Get an object by ID - typed version returns GameObject?
+    /// </summary>
+    public GameObject? GetGameObjectByIdFromObjById(string objectId)
+    {
+        return _objectManager.GetObject(objectId);
+    }
+
+    /// <summary>
+    /// Get an object by ID with type casting - typed version with generic type parameter
+    /// </summary>
+    public T? objById<T>(string objectId) where T : GameObject
+    {
+        return _objectManager.GetObject(objectId) as T;
     }
 
     // ScriptGlobals Say/notify/SayToRoom
@@ -150,8 +196,56 @@ public class ScriptGlobals
         set => _this = value as GameObject; 
     }
     
+    /// <summary>
+    /// Typed version of This - returns GameObject? for strict typing
+    /// </summary>
+    public GameObject? ThisGameObject 
+    { 
+        get => _this; 
+        set => _this = value; 
+    }
+    
+    /// <summary>
+    /// Typed access to This as Player (null if not a Player)
+    /// </summary>
+    public Player? ThisPlayer => _this as Player;
+    
+    /// <summary>
+    /// Typed access to This as Room (null if not a Room)
+    /// </summary>
+    public Room? ThisRoom => _this as Room;
+    
+    /// <summary>
+    /// Typed access to This as Exit (null if not an Exit)
+    /// </summary>
+    public Exit? ThisExit => _this as Exit;
+    
     public dynamic? ThisObject { get => This; set => This = value; }
-    public dynamic? Caller { get; set; }
+    
+    private GameObject? _caller;
+    
+    /// <summary>
+    /// The object that called this verb/function - dynamic version for backward compatibility
+    /// </summary>
+    public dynamic? Caller 
+    { 
+        get => _caller; 
+        set => _caller = value as GameObject; 
+    }
+    
+    /// <summary>
+    /// Typed version of Caller - returns GameObject? for strict typing
+    /// </summary>
+    public GameObject? CallerGameObject 
+    { 
+        get => _caller; 
+        set => _caller = value; 
+    }
+    
+    /// <summary>
+    /// Typed access to Caller as Player (null if not a Player)
+    /// </summary>
+    public Player? CallerPlayer => _caller as Player;
     public int CallDepth { get; set; } = 0;
     public string ThisObjectId { get; set; } = string.Empty;
 
@@ -183,7 +277,7 @@ public class ScriptGlobals
     }
 
     /// <summary>
-    /// Get an object by its DBref number (for #4.property syntax support)
+    /// Get an object by its DBref number (for #4.property syntax support) - dynamic version for backward compatibility
     /// </summary>
     public dynamic? GetObjectByDbRef(int dbRef)
     {
@@ -192,12 +286,44 @@ public class ScriptGlobals
     }
 
     /// <summary>
-    /// Get an object by its ID (for $objectId.property syntax support)
+    /// Get an object by its DBref number - typed version returns GameObject?
+    /// </summary>
+    public GameObject? GetGameObjectByDbRef(int dbRef)
+    {
+        return _objectManager.GetObjectByDbRef(dbRef);
+    }
+
+    /// <summary>
+    /// Get an object by its DBref number with type casting - typed version with generic type parameter
+    /// </summary>
+    public T? GetObjectByDbRef<T>(int dbRef) where T : GameObject
+    {
+        return _objectManager.GetObjectByDbRef(dbRef) as T;
+    }
+
+    /// <summary>
+    /// Get an object by its ID (for $objectId.property syntax support) - dynamic version for backward compatibility
     /// </summary>
     public dynamic? GetObjectById(string objectId)
     {
         var obj = _objectManager.GetObject(objectId);
         return obj;
+    }
+
+    /// <summary>
+    /// Get an object by its ID - typed version returns GameObject?
+    /// </summary>
+    public GameObject? GetGameObjectById(string objectId)
+    {
+        return _objectManager.GetObject(objectId);
+    }
+
+    /// <summary>
+    /// Get an object by its ID with type casting - typed version with generic type parameter
+    /// </summary>
+    public T? GetObjectById<T>(string objectId) where T : GameObject
+    {
+        return _objectManager.GetObject(objectId) as T;
     }
 
     /// <summary>
@@ -323,19 +449,30 @@ public class ScriptGlobals
     }
 
     /// <summary>
-    /// Get the current player for use with notify() - returns dynamic GameObject
+    /// Get the current player for use with notify() - dynamic version for backward compatibility
     /// </summary>
     public dynamic? me => Player;
 
     /// <summary>
-    /// Get the current player for use with notify() - returns dynamic GameObject
+    /// Get the current player - typed version returns Player?
+    /// </summary>
+    public Player? MePlayer => Player;
+
+    /// <summary>
+    /// Get the current player for use with notify() - dynamic version for backward compatibility
     /// </summary>
     public dynamic? player => Player;
+
+    /// <summary>
+    /// Get the current player - typed version returns Player?
+    /// </summary>
+    public Player? PlayerGameObject => Player;
 
     /// <summary>
     /// The current location as GameObject - returns the actual GameObject, not ScriptObject
     /// If script is running on a player: returns player's location
     /// If script is running on a room: returns the room itself
+    /// Dynamic version for backward compatibility
     /// </summary>
     public dynamic? here
     {
@@ -344,6 +481,16 @@ public class ScriptGlobals
             return Player!.Location as dynamic;
         }
     }
+
+    /// <summary>
+    /// The current location - typed version returns GameObject?
+    /// </summary>
+    public GameObject? HereGameObject => Player?.Location;
+
+    /// <summary>
+    /// The current location - typed version as Room?
+    /// </summary>
+    public Room? HereRoom => Player?.Location as Room;
 
     /// <summary>
     /// Check if an object is a room using class inheritance and properties
