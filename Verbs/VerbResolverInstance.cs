@@ -577,6 +577,14 @@ public class VerbResolverInstance : IVerbResolver
         }
         catch (Exception ex)
         {
+            // IMPORTANT: an error during a matched command is still a handled command.
+            // Do not allow this to fall through and be reported as "Unknown command".
+            var rawCommand = verb.Name ?? "";
+            var prettyCommand = rawCommand.Length > 0
+                ? char.ToUpperInvariant(rawCommand[0]) + rawCommand[1..].ToLowerInvariant()
+                : rawCommand;
+            commandProcessor?.SendToPlayer($"<span class='error'>Error in '<span class='command'>{prettyCommand}</span>' command</span>");
+
             // Check if it's our custom script exception with enhanced error reporting
             if (ex is ScriptExecutionException scriptEx)
             {
@@ -609,7 +617,7 @@ public class VerbResolverInstance : IVerbResolver
             
             // Clear the script stack trace in case of unhandled errors
             ScriptStackTrace.Clear();
-            return false;
+            return true;
         }
     }
 

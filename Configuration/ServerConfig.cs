@@ -11,4 +11,5 @@ public class ServerConfig
     public bool WsEnabled { get; set; } = true; // Enable WebSocket server
     public bool HttpEnabled { get; set; } = true; // Enable HTTP server
     public bool ShowDebugInConsole { get; set; } = false;
+    public string ServerUrl { get; set; } = "http://localhost"; // Base URL for the server (e.g., "http://localhost" or "https://moo.serverhost.com")
 }

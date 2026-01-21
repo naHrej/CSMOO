@@ -50,5 +50,17 @@ public static class ObjectResolver
     {
         return Instance.ResolveObject(name, looker, location, objectType);
     }
+
+    /// <summary>
+    /// Resolve a query to a single object, reporting ambiguity when multiple matches exist.
+    /// </summary>
+    public static ObjectResolutionResult ResolveUnique(
+        string name,
+        GameObject looker,
+        GameObject? location = null,
+        string? objectType = null)
+    {
+        return Instance.ResolveUnique(name, looker, location, objectType);
+    }
 }
 

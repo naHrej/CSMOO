@@ -1,37 +1,226 @@
 
+section.success {
+    // <section class='success'>
+    //   You go 
+    //   <span class='object'>North</span> 
+    //   to  
+    //   <span class='context'>Next Room</span>
+    //   .
+    // </section>
+
+    // <section class='success'>
+    //   <span class='actor'>Player</span>
+    //   goes
+    //   <span class='object'>North</span> 
+    //   to  
+    //   <span class='context'>Next Room</span> 
+    //   .
+    // </section>
+
+    color: dodgerblue;
+
+    span.actor {
+        color: white;
+    }
+
+    span.object {
+        color: yellow;
+    }
+
+    span.context {
+        color: yellow;
+    }
+}
+
+section.Speech {
+    color: dodgerblue;
+    span.actor {
+        color: lightskyblue;
+    }
+    span.text {
+        color: white;
+    }
+}
+
+section.Error {
+    color: red;
+
+    span.command {
+        color: yellow;
+    }
+
+    span.param {
+        color: #997700;
+    }
+
+    span.usage {
+        color: green;
+    }
+}
+
+// Room section styles
 section.Room {
-    // Room styles here
-    div.Name {
-      color:chartreuse;
+    margin: 0;
+
+    h3.Name {
+        background-color: dodgerblue;
+        color: white;
+        margin: 0;
+        font-weight: bold;
     }
-    div.Description {
-      color:green;
+
+    p.Description {
+        margin: 0.5em 0;
+    }
+
+    p.Exits {
+        margin: 0.5em 0;
+
+        span.Exit {
+            color: yellow;
+        }
+    }
+
+    p.Contents {
+        margin: 0.5em 0;
+
+        span.Object {
+            color: lightgreen;
+        }
+        span.Weapon {
+            color: LightCoral;
+        }
+        span.Armor {
+            color: LightSteelBlue;
+        }
+        span.Tool {
+            color: LightYellow;
+        }
+        span.Other {
+            color: Gray;
+        }   
+    }
+
+    p.Players {
+        margin: 0.5em 0;
+
+        span.Player {
+            color: DodgerBlue;
+        }
     }
 }
 
+// Exit section styles
 section.Exit {
-    // Exit styles here
-    div.Name {
-      color:chartreuse;
+    margin: 0;
+
+    h3.Name {
+        color: yellow;
+        margin: 0;
+        font-weight: bold;
+    }
+
+    p.Description {
+        margin: 0.5em 0;
+    }
+
+    p.Closed {
+        margin: 0.5em 0;
+        color: red;
+    }
+
+    span.Destination {
+        color: lightblue;
     }
 }
 
+// Player section styles
 section.Player {
-    // Player styles here
-    div.Name {
-      color:dodgerblue;
+    margin: 0;
+
+    h3.Name {
+        color: lightblue;
+        margin: 0;
+        font-weight: bold;
+    }
+
+    p.Description {
+        margin: 0.5em 0;
+    }
+
+    p.Inventory {
+        margin: 0.5em 0;
+
+        span.Object {
+            color: lightgreen;
+        }
     }
 }
 
-section.Item {
-    // Item styles here
-    div.Name {
-      color:gold;
+// Object section styles
+section.Object {
+    margin: 0;
+
+    h3.Name {
+        color: lightgreen;
+        margin: 0;
+        font-weight: bold;
     }
+
+    p.Description {
+        margin: 0.5em 0;
+    }
+
+    p.Type {
+        margin: 0.5em 0;
+        color: gray;
+        font-size: 0.9em;
+    }
+}
+
+// Legacy support for div-based names (if still used)
+div.Name {
+    color: chartreuse;
 }
 
 section.Who {
-  div.Name {
-    color: indigo;
-  }
+    div.Name {
+        color: indigo;
+    }
+}
+
+section.Help {
+    color: hotpink; //We should not see this, but if we do we know the styles aren't working.
+
+    h3 {
+        margin: 0;
+        padding-top: 0;
+        padding-bottom: 0;
+        font-weight: bold;
+        border-radius: 0.5em;
+        background-color: green;
+        color: white;
+    }
+
+    span.category {
+        color: white;
+        font-weight: bold;
+    }
+
+    span.topic {
+        color: cyan;
+        font-weight: bold;
+    }
+
+    span.usage {
+        color: green;
+    }
+
+    span.command {
+        color: gold;
+    }
+
+    span.param {
+        color: #997700;
+    }
 }

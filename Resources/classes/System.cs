@@ -29,14 +29,14 @@ public class System
         }
 
         var fullMessage = string.Join(" ", Args);
-        notify(Player, $"You say, \"{fullMessage}\"");
+        notify(Player, $"<section class='Speech'>You say, \"<span class='text'>{fullMessage}</span>\"</section>");
 
         // Send to other players in the room
         var players = Builtins.GetPlayersInRoom(Player.Location);
         foreach (var plr in players)
         {
             if (plr.Id != Player.Id)
-                notify(plr, $"{Player.Name} says, \"{fullMessage}\"");
+                notify(plr, $"<section class='Speech'><span class='actor'>{Player.Name}</span> says, \"<span class='text'>{fullMessage}</span>\"</section>");
         }
     }
 
@@ -85,13 +85,16 @@ public class System
         if (Args.Count == 0)
         {
             var output = new StringBuilder();
-            output.AppendLine("=== Help Categories ===");
+            output.AppendLine("<section class='Help'>");
+            output.AppendLine("<h3>Help Categories</h3>");
             foreach (var cat in helpCategories.Keys.OrderBy(x => x))
             {
-                output.AppendLine($"<span class='command' style='color:yellow'>{cat}</span>: {string.Join(", ", helpCategories[cat])}");
+                var topics = string.Join(", ", helpCategories[cat].Select(t => $"<span class='topic'>{t}</span>"));
+                output.AppendLine($"<div><span class='category'>{cat}</span>: {topics}</div>");
             }
-            output.AppendLine();
-            output.AppendLine("Use: <span class='command' style='color:yellow'>help <span class='param' style='color:gray'>&lt;category&gt;</span></span> or <span class='command' style='color:yellow'>help <span class='param' style='color:gray'>&lt;topic&gt;</span></span>");
+            output.AppendLine("<div><span class='usage'>Use: '<span class='command'>help <span class='param'>&lt;category&gt;</span></span>" +
+            "' or '<span class='command'>help <span class='param'>&lt;topic&gt;</span></span>'</span></div>");
+            output.AppendLine("</section>");
             notify(Player, output.ToString());
             return;
         }
@@ -102,13 +105,15 @@ public class System
         if (helpCategories.ContainsKey(searchTerm))
         {
             var output = new StringBuilder();
-            output.AppendLine($"=== {char.ToUpper(searchTerm[0])}{searchTerm.Substring(1)} Help ===");
+            var prettyCategory = char.ToUpper(searchTerm[0]) + searchTerm.Substring(1);
+            output.AppendLine("<section class='Help'>");
+            output.AppendLine($"<h3>{prettyCategory} Help</h3>");
             foreach (var topic in helpCategories[searchTerm])
             {
-                output.AppendLine($"• <span class='command' style='color:yellow'>{topic}</span>");
+                output.AppendLine($"<div><span class='topic'>{topic}</span></div>");
             }
-            output.AppendLine();
-            output.AppendLine($"Use: <span class='command' style='color:yellow'>help <span class='param' style='color:gray'>&lt;topic&gt;</span></span> for specific help");
+            output.AppendLine("<div><span class='usage'>Use: '<span class='command'>help <span class='param'>&lt;topic&gt;</span></span>' for specific help</span></div>");
+            output.AppendLine("</section>");
             notify(Player, output.ToString());
             return;
         }
@@ -120,12 +125,20 @@ public class System
         if (!foundInCategory.Equals(default(KeyValuePair<string, List<string>>)))
         {
             // Provide specific help for the topic
-            var helpText = his.GetTopicHelp(searchTerm);
+            // NOTE: verb scripts run in Roslyn scripting context (not inside a C# instance method),
+            // so `this` isn't available here. Keep the topic help inline.
+            var helpText = searchTerm switch
+            {
+                "movement" => "<section class='Help'><h3>Movement</h3><div>Movement commands: <span class='command'>go</span>, <span class='command'>north</span>, <span class='command'>south</span>, <span class='command'>east</span>, <span class='command'>west</span>, etc.</div><div>Use <span class='command'>look</span> to see available exits.</div></section>",
+                "communication" => "<section class='Help'><h3>Communication</h3><div>Communication: <span class='command'>say</span> (or <span class='command'>\"</span>), <span class='command'>tell</span>, <span class='command'>ooc</span></div></section>",
+                "objects" => "<section class='Help'><h3>Objects</h3><div>Object commands: <span class='command'>look</span>, <span class='command'>examine</span>, <span class='command'>get</span>, <span class='command'>drop</span>, <span class='command'>inventory</span></div></section>",
+                _ => $"Help for '{searchTerm}' is not yet available."
+            };
             notify(Player, helpText);
         }
         else
         {
-            notify(Player, $"No help found for '{searchTerm}'. Try <span class='command' style='color:yellow'>help</span> for available categories.");
+            notify(Player, $"<section class='Help'><div>No help found for '{searchTerm}'. Try <span class='command'>help</span> for available categories.</div></section>");
         }
     }
 
@@ -133,9 +146,9 @@ public class System
     {
         return topic.ToLower() switch
         {
-            "movement" => "Movement commands: <span class='command' style='color:yellow'>go</span>, <span class='command' style='color:yellow'>north</span>, <span class='command' style='color:yellow'>south</span>, <span class='command' style='color:yellow'>east</span>, <span class='command' style='color:yellow'>west</span>, etc.\nUse <span class='command' style='color:yellow'>look</span> to see available exits.",
-            "communication" => "Communication: <span class='command' style='color:yellow'>say</span> (or <span class='command' style='color:yellow'>\"</span>), <span class='command' style='color:yellow'>tell</span>, <span class='command' style='color:yellow'>ooc</span>",
-            "objects" => "Object commands: <span class='command' style='color:yellow'>look</span>, <span class='command' style='color:yellow'>examine</span>, <span class='command' style='color:yellow'>get</span>, <span class='command' style='color:yellow'>drop</span>, <span class='command' style='color:yellow'>inventory</span>",
+            "movement" => "Movement commands: <span class='command'>go</span>, <span class='command'>north</span>, <span class='command'>south</span>, <span class='command'>east</span>, <span class='command'>west</span>, etc.\nUse <span class='command'>look</span> to see available exits.",
+            "communication" => "Communication: <span class='command'>say</span> (or <span class='command'>\"</span>), <span class='command'>tell</span>, <span class='command'>ooc</span>",
+            "objects" => "Object commands: <span class='command'>look</span>, <span class='command'>examine</span>, <span class='command'>get</span>, <span class='command'>drop</span>, <span class='command'>inventory</span>",
             _ => $"Help for '{topic}' is not yet available."
         };
     }
@@ -152,7 +165,7 @@ public class System
         var currentLocation = Player.Location;
         if (currentLocation is null)
         {
-            notify(Player, "<p class='error' style='color:red'>You are not in any location.</p>");
+            notify(Player, "<p class='error'>You are not in any location.</p>");
             return false;
         }
         var exits = Builtins.GetExits(Location);
@@ -165,18 +178,18 @@ public class System
                 exitNames.Add(dir);
             }
         }
-        var availableExits = $"Available exits: <span class='param' style='color:yellow'>{string.Join(", ", exitNames)}</span>";
+        var availableExits = $"Available exits: <span class='param'>{string.Join(", ", exitNames)}</span>";
         if (Args.Count == 0)
         {
             // Show available exits if no direction given
             if (exits.Count == 0)
             {
-                notify(Player, "<p class='error' style='color:red'>There are no exits from here.</p>");
+                notify(Player, "<p class='error'>There are no exits from here.</p>");
             }
             else
             {
                 notify(Player, availableExits);
-                notify(Player, "<p class='usage' style='color:green'>Usage: <span class='command' style='color:yellow'>go <span class='param' style='color:gray'>&lt;direction&gt;</span></span></p>");
+                notify(Player, "<p class='usage'>Usage: <span class='command'>go <span class='param'>&lt;direction&gt;</span></span></p>");
             }
             return true; // Successfully handled the command (showed help)
         }
@@ -238,19 +251,19 @@ public class System
 
         if (destination == null)
         {
-            notify(Player, "<p class='error' style='color:red'>That exit doesn't lead anywhere.</p>");
+            notify(Player, "<p class='error'>That exit doesn't lead anywhere.</p>");
             return true; // Exit exists but broken - we handled the command
         }
         // Move the player
         if (Builtins.MoveObject(Player, destination))
         {
-            notify(Player, $"<p class='success' style='color:dodgerblue'>You go <span class='param' style='color:yellow'>{chosenDirection}</span>.</p>");
+            notify(Player, $"<p class='success'>You go <span class='param'>{chosenDirection}</span>.</p>");
             notify(Player, destination.Description());
             return true; // Successfully moved
         }
         else
         {
-            notify(Player, "<p class='error' style='color:red'>You can't go that way.</p>");
+            notify(Player, "<p class='error'>You can't go that way.</p>");
             return true; // We handled the command, but movement failed
         }
     }
@@ -264,28 +277,34 @@ public class System
     public verb Look(string target)
     {
         // Look command - shows room or looks at specific object.
-        // This is a test
-        var target = "";
+        var targetText = "";
         if (Args.Count == 0)
         {
-            target = "here";
+            targetText = "here";
         }
         else if (Args.Count >= 2 && Args[0].ToLower() == "at")
         {
             // 'look at something'
-            target = string.Join(" ", Args.Skip(1));
+            targetText = string.Join(" ", Args.Skip(1));
         }
         else
         {
             // 'look something'
-            target = string.Join(" ", Args);
+            targetText = string.Join(" ", Args);
         }
-        var resolved = ObjectResolver.ResolveObject(target, Player);
-        if (resolved == null)
+
+        var resolution = ObjectResolver.ResolveUnique(targetText, Player);
+        if (resolution.Ambiguous)
         {
-            notify(player, $"You don't see '{target}' here.");
-            return true; // Return true to indicate we handled the command (even if object not found)
+            notify(Player, $"<section class='error'>I don't know which '<span class='param'>{targetText}</span>' you mean.</section>");
+            return true;
         }
+        if (resolution.Match == null)
+        {
+            notify(Player, $"<section class='error'>You don't see '<span class='param'>{targetText}</span>' here.</section>");
+            return true;
+        }
+        var resolved = resolution.Match;
         
         // Try to call Description() function, but fall back to property access if object has no owner
         string description;
@@ -324,7 +343,7 @@ public class System
             }
         }
         
-        notify(player, description);
+        notify(Player, description);
         return true;
     }
 

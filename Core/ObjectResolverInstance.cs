@@ -3,6 +3,7 @@ using CSMOO.Object;
 using LiteDB;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.RegularExpressions;
 
 namespace CSMOO.Core;
 
@@ -185,65 +186,98 @@ public class ObjectResolverInstance : IObjectResolver
     /// </remarks>
     private List<dynamic> MatchNameOrAlias(string normName, List<GameObject> candidates)
     {
-        string lowerName = normName.ToLowerInvariant();
-        var results = new List<dynamic>();
+        var exact = new List<GameObject>();
+        var prefix = new List<GameObject>();
+
         foreach (var obj in candidates)
         {
-            // Name match (case-insensitive)
-            string? objName = !string.IsNullOrEmpty(obj.Name) ? obj.Name : (obj.Properties.ContainsKey("name") ? obj.Properties["name"].AsString : null);
-            if (!string.IsNullOrEmpty(objName) && string.Equals(objName, normName, StringComparison.OrdinalIgnoreCase))
+            var keys = GetMatchKeys(obj);
+
+            if (keys.Any(k => string.Equals(k, normName, StringComparison.OrdinalIgnoreCase)))
             {
-                results.Add(obj);
+                exact.Add(obj);
                 continue;
             }
-            // Alias match (case-insensitive)
-            if (obj.Properties.ContainsKey("aliases"))
+
+            if (keys.Any(k => TokenPrefixMatch(normName, k)))
             {
-                var aliasesProp = obj.Properties["aliases"];
-                List<string>? aliases = null;
-                if (aliasesProp.IsArray)
-                    aliases = aliasesProp.AsArray.Select(a => a.AsString).ToList();
-                else if (aliasesProp.IsString)
-                    aliases = aliasesProp.AsString.Split(new[] { ' ', ',' }, StringSplitOptions.RemoveEmptyEntries).ToList();
-                if (aliases != null && aliases.Any(a => string.Equals(a, normName, StringComparison.OrdinalIgnoreCase)))
-                {
-                    results.Add(obj);
-                    continue;
-                }
-            }
-            // Dynamic alias: capital letters and digits in name, ignoring other chars
-            if (!string.IsNullOrEmpty(objName))
-            {
-                var dynAlias = new string(objName.Where(c => char.IsUpper(c) || char.IsDigit(c)).ToArray());
-                if (!string.IsNullOrEmpty(dynAlias) && string.Equals(dynAlias, normName, StringComparison.OrdinalIgnoreCase))
-                {
-                    results.Add(obj);
-                    continue;
-                }
-            }
-            // Dynamic exit aliases (for exits)
-            if (obj.ClassId == "Exit" && obj.Properties.ContainsKey("direction"))
-            {
-                var dir = obj.Properties["direction"].AsString?.ToLowerInvariant();
-                if (!string.IsNullOrEmpty(dir))
-                {
-                    if (string.Equals(dir, lowerName, StringComparison.OrdinalIgnoreCase))
-                    {
-                        results.Add(obj);
-                        continue;
-                    }
-                    foreach (var alias in GetExitAliases(dir))
-                    {
-                        if (string.Equals(alias, lowerName, StringComparison.OrdinalIgnoreCase))
-                        {
-                            results.Add(obj);
-                            break;
-                        }
-                    }
-                }
+                prefix.Add(obj);
             }
         }
-        return results;
+
+        // Tiered: exact first, then token-prefix.
+        var chosen = exact.Count > 0 ? exact : prefix;
+        return chosen.Cast<dynamic>().ToList();
+    }
+
+    private static List<string> Tokenize(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return [];
+        return Regex.Split(text.ToLowerInvariant(), @"[^a-z0-9]+")
+            .Where(t => !string.IsNullOrWhiteSpace(t))
+            .ToList();
+    }
+
+    private static bool TokenPrefixMatch(string query, string candidate)
+    {
+        var qTokens = Tokenize(query);
+        if (qTokens.Count == 0) return false;
+        var cTokens = Tokenize(candidate);
+        if (cTokens.Count == 0) return false;
+
+        foreach (var qt in qTokens)
+        {
+            if (!cTokens.Any(ct => ct.StartsWith(qt, StringComparison.OrdinalIgnoreCase)))
+                return false;
+        }
+        return true;
+    }
+
+    private List<string> GetMatchKeys(GameObject obj)
+    {
+        var keys = new List<string>();
+
+        // Name
+        var objName = !string.IsNullOrEmpty(obj.Name)
+            ? obj.Name
+            : (obj.Properties.ContainsKey("name") ? obj.Properties["name"].AsString : null);
+        if (!string.IsNullOrWhiteSpace(objName))
+            keys.Add(objName);
+
+        // Aliases
+        if (obj.Properties.ContainsKey("aliases"))
+        {
+            var aliasesProp = obj.Properties["aliases"];
+            if (aliasesProp.IsArray)
+            {
+                keys.AddRange(aliasesProp.AsArray.Select(a => a.AsString));
+            }
+            else if (aliasesProp.IsString)
+            {
+                keys.AddRange(aliasesProp.AsString.Split(new[] { ' ', ',' }, StringSplitOptions.RemoveEmptyEntries));
+            }
+        }
+
+        // Exit direction + known aliases/abbrev
+        if (obj.Properties.ContainsKey("direction"))
+        {
+            var dir = obj.Properties["direction"].AsString;
+            if (!string.IsNullOrWhiteSpace(dir))
+            {
+                keys.Add(dir);
+                keys.AddRange(GetExitAliases(dir.ToLowerInvariant()));
+            }
+        }
+
+        // Computed abbreviation from capital letters/digits (e.g., "A Wooden Staff" -> "AWS")
+        if (!string.IsNullOrWhiteSpace(objName))
+        {
+            var dynAlias = new string(objName.Where(c => char.IsUpper(c) || char.IsDigit(c)).ToArray());
+            if (!string.IsNullOrWhiteSpace(dynAlias))
+                keys.Add(dynAlias);
+        }
+
+        return keys.Where(k => !string.IsNullOrWhiteSpace(k)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
     }
 
     // Helper for exit aliases (abbreviations, etc.)
@@ -287,6 +321,24 @@ public class ObjectResolverInstance : IObjectResolver
     {
         var matches = ResolveObjects(name, looker, location, objectType);
         return matches.FirstOrDefault();
+    }
+
+    public ObjectResolutionResult ResolveUnique(
+        string name,
+        GameObject looker,
+        GameObject? location = null,
+        string? objectType = null)
+    {
+        var matchesDyn = ResolveObjects(name, looker, location, objectType);
+        var matches = matchesDyn.OfType<GameObject>().ToList();
+
+        if (matches.Count == 1)
+            return new ObjectResolutionResult(name, matches[0], ambiguous: false, matches);
+
+        if (matches.Count > 1)
+            return new ObjectResolutionResult(name, match: null, ambiguous: true, matches);
+
+        return new ObjectResolutionResult(name, match: null, ambiguous: false, matches);
     }
 
     private GameObject? GetSystemObject()
