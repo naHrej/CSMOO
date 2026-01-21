@@ -52,8 +52,12 @@ public class Exit
                 {
                     try
                     {
-                        var roomDescription = destinationRoom.Description();
-                        desc.Append($"<p class='Description'>{roomDescription}</p>");
+                        var descResult = CallFunctionOnObject(destinationRoom, "Description");
+                        var roomDescription = descResult?.ToString() ?? "";
+                        if (!string.IsNullOrEmpty(roomDescription))
+                        {
+                            desc.Append($"<p class='Description'>{roomDescription}</p>");
+                        }
                     }
                     catch
                     {

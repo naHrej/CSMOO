@@ -16,7 +16,7 @@ public class ObjectResolverTests
     [Fact]
     public void ResolveUnique_PartialTokenPrefix_Resolves_Object_By_Name_Token()
     {
-        var room = new Room("room-1", "A Peaceful Grove", "A peaceful grove");
+        var room = new Room("room-1", "A Peaceful Grove", "A peaceful grove description");
         var player = new Player { Id = "p1", Name = "Tester", Location = room };
         var staff = new GameObject
         {
@@ -42,7 +42,7 @@ public class ObjectResolverTests
     [Fact]
     public void ResolveUnique_Ambiguous_PartialTokenPrefix_Returns_Ambiguous()
     {
-        var room = new Room("room-1", "A Peaceful Grove", "A peaceful grove");
+        var room = new Room("room-1", "A Peaceful Grove", "A peaceful grove description");
         var player = new Player { Id = "p1", Name = "Tester", Location = room };
         var staff = new GameObject { Id = "staff-1", Name = "A Wooden Staff", Properties = new LiteDB.BsonDocument { ["name"] = "A Wooden Staff" } };
         var sword = new GameObject { Id = "sword-1", Name = "A Wooden Sword", Properties = new LiteDB.BsonDocument { ["name"] = "A Wooden Sword" } };
@@ -64,7 +64,7 @@ public class ObjectResolverTests
     [Fact]
     public void ResolveUnique_Uses_Aliases_For_Matching()
     {
-        var room = new Room("room-1", "A Peaceful Grove", "A peaceful grove");
+        var room = new Room("room-1", "A Peaceful Grove", "A peaceful grove description");
         var player = new Player { Id = "p1", Name = "Tester", Location = room };
         var staff = new GameObject
         {
@@ -94,7 +94,7 @@ public class ObjectResolverTests
     [Fact]
     public void ResolveUnique_Resolves_Exit_By_Abbreviation()
     {
-        var room = new Room("room-1", "A Peaceful Grove", "A peaceful grove");
+        var room = new Room("room-1", "A Peaceful Grove", "A peaceful grove description");
         var player = new Player { Id = "p1", Name = "Tester", Location = room };
         var exit = new GameObject
         {
