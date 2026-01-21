@@ -11,18 +11,18 @@ public class Room
         }
         
         var desc = new StringBuilder();
-        desc.Append($"<section class='room' style='color:red;margin:0'>");
+        desc.Append($"<section class='Room'>");
         
         // Room name and description
         var roomName = Builtins.GetProperty(This, "name", "") ?? "a room";
-        desc.Append($"<h3 style='color:dodgerblue;margin:0;font-weight:bold'>{roomName}</h3>");
+        desc.Append($"<h3 class='Name'>{roomName}</h3>");
         
         var roomDescription = Builtins.GetProperty(This, "longDescription", "")
         ?? Builtins.GetProperty(This, "Description", "") ??
          "You see nothing special.";
         if (!string.IsNullOrEmpty(roomDescription))
         {
-            desc.Append($"<p style='margin:0.5em 0'>{roomDescription}</p>");
+            desc.Append($"<p class='Description'>{roomDescription}</p>");
         }
         
         // Show exits
@@ -39,7 +39,7 @@ public class Room
                         var dir = Builtins.GetProperty(exit, "direction", "");
                         if (!string.IsNullOrEmpty(dir))
                         {
-                            exitNames.Add($"<span class='exit' style='color:yellow'>{dir}</span>");
+                            exitNames.Add($"<span class='Exit'>{dir}</span>");
                         }
                     }
                     catch
@@ -49,7 +49,7 @@ public class Room
                 }
                 if (exitNames.Count > 0)
                 {
-                    desc.Append($"<p style='margin:0.5em 0'>Exits: {string.Join(", ", exitNames)}</p>");
+                    desc.Append($"<p class='Exits'>Exits: {string.Join(", ", exitNames)}</p>");
                 }
             }
         }
@@ -84,11 +84,11 @@ public class Room
             foreach (var item in contents)
             {
                 var itemName = Builtins.GetProperty(item, "name", "") ?? "something";
-                itemNames.Add($"<span class='object' style='color:lightgreen'>{itemName}</span>");
+                itemNames.Add($"<span class='Object'>{itemName}</span>");
             }
             if (itemNames.Count > 0)
             {
-                desc.Append($"<p style='margin:0.5em 0'>You see: {string.Join(", ", itemNames)}</p>");
+                desc.Append($"<p class='Contents'>You see: {string.Join(", ", itemNames)}</p>");
             }
         }
         
@@ -98,11 +98,11 @@ public class Room
             foreach (var player in players)
             {
                 var playerName = Builtins.GetProperty(player, "name", "") ?? "someone";
-                playerNames.Add($"<span class='player' style='color:lightblue'>{playerName}</span>");
+                playerNames.Add($"<span class='Player'>{playerName}</span>");
             }
             if (playerNames.Count > 0)
             {
-                desc.Append($"<p style='margin:0.5em 0'>Players here: {string.Join(", ", playerNames)}</p>");
+                desc.Append($"<p class='Players'>Players here: {string.Join(", ", playerNames)}</p>");
             }
         }
         

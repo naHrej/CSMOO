@@ -28,6 +28,7 @@ public class CommandProcessor
     private readonly IVerbResolver _verbResolver;
     private readonly IPermissionManager _permissionManager;
     private readonly IObjectManager _objectManager;
+    private readonly CSMOO.Core.IObjectResolver _objectResolver;
     private readonly IFunctionResolver _functionResolver;
     private readonly IDbProvider _dbProvider;
     private readonly IGameDatabase _gameDatabase;
@@ -59,6 +60,7 @@ public class CommandProcessor
         IVerbResolver verbResolver,
         IPermissionManager permissionManager,
         IObjectManager objectManager,
+        CSMOO.Core.IObjectResolver objectResolver,
         IFunctionResolver functionResolver,
         IDbProvider dbProvider,
         IGameDatabase gameDatabase,
@@ -80,6 +82,7 @@ public class CommandProcessor
         _verbResolver = verbResolver ?? throw new ArgumentNullException(nameof(verbResolver));
         _permissionManager = permissionManager ?? throw new ArgumentNullException(nameof(permissionManager));
         _objectManager = objectManager ?? throw new ArgumentNullException(nameof(objectManager));
+        _objectResolver = objectResolver ?? throw new ArgumentNullException(nameof(objectResolver));
         _functionResolver = functionResolver ?? throw new ArgumentNullException(nameof(functionResolver));
         _dbProvider = dbProvider ?? throw new ArgumentNullException(nameof(dbProvider));
         _gameDatabase = gameDatabase ?? throw new ArgumentNullException(nameof(gameDatabase));
@@ -107,7 +110,7 @@ public class CommandProcessor
     public CommandProcessor(Guid sessionGuid, TcpClient client)
         : this(sessionGuid, new TelnetConnection(sessionGuid, client), 
                CreateDefaultPlayerManager(), CreateDefaultVerbResolver(), CreateDefaultPermissionManager(), 
-               CreateDefaultObjectManager(), CreateDefaultFunctionResolver(), CreateDefaultDbProvider(), 
+               CreateDefaultObjectManager(), CreateDefaultObjectResolver(), CreateDefaultFunctionResolver(), CreateDefaultDbProvider(), 
                CreateDefaultGameDatabase(), CreateDefaultLogger(), CreateDefaultRoomManager(), new ScriptEngineFactory(),
                CreateDefaultVerbManager(), CreateDefaultFunctionManager(), CreateDefaultScriptPrecompiler(), CreateDefaultCompilationCache(), CreateDefaultHotReloadManager(), CreateDefaultCoreHotReloadManager(), CreateDefaultFunctionInitializer(), CreateDefaultPropertyInitializer())
     {
@@ -117,10 +120,21 @@ public class CommandProcessor
     public CommandProcessor(Guid sessionGuid, IClientConnection connection)
         : this(sessionGuid, connection,
                CreateDefaultPlayerManager(), CreateDefaultVerbResolver(), CreateDefaultPermissionManager(),
-               CreateDefaultObjectManager(), CreateDefaultFunctionResolver(), CreateDefaultDbProvider(),
+               CreateDefaultObjectManager(), CreateDefaultObjectResolver(), CreateDefaultFunctionResolver(), CreateDefaultDbProvider(),
                CreateDefaultGameDatabase(), CreateDefaultLogger(), CreateDefaultRoomManager(), new ScriptEngineFactory(),
                CreateDefaultVerbManager(), CreateDefaultFunctionManager(), CreateDefaultScriptPrecompiler(), CreateDefaultCompilationCache(), CreateDefaultHotReloadManager(), CreateDefaultCoreHotReloadManager(), CreateDefaultFunctionInitializer(), CreateDefaultPropertyInitializer())
     {
+    }
+
+    private static CSMOO.Core.IObjectResolver CreateDefaultObjectResolver()
+    {
+        var dbProvider = DbProvider.Instance;
+        var config = Config.Instance;
+        var logger = new LoggerInstance(config);
+        var classManager = new ClassManagerInstance(dbProvider, logger);
+        var objectManager = new ObjectManagerInstance(dbProvider, classManager);
+        var coreClassFactory = new CoreClassFactoryInstance(dbProvider, logger);
+        return new CSMOO.Core.ObjectResolverInstance(objectManager, coreClassFactory);
     }
 
     // Helper methods for backward compatibility - create default instances
@@ -359,13 +373,26 @@ public class CommandProcessor
             }
             // Reset stylesheet flag so it gets sent after login
             _stylesheetSent = false;
-            SendToPlayer($"Welcome back, {_player?.Name}!");
-            SendToPlayer("");
-            SendToPlayer("Type 'look' to see your surroundings.");
+            // Styled login greeting for MUjs/HTML clients
+            // Player names may include punctuation; trim trailing '!' so we don't render "!!" in greetings.
+            var playerName = (_player?.Name ?? "Player").TrimEnd('!');
+
+            // Tell MUjs where to fetch stylesheet.less (server port + 2, or explicit HttpPort if set)
+            var cfg = Config.Instance;
+            var stylePort = cfg.Server.HttpPort > 0 ? cfg.Server.HttpPort : (cfg.Server.Port + 2);
+            var stylesheetUrl = $"{cfg.Server.ServerUrl}:{stylePort}/stylesheet.less";
+            SendToPlayer($"<MUjs style=\"{stylesheetUrl}\"></MUjs>");
+
+            SendToPlayer($"<section class='success'>Welcome back, <span class='object'>{playerName}</span>!</section>");
+            
+            // Automatically show room description after login
+            ShowRoomDescription();
         }
         else
         {
-            SendToPlayer("Invalid username or password.");
+            // the player isn't logged in yet so doesn't have a stylesheet, 
+            // so we need to send the error message in a way that will be styled.
+            SendToPlayer("<div style='color:red'>Invalid username or password.</div>");
         }
     }
 
@@ -373,7 +400,7 @@ public class CommandProcessor
     {
         if (parts.Length != 4 || parts[1].ToLower() != "player")
         {
-            SendToPlayer("Usage: create player <username> <password>");
+            SendToPlayer("<section class='error'><span class='usage'>Usage: create player <span class='param'><username></span> <span class='param'><password></span></span></section>");
             return;
         }
 
@@ -404,7 +431,9 @@ public class CommandProcessor
             _stylesheetSent = false;
             SendToPlayer($"Welcome to CSMOO, {username}! Your character has been created.");
             SendToPlayer("");
-            SendToPlayer("Type 'look' to see your surroundings.");
+            
+            // Automatically show room description after login
+            ShowRoomDescription();
         }
         catch (Exception ex)
         {
@@ -483,13 +512,23 @@ public class CommandProcessor
             if (!input.Equals("go", StringComparison.OrdinalIgnoreCase) && 
                 !input.StartsWith("go ", StringComparison.OrdinalIgnoreCase))
             {
-                var exit = FindExitByNameOrAbbreviation(input, _player);
-                if (exit != null)
+                var exitClassId = _objectManager.GetClassByName("Exit")?.Id;
+                if (!string.IsNullOrEmpty(exitClassId) && _player.Location != null)
                 {
-                    if (TryExecuteExit(exit, _player))
+                    var resolved = _objectResolver.ResolveUnique(input, _player, _player.Location, exitClassId);
+                    if (resolved.Ambiguous)
                     {
-                        _logger.Info($"[HANDLED] Command '{input}' handled by: Exit (implicit)");
+                        SendToPlayer($"<section class='error'>I don't know which '<span class='param'>{input}</span>' you mean.</section>");
+                        _logger.Info($"[HANDLED] Command '{input}' handled by: Exit (ambiguous)");
                         return;
+                    }
+                    if (resolved.Match != null)
+                    {
+                        if (TryExecuteExit(resolved.Match, _player))
+                        {
+                            _logger.Info($"[HANDLED] Command '{input}' handled by: Exit (implicit)");
+                            return;
+                        }
                     }
                 }
             }
@@ -524,7 +563,7 @@ public class CommandProcessor
                     break;
                 default:
                     _logger.Warning($"[UNHANDLED] Command '{input}' not recognized - sending 'Unknown command' message to player");
-                    SendToPlayer($"Unknown command: {command}. Type 'help' for available commands.");
+                    SendToPlayer($"<span class='error'>Unknown command '<span class='command'>{command}</span>'. Type '<span class='command'>help</span>' for available commands.</span>");
                     break;
             }
         }
@@ -611,7 +650,7 @@ public class CommandProcessor
         var destination = _roomManager.GetExitDestination(exit);
         if (destination == null)
         {
-            SendToPlayer("<p class='error' style='color:red'>That exit doesn't lead anywhere.</p>");
+            SendToPlayer("<p class='error'>That exit doesn't lead anywhere.</p>");
             return true; // Exit exists but broken - we handled the command
         }
 
@@ -619,7 +658,7 @@ public class CommandProcessor
         if (_objectManager.MoveObject(player, destination))
         {
             var exitDirection = _objectManager.GetProperty(exit, "direction")?.AsString ?? "that way";
-            SendToPlayer($"<p class='success' style='color:dodgerblue'>You go <span class='param' style='color:yellow'>{exitDirection}</span>.</p>");
+            SendToPlayer($"<p class='success'>You go <span class='param'>{exitDirection}</span>.</p>");
             
             // Show destination description using the room's Description() function
             try
@@ -639,11 +678,12 @@ public class CommandProcessor
                         // Fallback to property access if Description() returns null/empty
                         var destinationName = _objectManager.GetProperty(destination, "name")?.AsString ?? destination.Id;
                         var destinationDesc = _objectManager.GetProperty(destination, "description")?.AsString ?? "You see nothing special.";
-                        SendToPlayer($"<h3 style='color:dodgerblue;margin:0;font-weight:bold'>{destinationName}</h3>");
+                        SendToPlayer($"<section class='Room'><h3 class='Name'>{destinationName}</h3>");
                         if (!string.IsNullOrEmpty(destinationDesc))
                         {
-                            SendToPlayer($"<p style='margin:0.5em 0'>{destinationDesc}</p>");
+                            SendToPlayer($"<p class='Description'>{destinationDesc}</p>");
                         }
+                        SendToPlayer("</section>");
                     }
                 }
                 else
@@ -651,11 +691,12 @@ public class CommandProcessor
                     // No Description() function, use property access as fallback
                     var destinationName = _objectManager.GetProperty(destination, "name")?.AsString ?? destination.Id;
                     var destinationDesc = _objectManager.GetProperty(destination, "description")?.AsString ?? "You see nothing special.";
-                    SendToPlayer($"<h3 style='color:dodgerblue;margin:0;font-weight:bold'>{destinationName}</h3>");
+                    SendToPlayer($"<section class='Room'><h3 class='Name'>{destinationName}</h3>");
                     if (!string.IsNullOrEmpty(destinationDesc))
                     {
-                        SendToPlayer($"<p style='margin:0.5em 0'>{destinationDesc}</p>");
+                        SendToPlayer($"<p class='Description'>{destinationDesc}</p>");
                     }
+                    SendToPlayer("</section>");
                 }
             }
             catch
@@ -665,17 +706,18 @@ public class CommandProcessor
                 {
                     var name = _objectManager.GetProperty(destination, "name")?.AsString ?? destination.Id;
                     var desc = _objectManager.GetProperty(destination, "description")?.AsString ?? "You see nothing special.";
-                    SendToPlayer($"<h3 style='color:dodgerblue;margin:0;font-weight:bold'>{name}</h3>");
+                    SendToPlayer($"<section class='Room'><h3 class='Name'>{name}</h3>");
                     if (!string.IsNullOrEmpty(desc))
                     {
-                        SendToPlayer($"<p style='margin:0.5em 0'>{desc}</p>");
+                        SendToPlayer($"<p class='Description'>{desc}</p>");
                     }
+                    SendToPlayer("</section>");
                 }
                 catch
                 {
                     // Last resort fallback
                     var name = _objectManager.GetProperty(destination, "name")?.AsString ?? destination.Id;
-                    SendToPlayer($"<h3>{name}</h3>");
+                    SendToPlayer($"<section class='Room'><h3 class='Name'>{name}</h3></section>");
                 }
             }
             
@@ -704,7 +746,7 @@ public class CommandProcessor
             var availableExits = _roomManager.GetExits(_player.Location.Id);
             if (availableExits.Count == 0)
             {
-                SendToPlayer("<p class='error' style='color:red'>There are no exits from here.</p>");
+                SendToPlayer("<p class='error'>There are no exits from here.</p>");
                 return true;
             }
 
@@ -717,9 +759,9 @@ public class CommandProcessor
                     exitNames.Add(dir);
                 }
             }
-            var exitsList = $"Available exits: <span class='param' style='color:yellow'>{string.Join(", ", exitNames)}</span>";
+            var exitsList = $"Available exits: <span class='param'>{string.Join(", ", exitNames)}</span>";
             SendToPlayer(exitsList);
-            SendToPlayer("<p class='usage' style='color:green'>Usage: <span class='command' style='color:yellow'>go <span class='param' style='color:gray'>&lt;direction&gt;</span></span></p>");
+            SendToPlayer("<p class='usage'>Usage: <span class='command'>go <span class='param'>&lt;direction&gt;</span></span></p>");
             return true;
         }
         else if (input.StartsWith("go ", StringComparison.OrdinalIgnoreCase))
@@ -739,7 +781,7 @@ public class CommandProcessor
             var availableExitsList = _roomManager.GetExits(_player.Location.Id);
             if (availableExitsList.Count == 0)
             {
-                SendToPlayer("<p class='error' style='color:red'>There are no exits from here.</p>");
+                SendToPlayer("<p class='error'>There are no exits from here.</p>");
                 return true;
             }
 
@@ -752,21 +794,33 @@ public class CommandProcessor
                     exitNamesList.Add(dir);
                 }
             }
-            var exitsDisplay = $"Available exits: <span class='param' style='color:yellow'>{string.Join(", ", exitNamesList)}</span>";
+            var exitsDisplay = $"Available exits: <span class='param'>{string.Join(", ", exitNamesList)}</span>";
             SendToPlayer(exitsDisplay);
-            SendToPlayer("<p class='usage' style='color:green'>Usage: <span class='command' style='color:yellow'>go <span class='param' style='color:gray'>&lt;direction&gt;</span></span></p>");
+            SendToPlayer("<p class='usage'>Usage: <span class='command'>go <span class='param'>&lt;direction&gt;</span></span></p>");
             return true;
         }
 
-        // Find exit by name or abbreviation
-        var exit = FindExitByNameOrAbbreviation(parameter, _player);
-        if (exit == null)
+        // Find exit by name/alias/partial/abbreviation using the shared resolver
+        var exitClassId = _objectManager.GetClassByName("Exit")?.Id;
+        if (string.IsNullOrEmpty(exitClassId) || _player.Location == null)
         {
-            SendToPlayer("<p class='error' style='color:red'>You can't go that way.</p>");
-            return true; // We handled the command, but no exit matched
+            SendToPlayer("<p class='error'>You can't go that way.</p>");
+            return true;
         }
 
-        return TryExecuteExit(exit, _player);
+        var resolved = _objectResolver.ResolveUnique(parameter, _player, _player.Location, exitClassId);
+        if (resolved.Ambiguous)
+        {
+            SendToPlayer($"<section class='error'>I don't know which '<span class='param'>{parameter}</span>' you mean.</section>");
+            return true;
+        }
+        if (resolved.Match == null)
+        {
+            SendToPlayer("<p class='error'>You can't go that way.</p>");
+            return true; // handled, but no exit matched
+        }
+
+        return TryExecuteExit(resolved.Match, _player);
     }
 
     private void HandleScript(string input)
@@ -925,12 +979,29 @@ public class CommandProcessor
             _logger.Info("DisplayLoginBanner: Starting login banner display");
             
             // send static Stylesheet.less as css to client
+            _logger.Info("[STYLESHEET] DisplayLoginBanner: Loading stylesheet...");
             string css = Html.GetStylesheet();
             if (string.IsNullOrEmpty(css))
             {
+                _logger.Warning("[STYLESHEET] DisplayLoginBanner: Stylesheet is empty or null, using fallback");
                 css = "/* No CSS available */";
             }
+            else
+            {
+                _logger.Info($"[STYLESHEET] DisplayLoginBanner: Stylesheet loaded successfully, length: {css.Length} characters");
+            }
+            // Tell MUjs where to fetch stylesheet.less *before* we send any styled HTML,
+            // so the client can start fetching/compiling immediately.
+            var config = Config.Instance;
+            var stylePort = config.Server.HttpPort > 0 ? config.Server.HttpPort : (config.Server.Port + 2);
+            var stylesheetUrl = $"{config.Server.ServerUrl}:{stylePort}/stylesheet.less";
+            SendToPlayer($"<MUjs style=\"{stylesheetUrl}\"></MUjs>");
+            _logger.Info($"[STYLESHEET] DisplayLoginBanner: MUjs tag sent with URL: {stylesheetUrl}");
+
+            _logger.Info($"[STYLESHEET] DisplayLoginBanner: Sending stylesheet to client (Session: {_sessionGuid})");
             SendToPlayer($"<style type='text/css'>{css}</style><hr/>");
+            
+            _logger.Info("[STYLESHEET] DisplayLoginBanner: Stylesheet sent to client");
 
             // Find all system objects (there might be multiple)
             var allObjects = _objectManager.GetAllObjects();
@@ -1055,17 +1126,34 @@ public class CommandProcessor
                 {
                     try
                     {
+                        _logger.Info($"[STYLESHEET] SendToPlayer: Loading stylesheet for player '{_player.Name}' (Session: {targetSession})");
                         string css = Html.GetStylesheet();
                         if (!string.IsNullOrEmpty(css))
                         {
+                            _logger.Info($"[STYLESHEET] SendToPlayer: Stylesheet loaded successfully, length: {css.Length} characters. Sending to player '{_player.Name}'");
                             _ = session.Connection.SendMessageAsync($"<style type='text/css'>{css}</style>\r\n");
+                            
+                            // Send MUjs tag with stylesheet URL so client can reload styles dynamically
+                            var config = Config.Instance;
+                            var stylesheetUrl = $"{config.Server.ServerUrl}:{config.Server.HttpPort}/stylesheet.less";
+                            _ = session.Connection.SendMessageAsync($"<MUjs style=\"{stylesheetUrl}\"></MUjs>\r\n");
+                            _logger.Info($"[STYLESHEET] SendToPlayer: MUjs tag sent with URL: {stylesheetUrl}");
+                            
+                            _logger.Info($"[STYLESHEET] SendToPlayer: Stylesheet sent successfully to player '{_player.Name}'");
+                        }
+                        else
+                        {
+                            _logger.Warning($"[STYLESHEET] SendToPlayer: Stylesheet is empty or null for player '{_player.Name}'");
                         }
                     }
-                    catch
+                    catch (Exception ex)
                     {
+                        _logger.Error($"[STYLESHEET] SendToPlayer: Error loading/sending stylesheet for player '{_player.Name}': {ex.Message}");
+                        _logger.Error($"[STYLESHEET] SendToPlayer: Stack trace: {ex.StackTrace}");
                         // Stylesheet not available, continue without it
                     }
                     _stylesheetSent = true;
+                    _logger.Info($"[STYLESHEET] SendToPlayer: Stylesheet flag set to true for player '{_player.Name}'");
                 }
                 
                 _ = session.Connection.SendMessageAsync(message + "\r\n");
@@ -1127,6 +1215,58 @@ public class CommandProcessor
         _editBuffer.Add(input);
         SendToPlayer($"[{_editBuffer.Count}] ");
         return true;
+    }
+
+    /// <summary>
+    /// Shows the room description (same as 'look' command)
+    /// </summary>
+    private void ShowRoomDescription()
+    {
+        if (_player == null || _player.Location == null)
+        {
+            SendToPlayer("You are nowhere.");
+            return;
+        }
+
+        try
+        {
+            // Get the room object
+            var room = _objectManager.GetObject(_player.Location.Id);
+            if (room == null)
+            {
+                SendToPlayer("You are in a void.");
+                return;
+            }
+
+            // Try to call the Description() function on the room
+            var scriptEngine = _scriptEngineFactory.Create();
+            var descriptionFunction = _functionResolver.FindFunction(room.Id, "Description");
+            if (descriptionFunction != null)
+            {
+                var description = scriptEngine.ExecuteFunction(descriptionFunction, Array.Empty<object>(), _player, this, room.Id);
+                if (description != null && !string.IsNullOrEmpty(description.ToString()))
+                {
+                    SendToPlayer(description.ToString()!);
+                    return;
+                }
+            }
+
+            // Fallback: use verb resolver to execute "look" command
+            _verbResolver.TryExecuteVerb("look", _player, this);
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"[SHOWROOM] Error showing room description: {ex.Message}", ex);
+            // Last resort: try verb resolver
+            try
+            {
+                _verbResolver.TryExecuteVerb("look", _player, this);
+            }
+            catch
+            {
+                SendToPlayer("Unable to show room description.");
+            }
+        }
     }
 }
 

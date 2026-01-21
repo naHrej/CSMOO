@@ -14,6 +14,115 @@ namespace CSMOO.Tests.Core;
 public class ObjectResolverTests
 {
     [Fact]
+    public void ResolveUnique_PartialTokenPrefix_Resolves_Object_By_Name_Token()
+    {
+        var room = new Room { Id = "room-1", Name = "A Peaceful Grove" };
+        var player = new Player { Id = "p1", Name = "Tester", Location = room };
+        var staff = new GameObject
+        {
+            Id = "staff-1",
+            Name = "A Wooden Staff",
+            ClassId = "Item",
+            Properties = new LiteDB.BsonDocument { ["name"] = "A Wooden Staff" }
+        };
+
+        var mockObjectManager = new Mock<IObjectManager>();
+        mockObjectManager.Setup(m => m.GetObjectsInLocation(room.Id)).Returns(new List<GameObject> { staff });
+        mockObjectManager.Setup(m => m.GetObjectsInLocation(player.Id)).Returns(new List<GameObject>());
+        mockObjectManager.Setup(m => m.GetAllObjects()).Returns(new List<GameObject> { player, room, staff });
+
+        var mockCoreClassFactory = new Mock<ICoreClassFactory>();
+        var resolver = new ObjectResolverInstance(mockObjectManager.Object, mockCoreClassFactory.Object);
+
+        var result = resolver.ResolveUnique("wood", player, room);
+        Assert.False(result.Ambiguous);
+        Assert.NotNull(result.Match);
+        Assert.Equal("staff-1", result.Match!.Id);
+    }
+
+    [Fact]
+    public void ResolveUnique_Ambiguous_PartialTokenPrefix_Returns_Ambiguous()
+    {
+        var room = new Room { Id = "room-1", Name = "A Peaceful Grove" };
+        var player = new Player { Id = "p1", Name = "Tester", Location = room };
+        var staff = new GameObject { Id = "staff-1", Name = "A Wooden Staff", Properties = new LiteDB.BsonDocument { ["name"] = "A Wooden Staff" } };
+        var sword = new GameObject { Id = "sword-1", Name = "A Wooden Sword", Properties = new LiteDB.BsonDocument { ["name"] = "A Wooden Sword" } };
+
+        var mockObjectManager = new Mock<IObjectManager>();
+        mockObjectManager.Setup(m => m.GetObjectsInLocation(room.Id)).Returns(new List<GameObject> { staff, sword });
+        mockObjectManager.Setup(m => m.GetObjectsInLocation(player.Id)).Returns(new List<GameObject>());
+        mockObjectManager.Setup(m => m.GetAllObjects()).Returns(new List<GameObject> { player, room, staff, sword });
+
+        var mockCoreClassFactory = new Mock<ICoreClassFactory>();
+        var resolver = new ObjectResolverInstance(mockObjectManager.Object, mockCoreClassFactory.Object);
+
+        var result = resolver.ResolveUnique("wood", player, room);
+        Assert.True(result.Ambiguous);
+        Assert.Null(result.Match);
+        Assert.True(result.Matches.Count >= 2);
+    }
+
+    [Fact]
+    public void ResolveUnique_Uses_Aliases_For_Matching()
+    {
+        var room = new Room { Id = "room-1", Name = "A Peaceful Grove" };
+        var player = new Player { Id = "p1", Name = "Tester", Location = room };
+        var staff = new GameObject
+        {
+            Id = "staff-1",
+            Name = "A Wooden Staff",
+            Properties = new LiteDB.BsonDocument
+            {
+                ["name"] = "A Wooden Staff",
+                ["aliases"] = new LiteDB.BsonArray(new[] { new LiteDB.BsonValue("stick"), new LiteDB.BsonValue("staff") })
+            }
+        };
+
+        var mockObjectManager = new Mock<IObjectManager>();
+        mockObjectManager.Setup(m => m.GetObjectsInLocation(room.Id)).Returns(new List<GameObject> { staff });
+        mockObjectManager.Setup(m => m.GetObjectsInLocation(player.Id)).Returns(new List<GameObject>());
+        mockObjectManager.Setup(m => m.GetAllObjects()).Returns(new List<GameObject> { player, room, staff });
+
+        var mockCoreClassFactory = new Mock<ICoreClassFactory>();
+        var resolver = new ObjectResolverInstance(mockObjectManager.Object, mockCoreClassFactory.Object);
+
+        var result = resolver.ResolveUnique("stick", player, room);
+        Assert.False(result.Ambiguous);
+        Assert.NotNull(result.Match);
+        Assert.Equal("staff-1", result.Match!.Id);
+    }
+
+    [Fact]
+    public void ResolveUnique_Resolves_Exit_By_Abbreviation()
+    {
+        var room = new Room { Id = "room-1", Name = "A Peaceful Grove" };
+        var player = new Player { Id = "p1", Name = "Tester", Location = room };
+        var exit = new GameObject
+        {
+            Id = "exit-north",
+            Name = "North Exit",
+            Properties = new LiteDB.BsonDocument
+            {
+                ["name"] = "North Exit",
+                ["direction"] = "north"
+            }
+        };
+
+        var mockObjectManager = new Mock<IObjectManager>();
+        mockObjectManager.Setup(m => m.GetObjectsInLocation(room.Id)).Returns(new List<GameObject> { exit });
+        mockObjectManager.Setup(m => m.GetObjectsInLocation(player.Id)).Returns(new List<GameObject>());
+        mockObjectManager.Setup(m => m.GetAllObjects()).Returns(new List<GameObject> { player, room, exit });
+
+        var mockCoreClassFactory = new Mock<ICoreClassFactory>();
+        var resolver = new ObjectResolverInstance(mockObjectManager.Object, mockCoreClassFactory.Object);
+
+        var result = resolver.ResolveUnique("n", player, room);
+        Assert.False(result.Ambiguous);
+        Assert.NotNull(result.Match);
+        Assert.Equal("exit-north", result.Match!.Id);
+    }
+
+    [Fact]
     public void ObjectResolver_Can_Be_Resolved_From_DI()
     {
         // Arrange

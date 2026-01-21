@@ -8,6 +8,7 @@ using CSMOO.Configuration;
 using CSMOO.Logging;
 using CSMOO.Object;
 using CSMOO.Database;
+using CSMOO.Core;
 
 namespace CSMOO.Network;
 
@@ -99,7 +100,45 @@ public class HttpServer
     
     public async Task HandleRequestAsync(HttpListenerContext context)
     {
-        // Example: Just return a simple response
+        var requestPath = context.Request.Url?.AbsolutePath ?? "/";
+        
+        // Serve stylesheet.less from file system
+        if (requestPath.Equals("/stylesheet.less", StringComparison.OrdinalIgnoreCase))
+        {
+            context.Response.ContentType = "text/css";
+            try
+            {
+                var stylesheet = Html.GetStylesheet();
+                if (!string.IsNullOrEmpty(stylesheet))
+                {
+                    using (var writer = new StreamWriter(context.Response.OutputStream))
+                    {
+                        await writer.WriteAsync(stylesheet);
+                    }
+                    _logger.Info($"[HTTP] Served stylesheet.less to {context.Request.RemoteEndPoint}");
+                }
+                else
+                {
+                    context.Response.StatusCode = (int)HttpStatusCode.NotFound;
+                    using (var writer = new StreamWriter(context.Response.OutputStream))
+                    {
+                        await writer.WriteLineAsync("/* Stylesheet not found */");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"[HTTP] Error serving stylesheet.less: {ex.Message}");
+                context.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
+                using (var writer = new StreamWriter(context.Response.OutputStream))
+                {
+                    await writer.WriteLineAsync($"/* Error loading stylesheet: {ex.Message} */");
+                }
+            }
+            return;
+        }
+        
+        // Legacy endpoint: return system object's less property (for backward compatibility)
         context.Response.ContentType = "text/plain";
         using (var writer = new StreamWriter(context.Response.OutputStream))
         {

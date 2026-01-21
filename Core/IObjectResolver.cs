@@ -27,4 +27,13 @@ public interface IObjectResolver
         GameObject looker,
         GameObject? location = null,
         string? objectType = null);
+
+    /// <summary>
+    /// Resolve a query to a single object, reporting ambiguity when multiple matches exist.
+    /// </summary>
+    ObjectResolutionResult ResolveUnique(
+        string name,
+        GameObject looker,
+        GameObject? location = null,
+        string? objectType = null);
 }
