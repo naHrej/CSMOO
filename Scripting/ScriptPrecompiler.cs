@@ -409,6 +409,42 @@ public class ScriptPrecompiler : IScriptPrecompiler
             return $"GetObjectById(\"{objectId}\").{member} =";
         });
 
+        // Handle method calls on GameObject variables: variableName.MethodName(args)
+        // This rewrites typed method calls to use CallFunctionOnObject to avoid dynamic casting
+        // Pattern matches: identifier.MethodName(args) where MethodName starts with capital letter
+        // Excludes common C# methods like ToString(), GetType(), Equals(), etc.
+        var methodCallPattern = @"\b([a-zA-Z_][a-zA-Z0-9_]*)\\.([A-Z][a-zA-Z0-9_]*)\\s*\\(([^)]*)\\)";
+        var knownBuiltInMethods = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "ToString", "GetType", "Equals", "GetHashCode", "ReferenceEquals",
+            "GetType", "MemberwiseClone", "CompareTo", "Clone"
+        };
+        
+        result = Regex.Replace(result, methodCallPattern, match =>
+        {
+            var variableName = match.Groups[1].Value;
+            var methodName = match.Groups[2].Value;
+            var args = match.Groups[3].Value;
+            
+            // Skip if it's a known built-in C# method
+            if (knownBuiltInMethods.Contains(methodName))
+                return match.Value;
+            
+            // Skip if it's a known ScriptGlobals method call (like ObjectResolver.ResolveObject)
+            if (IsKnownStaticType(variableName))
+                return match.Value;
+            
+            // Rewrite to CallFunctionOnObject(variableName, "MethodName", args)
+            if (string.IsNullOrEmpty(args))
+            {
+                return $"CallFunctionOnObject({variableName}, \"{methodName}\")";
+            }
+            else
+            {
+                return $"CallFunctionOnObject({variableName}, \"{methodName}\", {args})";
+            }
+        });
+
         return result;
     }
 
@@ -800,6 +836,20 @@ public class ScriptPrecompiler : IScriptPrecompiler
             "This", "Caller", "Player", "Args", "Input", "Verb", "Variables"
         };
         return types.Contains(identifier);
+    }
+
+    private bool IsKnownStaticType(string identifier)
+    {
+        var staticTypes = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "StringComparer", "StringComparison", "System", "Console", "Math", "DateTime",
+            "TimeSpan", "Guid", "Regex", "Encoding", "Convert", "Environment", "AppDomain",
+            "Type", "Assembly", "Activator", "Task", "Thread", "ThreadPool", "Linq",
+            "Enumerable", "List", "Dictionary", "HashSet", "Array", "StringBuilder",
+            "Object", "Char", "Int32", "Int64", "Double", "Single", "Boolean", "Decimal",
+            "ObjectManager", "ObjectResolver", "Builtins"
+        };
+        return staticTypes.Contains(identifier);
     }
 
     /// <summary>

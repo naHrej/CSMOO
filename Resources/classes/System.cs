@@ -283,11 +283,10 @@ public class System
         {
             notify(Player, $"<p class='success'>You go <span class='param'>{chosenDirection}</span>.</p>");
             // Call Description() function if available, otherwise use property
-            // GameObject is DynamicObject so method calls work at runtime
-            // Cast only at call site, not as variable type
+            // Precompiler will rewrite destination.Description() to CallFunctionOnObject(destination, "Description")
             try
             {
-                var description = ((dynamic)destination).Description();
+                var description = destination.Description();
                 if (!string.IsNullOrEmpty(description))
                 {
                     notify(Player, description);
@@ -350,9 +349,8 @@ public class System
         string description;
         try
         {
-            // Try calling Description() - GameObject is DynamicObject so method calls work at runtime
-            // Cast only at call site, not as variable type
-            description = ((dynamic)resolved).Description();
+            // Precompiler will rewrite resolved.Description() to CallFunctionOnObject(resolved, "Description")
+            description = resolved.Description();
         }
         catch (Exception)
         {

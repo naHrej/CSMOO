@@ -645,6 +645,25 @@ public class ScriptGlobals
     }
 
     /// <summary>
+    /// Call a function on a GameObject directly (typed, no dynamic casting needed)
+    /// This is used by the precompiler to rewrite method calls like obj.Description() to CallFunctionOnObject(obj, "Description")
+    /// </summary>
+    public object? CallFunctionOnObject(GameObject? obj, string functionName, params object?[]? args)
+    {
+        if (obj == null)
+            return null;
+
+        var function = _functionResolver.FindFunction(obj.Id, functionName);
+        if (function == null)
+        {
+            throw new Exceptions.FunctionExecutionException($"Function '{functionName}' not found on object {obj.Name}(#{obj.DbRef}). Check function name and ensure it's defined on this object or its class.");
+        }
+
+        var engine = ScriptEngineFactoryStatic.Create();
+        return engine.ExecuteFunction(function, args ?? new object[0], Player, CommandProcessor, obj.Id);
+    }
+
+    /// <summary>
     /// Resolve object reference from script context
     /// </summary>
     private string? ResolveObjectFromScript(string objectRef)
