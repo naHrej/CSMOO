@@ -52,16 +52,19 @@ public static class Builtins
             }
             
             var playerManager = new PlayerManagerInstance(dbProvider);
-            // PlayerManagerInstance has a circular dependency on IObjectManager; wire it up
-            // so calls like GetOnlinePlayers()/GetPlayersInRoom() work in scripts.
-            playerManager.SetObjectManager(objectManager);
+            // PlayerManagerInstance requires ObjectManager to be set via SetObjectManager
+            if (playerManager is PlayerManagerInstance pmi)
+            {
+                pmi.SetObjectManager(objectManager);
+            }
             var permissionManager = new PermissionManagerInstance(dbProvider, logger);
             var functionResolver = new FunctionResolverInstance(dbProvider, objectManager);
             var verbResolver = new VerbResolverInstance(dbProvider, objectManager, logger);
             var verbManager = new VerbManagerInstance(dbProvider);
             var roomManager = new RoomManagerInstance(dbProvider, logger, objectManager);
             var objectResolver = CreateDefaultObjectResolver();
-            var scriptEngineFactory = new ScriptEngineFactory(objectManager, logger, config, objectResolver, verbResolver, functionResolver, dbProvider, playerManager, verbManager, roomManager);
+            var compilationCache = new CompilationCache();
+            var scriptEngineFactory = new ScriptEngineFactory(objectManager, logger, config, objectResolver, verbResolver, functionResolver, dbProvider, playerManager, verbManager, roomManager, compilationCache);
             _instance = new BuiltinsInstance(
                 objectManager,
                 playerManager,
@@ -371,12 +374,20 @@ public static class Builtins
     }
     
     /// <summary>
-    /// Get all objects in a location - returns GameObject dynamic objects
+    /// Get all objects in a location - returns GameObject dynamic objects (backward compatibility)
     /// </summary>
     public static List<dynamic> GetObjectsInLocation(string locationId)
     {
         var gameObjects = ObjectManagerInstance.GetObjectsInLocation(locationId);
         return gameObjects.Cast<dynamic>().ToList();
+    }
+    
+    /// <summary>
+    /// Get all objects in a location - typed version returns List<GameObject>
+    /// </summary>
+    public static List<GameObject> GetObjectsInLocationTyped(string locationId)
+    {
+        return ObjectManagerInstance.GetObjectsInLocation(locationId);
     }
     
 
@@ -449,7 +460,7 @@ public static class Builtins
     }
     
     /// <summary>
-    /// Get all online players
+    /// Get all online players - dynamic version for backward compatibility
     /// </summary>
     public static List<dynamic> GetOnlinePlayers()
     {
@@ -457,7 +468,15 @@ public static class Builtins
     }
     
     /// <summary>
-    /// Get all players (online and offline) - useful for lambda filtering
+    /// Get all online players - typed version returns List<Player>
+    /// </summary>
+    public static List<Player> GetOnlinePlayersTyped()
+    {
+        return PlayerManagerInstance.GetOnlinePlayers().ToList();
+    }
+    
+    /// <summary>
+    /// Get all players (online and offline) - useful for lambda filtering - dynamic version for backward compatibility
     /// </summary>
     public static List<dynamic> GetAllPlayers()
     {
@@ -468,13 +487,33 @@ public static class Builtins
     }
     
     /// <summary>
-    /// Get all game objects - useful for lambda filtering and searching
+    /// Get all players (online and offline) - typed version returns List<Player>
+    /// </summary>
+    public static List<Player> GetAllPlayersTyped()
+    {
+        return ObjectManagerInstance.GetAllObjects()
+            .OfType<Player>()
+            .ToList();
+    }
+    
+    /// <summary>
+    /// Get all game objects - useful for lambda filtering and searching - dynamic version for backward compatibility
     /// </summary>
     public static List<dynamic> GetAllObjects()
     {
         return ObjectManagerInstance.GetAllObjects()
             .OfType<GameObject>()
             .Cast<dynamic>()
+            .ToList();
+    }
+    
+    /// <summary>
+    /// Get all game objects - typed version returns List<GameObject>
+    /// </summary>
+    public static List<GameObject> GetAllObjectsTyped()
+    {
+        return ObjectManagerInstance.GetAllObjects()
+            .OfType<GameObject>()
             .ToList();
     }
     
@@ -500,6 +539,31 @@ public static class Builtins
             .ToList();
     }
     
+    /// <summary>
+    /// Get objects by class name - typed version returns List<GameObject>
+    /// </summary>
+    public static List<GameObject> GetObjectsByClassTyped(string className)
+    {
+        if (string.IsNullOrEmpty(className)) return new List<GameObject>();
+        
+        var objectClass = ObjectManagerInstance.GetClassByName(className);
+        
+        if (objectClass == null) return new List<GameObject>();
+        
+        return ObjectManagerInstance.GetAllObjects()
+            .OfType<GameObject>()
+            .Where(obj => obj.ClassId == objectClass.Id)
+            .ToList();
+    }
+    
+    /// <summary>
+    /// Get the inheritance chain for a class
+    /// </summary>
+    public static List<ObjectClass> GetInheritanceChain(string classId)
+    {
+        return ObjectManagerInstance.GetInheritanceChain(classId);
+    }
+
     /// <summary>
     /// Get an object class by its name
     /// </summary>

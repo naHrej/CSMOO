@@ -82,4 +82,9 @@ public interface IFunctionManager
     /// Sets function permissions
     /// </summary>
     bool SetFunctionPermissions(string functionId, List<Keyword> permissions);
+    
+    /// <summary>
+    /// Gets all functions from the database
+    /// </summary>
+    List<Function> GetAllFunctions();
 }

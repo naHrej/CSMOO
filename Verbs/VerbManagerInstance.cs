@@ -289,4 +289,12 @@ public class VerbManagerInstance : IVerbManager
 
         return result;
     }
+
+    /// <summary>
+    /// Gets all verbs from the database
+    /// </summary>
+    public List<Verb> GetAllVerbs()
+    {
+        return _dbProvider.FindAll<Verb>("verbs").ToList();
+    }
 }

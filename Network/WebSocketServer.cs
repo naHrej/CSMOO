@@ -174,7 +174,9 @@ public class WebSocketServer
             var coreHotReloadManager = _serviceProvider.GetService<ICoreHotReloadManager>();
             var functionInitializer = _serviceProvider.GetService<IFunctionInitializer>();
             var propertyInitializer = _serviceProvider.GetService<IPropertyInitializer>();
-            commandProcessor = new CommandProcessor(session.SessionId, connection, playerManager, verbResolver, permissionManager, objectManager, objectResolver, functionResolver, dbProvider, gameDatabase, logger, roomManager, scriptEngineFactory, verbManager, functionManager, hotReloadManager, coreHotReloadManager, functionInitializer, propertyInitializer);
+            var scriptPrecompiler = _serviceProvider.GetRequiredService<CSMOO.Scripting.IScriptPrecompiler>();
+            var compilationCache = _serviceProvider.GetRequiredService<CSMOO.Scripting.ICompilationCache>();
+            commandProcessor = new CommandProcessor(session.SessionId, connection, playerManager, verbResolver, permissionManager, objectManager, functionResolver, dbProvider, gameDatabase, logger, roomManager, scriptEngineFactory, verbManager, functionManager, scriptPrecompiler, compilationCache, hotReloadManager, coreHotReloadManager, functionInitializer, propertyInitializer);
         }
         else
         {

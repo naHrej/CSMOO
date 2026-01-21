@@ -34,6 +34,7 @@ public class ScriptEngineFactory : IScriptEngineFactory
     private readonly IPlayerManager _playerManager;
     private readonly IVerbManager _verbManager;
     private readonly IRoomManager _roomManager;
+    private readonly ICompilationCache _compilationCache;
 
     // Primary constructor with DI dependencies
     public ScriptEngineFactory(
@@ -46,7 +47,8 @@ public class ScriptEngineFactory : IScriptEngineFactory
         IDbProvider dbProvider,
         IPlayerManager playerManager,
         IVerbManager verbManager,
-        IRoomManager roomManager)
+        IRoomManager roomManager,
+        ICompilationCache compilationCache)
     {
         _objectManager = objectManager ?? throw new ArgumentNullException(nameof(objectManager));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -58,19 +60,20 @@ public class ScriptEngineFactory : IScriptEngineFactory
         _playerManager = playerManager ?? throw new ArgumentNullException(nameof(playerManager));
         _verbManager = verbManager ?? throw new ArgumentNullException(nameof(verbManager));
         _roomManager = roomManager ?? throw new ArgumentNullException(nameof(roomManager));
+        _compilationCache = compilationCache ?? throw new ArgumentNullException(nameof(compilationCache));
     }
 
     // Backward compatibility constructor
     public ScriptEngineFactory()
         : this(ScriptEngineFactoryStatic.CreateDefaultObjectManager(), ScriptEngineFactoryStatic.CreateDefaultLogger(), ScriptEngineFactoryStatic.CreateDefaultConfig(), ScriptEngineFactoryStatic.CreateDefaultObjectResolver(),
                ScriptEngineFactoryStatic.CreateDefaultVerbResolver(), ScriptEngineFactoryStatic.CreateDefaultFunctionResolver(), ScriptEngineFactoryStatic.CreateDefaultDbProvider(),
-               ScriptEngineFactoryStatic.CreateDefaultPlayerManager(), ScriptEngineFactoryStatic.CreateDefaultVerbManager(), ScriptEngineFactoryStatic.CreateDefaultRoomManager())
+               ScriptEngineFactoryStatic.CreateDefaultPlayerManager(), ScriptEngineFactoryStatic.CreateDefaultVerbManager(), ScriptEngineFactoryStatic.CreateDefaultRoomManager(), new CompilationCache())
     {
     }
 
     public ScriptEngine Create()
     {
-        return new ScriptEngine(_objectManager, _logger, _config, _objectResolver, _verbResolver, _functionResolver, _dbProvider, _playerManager, _verbManager, _roomManager);
+        return new ScriptEngine(_objectManager, _logger, _config, _objectResolver, _verbResolver, _functionResolver, _dbProvider, _playerManager, _verbManager, _roomManager, _compilationCache);
     }
 }
 

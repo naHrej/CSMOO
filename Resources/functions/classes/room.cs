@@ -5,6 +5,11 @@ public class Room
     /// </summary>
     public string Description()
     {
+        if (This is null)
+        {
+            return "";
+        }
+        
         var desc = new StringBuilder();
         desc.Append($"<section class='Room'>");
         
@@ -54,8 +59,8 @@ public class Room
         }
         
         // Show contents (objects and players)
-        List<dynamic> contents = new List<dynamic>();
-        List<dynamic> players = new List<dynamic>();
+        List<GameObject> contents = new List<GameObject>();
+        List<GameObject> players = new List<GameObject>();
         try
         {
             contents = This.Contents();
@@ -108,24 +113,36 @@ public class Room
     /// <summary>
     /// Returns a list of Contents in the room
     /// </summary>
-    public List<dynamic> Contents()
+    public List<GameObject> Contents()
     {
-        return Builtins.GetObjectsInRoom(This);
+        if (This is null)
+        {
+            return new List<GameObject>();
+        }
+        return Builtins.GetObjectsInRoom(This).Cast<GameObject>().ToList();
     }
 
     /// <summary>
     /// Returns a list of Exits from the room
     /// </summary>
-    public List<dynamic> Exits()
+    public List<GameObject> Exits()
     {
-        return Builtins.GetExits(This);
+        if (This is null)
+        {
+            return new List<GameObject>();
+        }
+        return Builtins.GetExits(This).Cast<GameObject>().ToList();
     }
 
     /// <summary>
     /// Returns a list of Players in the room
     /// </summary>
-    public List<dynamic> Players()
+    public List<GameObject> Players()
     {
-        return Builtins.GetPlayersInRoom(This);
+        if (This is null)
+        {
+            return new List<GameObject>();
+        }
+        return Builtins.GetPlayersInRoom(This).Cast<GameObject>().ToList();
     }
 }

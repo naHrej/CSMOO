@@ -71,7 +71,7 @@ public class ScriptExecutionException : Exception
     /// <summary>
     /// Get the HTML formatted version of this exception for player display
     /// </summary>
-    public string ToHtmlString()
+    public virtual string ToHtmlString()
     {
         return ScriptStackTrace.FormatError(this, SourceCode);
     }

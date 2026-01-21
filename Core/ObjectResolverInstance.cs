@@ -26,14 +26,14 @@ public class ObjectResolverInstance : IObjectResolver
     /// If a location is specified, it will be used as if the looker is in that location even if they are not.
     /// The objectType can be used to filter results by class or type.
     /// </summary>
-    public List<dynamic> ResolveObjects(
+    public List<GameObject> ResolveObjects(
         string name,
         GameObject looker,
         GameObject? location = null,
         string? objectType = null)
     {
         if (string.IsNullOrWhiteSpace(name) || looker == null)
-            return new List<dynamic>();
+            return new List<GameObject>();
 
         string normName = name.Trim();
         string lowerName = normName.ToLowerInvariant();
@@ -184,8 +184,10 @@ public class ObjectResolverInstance : IObjectResolver
     /// - Dynamic alias: capital letters and digits in name.
     /// - Exit alias: direction and abbreviations for exits.
     /// </remarks>
-    private List<dynamic> MatchNameOrAlias(string normName, List<GameObject> candidates)
+    private List<GameObject> MatchNameOrAlias(string normName, List<GameObject> candidates)
     {
+        string lowerName = normName.ToLowerInvariant();
+        var results = new List<GameObject>();
         var exact = new List<GameObject>();
         var prefix = new List<GameObject>();
 
