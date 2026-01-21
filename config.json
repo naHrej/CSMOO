@@ -3,7 +3,8 @@
     "Port": 1701,
     "WsPort": 1702,
     "HttpPort": 1703,
-    "ShowDebugInConsole": true
+    "ShowDebugInConsole": true,
+    "ServerUrl": "http://localhost"
   },
   "HotReload": {
     "Enabled": false

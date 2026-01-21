@@ -57,6 +57,14 @@ public class ScriptEngine
         _playerManager = playerManager ?? throw new ArgumentNullException(nameof(playerManager));
         _verbManager = verbManager ?? throw new ArgumentNullException(nameof(verbManager));
         _roomManager = roomManager ?? throw new ArgumentNullException(nameof(roomManager));
+
+        // Ensure circular dependency is wired for PlayerManagerInstance.
+        // Many code paths construct PlayerManagerInstance directly; it requires SetObjectManager()
+        // or calls like GetOnlinePlayers() will throw "ObjectManager not set".
+        if (_playerManager is CSMOO.Object.PlayerManagerInstance pmi)
+        {
+            pmi.SetObjectManager(_objectManager);
+        }
         
         _scriptOptions = ScriptOptions.Default
             .WithLanguageVersion(Microsoft.CodeAnalysis.CSharp.LanguageVersion.Latest)

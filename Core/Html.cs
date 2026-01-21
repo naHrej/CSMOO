@@ -1,6 +1,7 @@
 using System.Text.RegularExpressions;
 using HtmlAgilityPack;
 using dotless.Core;
+using CSMOO.Logging;
 
 namespace CSMOO.Core;
 
@@ -183,21 +184,28 @@ public static class Html
                 }
 
                 // Use dotless to compile LESS to CSS
+                Logger.Debug("[STYLESHEET] ProcessLess: Creating dotless engine...");
                 var engine = new EngineFactory().GetEngine();
+                Logger.Debug("[STYLESHEET] ProcessLess: Transforming LESS to CSS...");
                 var css = engine.TransformToCss(lessCSS, null);
+                Logger.Debug($"[STYLESHEET] ProcessLess: CSS generated, length: {css.Length} characters");
                 
                 // Clean up whitespace for MUD client compatibility
+                Logger.Debug("[STYLESHEET] ProcessLess: Cleaning up whitespace...");
                 css = Regex.Replace(css, @"\s+", " ").Trim();
                 css = Regex.Replace(css, @"\s*{\s*", " { ");
                 css = Regex.Replace(css, @"\s*}\s*", " } ");
                 css = Regex.Replace(css, @";\s*", "; ");
+                Logger.Debug($"[STYLESHEET] ProcessLess: CSS cleaned, final length: {css.Length} characters");
                 
                 return css;
             }
-            catch (Exception)
+            catch (Exception ex)
             {
                 // Fallback: return the original LESS as-is if compilation fails
                 // This ensures the system doesn't break if there's invalid LESS
+                Logger.Error($"[STYLESHEET] ProcessLess: ERROR - LESS compilation failed: {ex.Message}", ex);
+                Logger.Warning("[STYLESHEET] ProcessLess: Falling back to LESS as-is (no compilation)");
                 return lessCSS.Replace("\r\n", " ").Replace("\n", " ").Replace("\r", " ");
             }
         }
@@ -329,15 +337,18 @@ public static class Html
         // Use multiple fallback strategies to ensure cross-platform compatibility
         var possiblePaths = new List<string>();
         
-        // Strategy 1: Application base directory
+        // Strategy 1: Application base directory (check classes folder first, then root)
         var appDirectory = AppDomain.CurrentDomain.BaseDirectory;
+        possiblePaths.Add(Path.Combine(appDirectory, "Resources", "classes", "stylesheet.less"));
         possiblePaths.Add(Path.Combine(appDirectory, "Resources", "stylesheet.less"));
         
-        // Strategy 2: Current working directory
+        // Strategy 2: Current working directory (check classes folder first, then root)
         var workingDirectory = Directory.GetCurrentDirectory();
+        possiblePaths.Add(Path.Combine(workingDirectory, "Resources", "classes", "stylesheet.less"));
         possiblePaths.Add(Path.Combine(workingDirectory, "Resources", "stylesheet.less"));
         
-        // Strategy 3: Relative path from current directory
+        // Strategy 3: Relative path from current directory (check classes folder first, then root)
+        possiblePaths.Add(Path.Combine("Resources", "classes", "stylesheet.less"));
         possiblePaths.Add(Path.Combine("Resources", "stylesheet.less"));
         
         // Strategy 4: Check if we're in a subdirectory and need to go up
@@ -345,6 +356,7 @@ public static class Html
         var parentDir = Directory.GetParent(currentDir);
         if (parentDir != null)
         {
+            possiblePaths.Add(Path.Combine(parentDir.FullName, "Resources", "classes", "stylesheet.less"));
             possiblePaths.Add(Path.Combine(parentDir.FullName, "Resources", "stylesheet.less"));
         }
         
@@ -354,6 +366,7 @@ public static class Html
             if (File.Exists(path))
             {
                 lessPath = path;
+                Logger.Info($"[STYLESHEET] GetStylesheet: Found stylesheet at: {path}");
                 break;
             }
         }
@@ -361,11 +374,23 @@ public static class Html
         if (lessPath == null)
         {
             var searchedPaths = string.Join("\n  - ", possiblePaths);
-            throw new FileNotFoundException($"LESS stylesheet not found. Searched paths:\n  - {searchedPaths}\nCurrent directory: {Directory.GetCurrentDirectory()}\nApp base directory: {appDirectory}");
+            var errorMsg = $"LESS stylesheet not found. Searched paths:\n  - {searchedPaths}\nCurrent directory: {Directory.GetCurrentDirectory()}\nApp base directory: {appDirectory}";
+            Logger.Error($"[STYLESHEET] GetStylesheet: ERROR - {errorMsg}");
+            throw new FileNotFoundException(errorMsg);
         }
 
+        Logger.Info($"[STYLESHEET] GetStylesheet: Reading LESS file from: {lessPath}");
         var lessContent = File.ReadAllText(lessPath);
+        Logger.Info($"[STYLESHEET] GetStylesheet: LESS file read, length: {lessContent.Length} characters");
+        
+        Logger.Info("[STYLESHEET] GetStylesheet: Compiling LESS to CSS...");
         var css = Style.ProcessLess(lessContent);
+        Logger.Info($"[STYLESHEET] GetStylesheet: LESS compiled to CSS, length: {css.Length} characters");
+        
+        // Log first 200 characters of CSS for verification
+        var preview = css.Length > 200 ? css.Substring(0, 200) + "..." : css;
+        Logger.Debug($"[STYLESHEET] GetStylesheet: CSS preview: {preview}");
+        
         return css;
     }
 }

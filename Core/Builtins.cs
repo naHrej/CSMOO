@@ -52,6 +52,9 @@ public static class Builtins
             }
             
             var playerManager = new PlayerManagerInstance(dbProvider);
+            // PlayerManagerInstance has a circular dependency on IObjectManager; wire it up
+            // so calls like GetOnlinePlayers()/GetPlayersInRoom() work in scripts.
+            playerManager.SetObjectManager(objectManager);
             var permissionManager = new PermissionManagerInstance(dbProvider, logger);
             var functionResolver = new FunctionResolverInstance(dbProvider, objectManager);
             var verbResolver = new VerbResolverInstance(dbProvider, objectManager, logger);
