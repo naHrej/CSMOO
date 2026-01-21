@@ -44,18 +44,36 @@ public class ScriptCompilationException : ScriptExecutionException
     public override string ToHtmlString()
     {
         var sb = new System.Text.StringBuilder();
-        sb.AppendLine("<div style='color: #ff6b6b; font-weight: bold; margin: 4px 0;'>Script Compilation Failed</div>");
+        sb.AppendLine("<section class=\"compiler\">");
+        sb.AppendLine("<span class=\"error\">Script Compilation Failed</span>");
         
         if (CompilationResult.Errors.Count > 0)
         {
-            sb.AppendLine(DiagnosticFormatter.FormatCompilationErrors(CompilationResult.Errors, SourceCode ?? string.Empty));
+            // FormatCompilationErrors already wraps in <section class="compiler">, extract content
+            var errorContent = DiagnosticFormatter.FormatCompilationErrors(CompilationResult.Errors, SourceCode ?? string.Empty);
+            var startTag = "<section class=\"compiler\">";
+            var endTag = "</section>";
+            if (errorContent.StartsWith(startTag) && errorContent.EndsWith(endTag))
+            {
+                errorContent = errorContent.Substring(startTag.Length, errorContent.Length - startTag.Length - endTag.Length).Trim();
+            }
+            sb.AppendLine(errorContent);
         }
         
         if (CompilationResult.Warnings.Count > 0)
         {
-            sb.AppendLine(DiagnosticFormatter.FormatCompilationWarnings(CompilationResult.Warnings, SourceCode ?? string.Empty));
+            // FormatCompilationWarnings already wraps in <section class="compiler">, extract content
+            var warningContent = DiagnosticFormatter.FormatCompilationWarnings(CompilationResult.Warnings, SourceCode ?? string.Empty);
+            var startTag = "<section class=\"compiler\">";
+            var endTag = "</section>";
+            if (warningContent.StartsWith(startTag) && warningContent.EndsWith(endTag))
+            {
+                warningContent = warningContent.Substring(startTag.Length, warningContent.Length - startTag.Length - endTag.Length).Trim();
+            }
+            sb.AppendLine(warningContent);
         }
         
+        sb.AppendLine("</section>");
         return sb.ToString();
     }
 }

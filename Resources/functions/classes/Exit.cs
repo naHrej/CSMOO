@@ -5,6 +5,11 @@ public class Exit
     /// </summary>
     public string Description()
     {
+        if (This is null)
+        {
+            return "";
+        }
+        
         var desc = new StringBuilder();
         desc.Append($"<section class='exit' style='margin:0'>");
         

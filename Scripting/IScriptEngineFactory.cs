@@ -50,7 +50,6 @@ public class ScriptEngineFactory : IScriptEngineFactory
         IRoomManager roomManager,
         ICompilationCache compilationCache)
     {
-        _objectManager = objectManager ?? throw new ArgumentNullException(nameof(objectManager));        
         _objectManager = objectManager ?? throw new ArgumentNullException(nameof(objectManager));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _config = config ?? throw new ArgumentNullException(nameof(config));

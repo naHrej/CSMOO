@@ -18,6 +18,12 @@ public class ScriptPlayerManager
     {
         _playerManager = playerManager ?? throw new ArgumentNullException(nameof(playerManager));
         _objectManager = objectManager ?? throw new ArgumentNullException(nameof(objectManager));
+        
+        // PlayerManagerInstance requires ObjectManager to be set via SetObjectManager
+        if (playerManager is PlayerManagerInstance pmi)
+        {
+            pmi.SetObjectManager(objectManager);
+        }
     }
 
     // Backward compatibility constructor

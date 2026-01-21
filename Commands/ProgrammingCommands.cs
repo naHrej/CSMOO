@@ -577,7 +577,10 @@ public class ProgrammingCommands
                     // Show compilation errors/warnings
                     ShowCompilationResult(compileResult, code);
                     _commandProcessor.SendToPlayer("\n⚠️ Code NOT saved. Fix errors and try again.");
-                    // Stay in programming mode - don't exit
+                    // Exit programming mode on compilation errors
+                    _isInProgrammingMode = false;
+                    _currentCode.Clear();
+                    _currentVerbId = string.Empty;
                     return true;
                 }
 
@@ -616,7 +619,7 @@ public class ProgrammingCommands
                 }
 
                 // Precompile the code
-                var compileResult = _scriptPrecompiler.PrecompileFunction(code, function.ObjectId, function.ParameterTypes, function.ReturnType);
+                var compileResult = _scriptPrecompiler.PrecompileFunction(code, function.ObjectId, function.ParameterTypes, function.ParameterNames, function.ReturnType);
 
                 // Check for errors or warnings (warnings treated as errors)
                 if (!compileResult.Success || compileResult.Errors.Count > 0 || compileResult.Warnings.Count > 0)
@@ -624,7 +627,10 @@ public class ProgrammingCommands
                     // Show compilation errors/warnings
                     ShowCompilationResult(compileResult, code);
                     _commandProcessor.SendToPlayer("\n⚠️ Code NOT saved. Fix errors and try again.");
-                    // Stay in programming mode - don't exit
+                    // Exit programming mode on compilation errors
+                    _isInProgrammingMode = false;
+                    _currentCode.Clear();
+                    _currentFunctionId = string.Empty;
                     return true;
                 }
 

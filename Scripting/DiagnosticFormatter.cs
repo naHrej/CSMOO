@@ -16,21 +16,22 @@ public static class DiagnosticFormatter
             return string.Empty;
 
         var sb = new StringBuilder();
-        sb.AppendLine("<div style='color: #ff6b6b; font-weight: bold; margin: 4px 0;'>Compilation Errors:</div>");
+        sb.AppendLine("<section class=\"compiler\">");
+        sb.AppendLine("<span class=\"error\">Compilation Errors:</span>");
 
         var codeLines = code.Split('\n');
 
         foreach (var error in errors)
         {
-            sb.AppendLine("<div style='color: #ffa8a8; margin: 4px 0;'>");
-            sb.AppendLine($"  Line {error.Line}, Column {error.Column}: {error.ErrorCode}");
-            sb.AppendLine($"  {HtmlEncode(error.Message)}");
+            sb.AppendLine("<div>");
+            sb.AppendLine($"  <span class=\"error\">Line {error.Line}, Column {error.Column}: {error.ErrorCode}</span>");
+            sb.AppendLine($"  <span class=\"error\">{HtmlEncode(error.Message)}</span>");
             
             // Show the actual line of code with error highlighted
             if (error.Line > 0 && error.Line <= codeLines.Length)
             {
                 var errorLine = codeLines[error.Line - 1];
-                sb.AppendLine($"  <pre style='background: #2d2d2d; padding: 4px; margin: 2px 0; font-family: monospace;'>");
+                sb.AppendLine($"  <pre>");
                 sb.AppendLine($"  {HtmlEncode(errorLine)}");
                 
                 // Add caret to point at error column
@@ -48,6 +49,7 @@ public static class DiagnosticFormatter
             sb.AppendLine("</div>");
         }
 
+        sb.AppendLine("</section>");
         return sb.ToString();
     }
 
@@ -60,21 +62,22 @@ public static class DiagnosticFormatter
             return string.Empty;
 
         var sb = new StringBuilder();
-        sb.AppendLine("<div style='color: #ffa500; font-weight: bold; margin: 4px 0;'>Compilation Warnings (treated as errors):</div>");
+        sb.AppendLine("<section class=\"compiler\">");
+        sb.AppendLine("<span class=\"warning\">Compilation Warnings (treated as errors):</span>");
 
         var codeLines = code.Split('\n');
 
         foreach (var warning in warnings)
         {
-            sb.AppendLine("<div style='color: #ffd700; margin: 4px 0;'>");
-            sb.AppendLine($"  Line {warning.Line}, Column {warning.Column}: {warning.ErrorCode}");
-            sb.AppendLine($"  {HtmlEncode(warning.Message)}");
+            sb.AppendLine("<div>");
+            sb.AppendLine($"  <span class=\"warning\">Line {warning.Line}, Column {warning.Column}: {warning.ErrorCode}</span>");
+            sb.AppendLine($"  <span class=\"warning\">{HtmlEncode(warning.Message)}</span>");
             
             // Show the actual line of code with warning highlighted
             if (warning.Line > 0 && warning.Line <= codeLines.Length)
             {
                 var warningLine = codeLines[warning.Line - 1];
-                sb.AppendLine($"  <pre style='background: #2d2d2d; padding: 4px; margin: 2px 0; font-family: monospace;'>");
+                sb.AppendLine($"  <pre>");
                 sb.AppendLine($"  {HtmlEncode(warningLine)}");
                 
                 // Add caret to point at warning column
@@ -92,6 +95,7 @@ public static class DiagnosticFormatter
             sb.AppendLine("</div>");
         }
 
+        sb.AppendLine("</section>");
         return sb.ToString();
     }
 

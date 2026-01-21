@@ -21,9 +21,10 @@ public interface IScriptPrecompiler
     /// <param name="code">Source code to compile</param>
     /// <param name="objectId">Optional object ID for context</param>
     /// <param name="parameterTypes">Parameter types for function signature</param>
+    /// <param name="parameterNames">Parameter names for function signature (must match parameterTypes length)</param>
     /// <param name="returnType">Return type of the function</param>
     /// <returns>Compilation result with diagnostics and compiled script</returns>
-    CompilationResult PrecompileFunction(string code, string? objectId = null, string[]? parameterTypes = null, string returnType = "void");
+    CompilationResult PrecompileFunction(string code, string? objectId = null, string[]? parameterTypes = null, string[]? parameterNames = null, string returnType = "void");
     
     /// <summary>
     /// Precompiles generic script code (for @script command)

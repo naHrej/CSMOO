@@ -32,11 +32,19 @@ public class System
         notify(Player, $"You say, \"{fullMessage}\"");
 
         // Send to other players in the room
-        var players = Builtins.GetPlayersInRoom(Player.Location);
-        foreach (var plr in players)
+        if (Player.Location is null)
         {
-            if (plr.Id != Player.Id)
-                notify(plr, $"{Player.Name} says, \"{fullMessage}\"");
+            return;
+        }
+        // Use pattern matching to ensure compiler recognizes location as non-null
+        if (Player.Location is GameObject location)
+        {
+            var players = Builtins.GetPlayersInRoom(location);
+            foreach (var plr in players)
+            {
+                if (plr is Player && plr.Id != Player.Id)
+                    notify(plr, $"{Player.Name} says, \"{fullMessage}\"");
+            }
         }
     }
 
@@ -157,13 +165,23 @@ public class System
     public verb Go(string direction)
     {
         // Smart go command - move in any available direction.
-        var currentLocation = Player.Location;
-        if (currentLocation is null)
+        if (Player is null)
+        {
+            return false;
+        }
+        var location = Player.Location;
+        if (location is null)
         {
             notify(Player, "<p class='error' style='color:red'>You are not in any location.</p>");
             return false;
         }
-        var exits = Builtins.GetExits(Location);
+        // GetExits requires a Room, so cast only when needed
+        if (location is not Room currentRoom)
+        {
+            notify(Player, "<p class='error' style='color:red'>You cannot go anywhere from here.</p>");
+            return false;
+        }
+        var exits = Builtins.GetExits(currentRoom);
         var exitNames = new List<string>();
         foreach (var exit in exits)
         {
@@ -189,16 +207,16 @@ public class System
             return true; // Successfully handled the command (showed help)
         }
         var chosenDirection = direction.ToLowerInvariant();
-        dynamic chosenExit = null;
+        GameObject? chosenExit = null;
         
         // Extract abbreviation (capitalized letters and numbers) - inlined to avoid local function issues
         string ExtractAbbreviation(string text)
         {
             if (string.IsNullOrEmpty(text)) return "";
-            var result = new System.Text.StringBuilder();
+            var result = new global::System.Text.StringBuilder();
             foreach (char c in text)
             {
-                if (System.Char.IsUpper(c) || System.Char.IsDigit(c))
+                if (global::System.Char.IsUpper(c) || global::System.Char.IsDigit(c))
                 {
                     result.Append(c);
                 }
@@ -225,7 +243,7 @@ public class System
             // Check exact name match (case-insensitive)
             if (exitDirectionLower == chosenDirection)
             {
-                chosenExit = exit as dynamic;
+                chosenExit = exit;
                 break;
             }
             
@@ -234,7 +252,7 @@ public class System
             if (!string.IsNullOrEmpty(exitAbbreviation) && 
                 exitAbbreviation == chosenAbbreviation)
             {
-                chosenExit = exit as dynamic;
+                chosenExit = exit;
                 break;
             }
         }
@@ -242,7 +260,13 @@ public class System
         {
             return false; // Direction not recognized - let other command processing handle it
         }
-        dynamic destination = chosenExit.destination;
+        // Get destination from exit properties and resolve to GameObject
+        var destinationId = Builtins.GetProperty(chosenExit, "destination", "");
+        GameObject? destination = null;
+        if (!string.IsNullOrEmpty(destinationId))
+        {
+            destination = ObjectResolver.ResolveObject(destinationId, Player);
+        }
 
         if (destination == null)
         {
@@ -253,7 +277,23 @@ public class System
         if (Builtins.MoveObject(Player, destination))
         {
             notify(Player, $"<p class='success' style='color:dodgerblue'>You go <span class='param' style='color:yellow'>{chosenDirection}</span>.</p>");
-            notify(Player, destination.Description());
+            // Call Description() function if available, otherwise use property
+            // GameObject is DynamicObject so method calls work at runtime
+            // Cast only at call site, not as variable type
+            try
+            {
+                var description = ((dynamic)destination).Description();
+                if (!string.IsNullOrEmpty(description))
+                {
+                    notify(Player, description);
+                }
+            }
+            catch
+            {
+                // Fallback to property access if function call fails
+                var description = Builtins.GetProperty(destination, "longDescription", "") ?? Builtins.GetProperty(destination, "description", "") ?? "You see nothing special.";
+                notify(Player, description);
+            }
             return true; // Successfully moved
         }
         else
@@ -300,10 +340,11 @@ public class System
         string description;
         try
         {
-            // Try calling Description() via dynamic (for backward compatibility with function calls)
+            // Try calling Description() - GameObject is DynamicObject so method calls work at runtime
+            // Cast only at call site, not as variable type
             description = ((dynamic)resolved).Description();
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             // Object has no owner or Description() function failed, use typed property access
             try
@@ -349,11 +390,11 @@ public class System
         // First, try to resolve as a class name
         var classTarget = Builtins.GetClassByName(targetName);
         var isExaminingClass = classTarget != null;
-        dynamic target = null;
-        dynamic targetPlayer = null;
+        GameObject? target = null;
+        Player? targetPlayer = null;
         var targetId = "";
-        ObjectClass objectClass = null;
-        if (isExaminingClass)
+        ObjectClass? objectClass = null;
+        if (isExaminingClass && classTarget is not null)
         {
             // Examining a class definition
             objectClass = classTarget;
@@ -371,7 +412,8 @@ public class System
             }
             targetId = target.Id;
             objectClass = Builtins.GetObjectClass(target);
-            notify(Player, $"<hr/><p>Examining {target.Properties["name"].AsString} '{targetName}' ({target.Id})</p>");
+            var targetNameProp = Builtins.GetProperty(target, "name", "") ?? target.Name ?? "something";
+            notify(Player, $"<hr/><p>Examining {targetNameProp} '{targetName}' ({target.Id})</p>");
             // Check if target is a player (only for object instances)
             if (Builtins.IsPlayerObject(target))
             {
@@ -380,7 +422,7 @@ public class System
         }
         // Get basic properties using different approaches for classes vs instances
         string name, shortDesc, longDesc;
-        if (isExaminingClass)
+        if (isExaminingClass && objectClass is not null)
         {
             // For class definitions, use class properties
             name = objectClass.Name;
@@ -389,10 +431,16 @@ public class System
         }
         else
         {
-            // For object instances, use dynamic access
+            // For object instances, use typed property access
+            // target is already checked for null in the else block above
+            if (target is null)
+            {
+                notify(Player, "Error: Object information not available.");
+                return false;
+            }
             name = target.Name ?? Builtins.GetObjectName(target);
-            shortDesc = target.shortDescription ?? "";
-            longDesc = target.longDescription ?? target.description ?? "";
+            shortDesc = Builtins.GetProperty(target, "shortDescription", "") ?? "";
+            longDesc = Builtins.GetProperty(target, "longDescription", "") ?? Builtins.GetProperty(target, "description", "") ?? "";
         }
         // Build the examination output
         var output = new StringBuilder();
@@ -432,7 +480,7 @@ public class System
             }
         }
         // For class definitions, show default properties and instances
-        if (isExaminingClass)
+        if (isExaminingClass && objectClass is not null)
         {
             output.AppendLine();
             output.AppendLine("=== Class Information ===");
@@ -493,7 +541,7 @@ public class System
         {
             output.AppendLine();
             output.AppendLine("=== Administrative Information ===");
-            if (isExaminingClass)
+            if (isExaminingClass && objectClass is not null)
             {
                 // Administrative info for class definitions
                 output.AppendLine($"Class ID: {objectClass.Id}");
@@ -501,7 +549,7 @@ public class System
                 output.AppendLine($"Created: {objectClass.CreatedAt}");
                 output.AppendLine($"Modified: {objectClass.ModifiedAt}");
             }
-            else
+            else if (!isExaminingClass && target is not null)
             {
                 // Administrative info for object instances
                 output.AppendLine($"Owner: {target.Owner}(#{target.DbRef})");
@@ -529,7 +577,7 @@ public class System
                 output.AppendLine($"Class: {objectClass.Name}");
             }
             // Show verbs (different approach for classes vs instances)
-            if (isExaminingClass)
+            if (isExaminingClass && objectClass is not null)
             {
                 var verbs = Builtins.GetVerbsOnClass(objectClass.Id);
                 if (verbs.Count > 0)
@@ -607,7 +655,7 @@ public class System
                 }
             }
             // Show functions (different approach for classes vs instances)
-            if (isExaminingClass)
+            if (isExaminingClass && objectClass is not null)
             {
                 var functions = Builtins.GetFunctionsOnClass(objectClass.Id);
                 if (functions.Count > 0)
@@ -676,7 +724,7 @@ public class System
                 }
             }
             // Show properties (only for object instances, classes already show default properties above)
-            if (!isExaminingClass)
+            if (!isExaminingClass && target is not null)
             {
                 // For properties, we need to separate instance vs inherited differently
                 // Instance properties are those directly in target.Properties
@@ -781,7 +829,7 @@ public class System
 
         var targetName = string.Join(" ", Args);
         var resolved = ObjectResolver.ResolveObject(targetName, Player);
-        if (resolved == null)
+        if (resolved is null)
         {
             notify(Player, $"You don't see '{targetName}' here.");
             return false;
@@ -813,22 +861,33 @@ public class System
 
         var targetName = string.Join(" ", Args);
         var resolved = ObjectResolver.ResolveObject(targetName, Player);
-        if (resolved == null)
+        if (resolved is null)
         {
             notify(Player, $"You don't have '{targetName}'.");
             return false;
         }
 
-        if (Builtins.MoveObject(resolved, Player.Location))
+        if (Player.Location is null)
         {
-            notify(Player, $"You drop the {resolved.Name}.");
-            return true;
-        }
-        else
-        {
-            notify(Player, $"You can't drop the {resolved.Name}.");
+            notify(Player, "You are not in any location.");
             return false;
         }
+        // Use pattern matching to ensure compiler recognizes location as non-null
+        if (Player.Location is GameObject location)
+        {
+            if (Builtins.MoveObject(resolved, location))
+            {
+                notify(Player, $"You drop the {resolved.Name}.");
+                return true;
+            }
+            else
+            {
+                notify(Player, $"You can't drop the {resolved.Name}.");
+                return false;
+            }
+        }
+        notify(Player, "You are not in any location.");
+        return false;
     }
 
     public string display_login()

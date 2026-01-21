@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Scripting;
 using Microsoft.CodeAnalysis.Scripting;
@@ -97,7 +98,7 @@ public class ScriptPrecompiler : IScriptPrecompiler
             // Apply same preprocessing as ScriptEngine
             var preprocessedCode = PreprocessObjectReferenceSyntax(code);
             var collectionFixedCode = PreprocessCollectionExpressions(preprocessedCode);
-            var completeScript = BuildScriptWithVariables(collectionFixedCode, variables);
+            var (completeScript, lineOffset) = BuildScriptWithVariables(collectionFixedCode, variables);
 
             // Create script without executing
             var script = CSharpScript.Create(completeScript, _scriptOptions, typeof(ScriptGlobals));
@@ -106,17 +107,25 @@ public class ScriptPrecompiler : IScriptPrecompiler
             var compilation = script.GetCompilation();
             var diagnostics = compilation.GetDiagnostics();
 
-            // Convert diagnostics to DiagnosticInfo
+            // Convert diagnostics to DiagnosticInfo and adjust line numbers
             foreach (var diagnostic in diagnostics)
             {
-                var diagnosticInfo = ConvertDiagnostic(diagnostic);
+                var diagnosticInfo = ConvertDiagnostic(diagnostic, lineOffset);
                 if (diagnosticInfo.IsError)
                 {
                     result.Errors.Add(diagnosticInfo);
                 }
                 else if (diagnosticInfo.IsWarning)
                 {
-                    result.Warnings.Add(diagnosticInfo);
+                    // Filter out expected nullable warnings:
+                    // CS8625: Cannot convert null literal to non-nullable reference type (for initial null assignments)
+                    // CS8601/CS8602: Possible null reference for dynamic types (compiler can't track null state for dynamic)
+                    if (diagnosticInfo.ErrorCode != "CS8625" && 
+                        diagnosticInfo.ErrorCode != "CS8601" && 
+                        diagnosticInfo.ErrorCode != "CS8602")
+                    {
+                        result.Warnings.Add(diagnosticInfo);
+                    }
                 }
             }
 
@@ -145,7 +154,7 @@ public class ScriptPrecompiler : IScriptPrecompiler
         return result;
     }
 
-    public CompilationResult PrecompileFunction(string code, string? objectId = null, string[]? parameterTypes = null, string returnType = "void")
+    public CompilationResult PrecompileFunction(string code, string? objectId = null, string[]? parameterTypes = null, string[]? parameterNames = null, string returnType = "void")
     {
         var result = new CompilationResult
         {
@@ -156,14 +165,21 @@ public class ScriptPrecompiler : IScriptPrecompiler
         {
             // Build function script similar to ScriptEngine.ExecuteFunction
             var scriptCode = new System.Text.StringBuilder();
+            int parameterLineCount = 0;
 
             // Declare parameters if provided
+            // IMPORTANT: Use actual parameter names instead of param0, param1, etc.
+            // This ensures cached scripts work correctly with runtime parameter names
             if (parameterTypes != null && parameterTypes.Length > 0)
             {
                 for (int i = 0; i < parameterTypes.Length; i++)
                 {
-                    var paramName = $"param{i}";
+                    // Use actual parameter name if provided, otherwise fall back to param{i}
+                    var paramName = (parameterNames != null && i < parameterNames.Length && !string.IsNullOrEmpty(parameterNames[i]))
+                        ? parameterNames[i]
+                        : $"param{i}";
                     scriptCode.AppendLine($"{parameterTypes[i]} {paramName} = ({parameterTypes[i]})GetParameter(\"{paramName}\");");
+                    parameterLineCount++;
                 }
             }
 
@@ -173,6 +189,7 @@ public class ScriptPrecompiler : IScriptPrecompiler
             scriptCode.AppendLine(collectionFixedFunctionCode);
 
             var finalCode = scriptCode.ToString();
+            int functionLineOffset = parameterLineCount;
 
             // Create script without executing
             var script = CSharpScript.Create(finalCode, _scriptOptions, typeof(ScriptGlobals));
@@ -181,17 +198,25 @@ public class ScriptPrecompiler : IScriptPrecompiler
             var compilation = script.GetCompilation();
             var diagnostics = compilation.GetDiagnostics();
 
-            // Convert diagnostics to DiagnosticInfo
+            // Convert diagnostics to DiagnosticInfo and adjust line numbers
             foreach (var diagnostic in diagnostics)
             {
-                var diagnosticInfo = ConvertDiagnostic(diagnostic);
+                var diagnosticInfo = ConvertDiagnostic(diagnostic, functionLineOffset);
                 if (diagnosticInfo.IsError)
                 {
                     result.Errors.Add(diagnosticInfo);
                 }
                 else if (diagnosticInfo.IsWarning)
                 {
-                    result.Warnings.Add(diagnosticInfo);
+                    // Filter out expected nullable warnings:
+                    // CS8625: Cannot convert null literal to non-nullable reference type (for initial null assignments)
+                    // CS8601/CS8602: Possible null reference for dynamic types (compiler can't track null state for dynamic)
+                    if (diagnosticInfo.ErrorCode != "CS8625" && 
+                        diagnosticInfo.ErrorCode != "CS8601" && 
+                        diagnosticInfo.ErrorCode != "CS8602")
+                    {
+                        result.Warnings.Add(diagnosticInfo);
+                    }
                 }
             }
 
@@ -287,7 +312,7 @@ public class ScriptPrecompiler : IScriptPrecompiler
         return Convert.ToHexString(hash).ToLowerInvariant();
     }
 
-    private DiagnosticInfo ConvertDiagnostic(Diagnostic diagnostic)
+    private DiagnosticInfo ConvertDiagnostic(Diagnostic diagnostic, int lineOffset = 0)
     {
         var info = new DiagnosticInfo
         {
@@ -300,7 +325,21 @@ public class ScriptPrecompiler : IScriptPrecompiler
         if (diagnostic.Location != Location.None)
         {
             var lineSpan = diagnostic.Location.GetLineSpan();
-            info.Line = lineSpan.StartLinePosition.Line + 1; // Convert to 1-based
+            var originalLine = lineSpan.StartLinePosition.Line + 1; // Convert to 1-based
+            
+            // Adjust line number to reference original script
+            // Only adjust if the line is after the offset (i.e., in the original code section)
+            if (originalLine > lineOffset)
+            {
+                info.Line = originalLine - lineOffset;
+            }
+            else
+            {
+                // Line is in injected code, keep original line number but mark as 0 or negative?
+                // For now, keep as-is but could be improved
+                info.Line = originalLine;
+            }
+            
             info.Column = lineSpan.StartLinePosition.Character + 1; // Convert to 1-based
             info.FilePath = lineSpan.Path;
         }
@@ -380,59 +419,46 @@ public class ScriptPrecompiler : IScriptPrecompiler
 
         var result = originalCode;
 
-        // Fix dynamic variable assignments with collection expressions
-        var dynamicArrayPattern = @"(dynamic\s+\w+\s*=\s*)\[\s*\]";
-        result = Regex.Replace(result, dynamicArrayPattern, 
-            match => match.Groups[1].Value + "new List<object>()");
-
-        var dynamicDictPattern = @"(dynamic\s+\w+\s*=\s*)\{\s*\}";
-        result = Regex.Replace(result, dynamicDictPattern, 
-            match => match.Groups[1].Value + "new Dictionary<string, object>()");
-
-        var dynamicArrayWithItemsPattern = @"(dynamic\s+\w+\s*=\s*)\[([^\]]+)\]";
-        result = Regex.Replace(result, dynamicArrayWithItemsPattern, 
-            match => match.Groups[1].Value + "new List<object> { " + match.Groups[2].Value + " }");
-
-        // Fix dynamic property assignments with collection expressions
-        var propertyArrayPattern = @"(\w+\.\w+\s*=\s*)\[\s*\]";
-        result = Regex.Replace(result, propertyArrayPattern, 
-            match => match.Groups[1].Value + "new List<object>()");
-
-        var propertyDictPattern = @"(\w+\.\w+\s*=\s*)\{\s*\}";
-        result = Regex.Replace(result, propertyDictPattern, 
-            match => match.Groups[1].Value + "new Dictionary<string, object>()");
-
-        var propertyArrayWithItemsPattern = @"(\w+\.\w+\s*=\s*)\[([^\]]+)\]";
-        result = Regex.Replace(result, propertyArrayWithItemsPattern, 
-            match => match.Groups[1].Value + "new List<object> { " + match.Groups[2].Value + " }");
-
+        // Collection expression preprocessing removed - scripts should use proper types
+        // (List<GameObject>, List<string>, etc.) instead of dynamic
+        // Property collection expression preprocessing removed - use proper types
         return result;
     }
 
-    private string BuildScriptWithVariables(string originalCode, Dictionary<string, string>? variables)
+    private (string script, int lineOffset) BuildScriptWithVariables(string originalCode, Dictionary<string, string>? variables)
     {
         var scriptBuilder = new System.Text.StringBuilder();
+        int lineCount = 0;
+
+        // Enable nullable reference types for the script
+        scriptBuilder.AppendLine("#nullable enable");
+        lineCount++; // Line 1
+
+        scriptBuilder.AppendLine();
+        lineCount++; // Line 2 (blank)
 
         // Track which variables are already declared
         var declaredVariables = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         // Add variable declarations from pattern matching
+        // IMPORTANT: Read from Variables dictionary at runtime instead of hardcoding values
+        // This allows cached scripts to work correctly with different runtime variable values
         if (variables != null && variables.Count > 0)
         {
             scriptBuilder.AppendLine("// Auto-generated variable declarations from pattern matching");
+            lineCount++; // Comment line 1
+            scriptBuilder.AppendLine("// Variables are read from Variables dictionary at runtime to support caching");
+            lineCount++; // Comment line 2
             foreach (var kvp in variables)
             {
-                var escapedValue = kvp.Value
-                    .Replace("\\", "\\\\")
-                    .Replace("\"", "\\\"")
-                    .Replace("\r", "\\r")
-                    .Replace("\n", "\\n")
-                    .Replace("\t", "\\t");
-
-                scriptBuilder.AppendLine($"string {kvp.Key} = \"{escapedValue}\";");
+                // Read from Variables dictionary instead of hardcoding the value
+                // This ensures cached scripts work with actual runtime values
+                scriptBuilder.AppendLine($"string {kvp.Key} = Variables.TryGetValue(\"{kvp.Key}\", out var _{kvp.Key}_val) ? _{kvp.Key}_val : \"\";");
+                lineCount++; // Variable declaration line
                 declaredVariables.Add(kvp.Key);
             }
             scriptBuilder.AppendLine();
+            lineCount++; // Blank line
         }
 
         // Find variables already declared in the code
@@ -443,37 +469,56 @@ public class ScriptPrecompiler : IScriptPrecompiler
         }
 
         // Add automatic object resolution variables (only if not already declared)
-        var objectVariables = ExtractPotentialObjectReferences(originalCode);
+        // Pass declared variables to ExtractPotentialObjectReferences so it can skip them
+        var objectVariables = ExtractPotentialObjectReferences(originalCode, codeDeclaredVariables);
+        
         if (objectVariables.Count > 0)
         {
             scriptBuilder.AppendLine("// Auto-resolved object variables (typed)");
+            lineCount++; // Comment line
             foreach (var objectVar in objectVariables)
             {
                 // Skip if already declared from pattern or in code
-                if (!declaredVariables.Contains(objectVar))
+                var isDeclared = declaredVariables.Contains(objectVar);
+                
+                if (!isDeclared)
                 {
                     // Infer type based on variable name
                     var inferredType = InferObjectType(objectVar);
-                    scriptBuilder.AppendLine($"{inferredType} {objectVar} = ObjectResolver.ResolveObject(\"{objectVar}\", This) ?? throw new ScriptExecutionException(\"Object '{objectVar}' not found\");");
+                    // Keep nullable type since ObjectResolver.ResolveObject returns GameObject?
+                    // The ?? throw ensures non-null at runtime, but we keep the nullable type for compiler compatibility
+                    var injectedLine = $"{inferredType} {objectVar} = ObjectResolver.ResolveObject(\"{objectVar}\", This) ?? throw new ScriptExecutionException(\"Object '{objectVar}' not found\");";
+                    
+                    scriptBuilder.AppendLine(injectedLine);
+                    lineCount++; // Variable declaration line
                     declaredVariables.Add(objectVar);
                 }
             }
             scriptBuilder.AppendLine();
+            lineCount++; // Blank line
         }
 
         // Add the original code
         scriptBuilder.AppendLine("// Original script code:");
+        lineCount++; // Comment line
         scriptBuilder.AppendLine(originalCode);
 
-        return scriptBuilder.ToString();
+        // lineCount now represents the number of lines before the original code starts
+        // This includes the "// Original script code:" comment line
+        // The original code starts at lineCount + 1 in the compiled script
+        // So the offset is lineCount (the number of lines to subtract)
+        return (scriptBuilder.ToString(), lineCount);
     }
 
-    private HashSet<string> ExtractPotentialObjectReferences(string code)
+    private HashSet<string> ExtractPotentialObjectReferences(string code, HashSet<string>? declaredVariables = null)
     {
         var potentialObjects = new HashSet<string>();
         
         if (string.IsNullOrEmpty(code))
             return potentialObjects;
+        
+        // Use case-insensitive comparison for declared variables check
+        var declaredVars = declaredVariables ?? new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         // Known type/class names that should not be auto-resolved (they're static types, not object instances)
         var knownStaticTypes = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
@@ -505,15 +550,72 @@ public class ScriptPrecompiler : IScriptPrecompiler
             };
 
         // Simplified extraction - just find identifiers followed by dot
+        // IMPORTANT: Exclude namespace-qualified identifiers like System.Text, System.Char, etc.
+        // These should not be auto-resolved as they're namespace references, not object instances
         var objectAccessPattern = @"\b([a-zA-Z_][a-zA-Z0-9_]*)\s*\.\s*[a-zA-Z_]";
         var matches = System.Text.RegularExpressions.Regex.Matches(code, objectAccessPattern);
+
+        // Common lambda parameter names to exclude (single/double letter variables commonly used in LINQ)
+        var commonLambdaParams = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "v", "f", "ip", "p", "k", "x", "y", "z", "i", "j", "n", "m", "t", "s", "e", "a", "b", "c", "d"
+        };
 
         foreach (System.Text.RegularExpressions.Match match in matches)
         {
             var identifier = match.Groups[1].Value;
-            // Skip common keywords, built-in types, known static types, and known ScriptGlobals identifiers
+            var fullMatch = match.Value;
+            
+            // Skip namespace-qualified identifiers (System.Text, System.Char, etc.)
+            // These are namespace references, not object instances that should be auto-resolved
+            if (identifier == "System" && (fullMatch.Contains("System.Text") || fullMatch.Contains("System.Char")))
+            {
+                continue; // Skip System when it's part of System.Text or System.Char
+            }
+            
+            // Skip very short identifiers that are likely lambda parameters (1-2 characters)
+            // These are commonly used in LINQ expressions like .OrderBy(v => v.Name)
+            if (identifier.Length <= 2 && commonLambdaParams.Contains(identifier))
+            {
+                // Check if this identifier appears in a lambda expression context
+                // Look backwards from the match position to find if it's part of a lambda
+                var beforeMatch = code.Substring(0, match.Index);
+                var searchStart = Math.Max(0, beforeMatch.Length - 200); // Look back up to 200 chars
+                var searchText = beforeMatch.Substring(searchStart);
+                
+                // Check for lambda patterns: .Method(identifier => or .Method((identifier, ...) =>
+                // Also check for tuple patterns: (identifier, ...) =>
+                var lambdaPatterns = new[]
+                {
+                    new System.Text.RegularExpressions.Regex(@$"\.(OrderBy|Where|Select|Any|All|FirstOrDefault|SingleOrDefault|GroupBy|Join|Zip)\s*\(\s*{System.Text.RegularExpressions.Regex.Escape(identifier)}\s*=>"),
+                    new System.Text.RegularExpressions.Regex(@$"\(\s*{System.Text.RegularExpressions.Regex.Escape(identifier)}\s*,"),
+                    new System.Text.RegularExpressions.Regex(@$",\s*{System.Text.RegularExpressions.Regex.Escape(identifier)}\s*\)\s*=>")
+                };
+                
+                bool isLambdaParam = false;
+                foreach (var pattern in lambdaPatterns)
+                {
+                    if (pattern.IsMatch(searchText))
+                    {
+                        isLambdaParam = true;
+                        break;
+                    }
+                }
+                
+                if (isLambdaParam)
+                {
+                    continue; // This is a lambda parameter, not an object reference
+                }
+                // If it's a common lambda param but NOT in a lambda context, still skip it
+                // These short names are almost always lambda params, not object references
+                continue;
+            }
+            
+            // Skip common keywords, built-in types, known static types, known ScriptGlobals identifiers,
+            // and variables that are already declared in the script
             if (!IsReservedKeyword(identifier) && !IsBuiltInType(identifier) && 
-                !knownStaticTypes.Contains(identifier) && !knownIdentifiers.Contains(identifier))
+                !knownStaticTypes.Contains(identifier) && !knownIdentifiers.Contains(identifier) &&
+                !declaredVars.Contains(identifier))
             {
                 potentialObjects.Add(identifier);
             }
@@ -532,11 +634,64 @@ public class ScriptPrecompiler : IScriptPrecompiler
         if (string.IsNullOrEmpty(code))
             return declared;
 
+        // Pattern to match pattern match variables: is TypeName varName or is not TypeName varName
+        // These are variables declared in pattern matching expressions like: if (obj is GameObject playerObj)
+        var patternMatchPattern = @"is\s+(?:not\s+)?([a-zA-Z_][a-zA-Z0-9_<>\[\]]*)\s+([a-zA-Z_][a-zA-Z0-9_]*)";
+        var patternMatchMatches = System.Text.RegularExpressions.Regex.Matches(code, patternMatchPattern);
+        
+        foreach (System.Text.RegularExpressions.Match match in patternMatchMatches)
+        {
+            if (match.Groups.Count > 2)
+            {
+                var varName = match.Groups[2].Value;
+                // Add pattern match variables to declared set so they won't be auto-injected
+                declared.Add(varName);
+            }
+        }
+
         // Pattern to match variable declarations: var name = ... or string name = ... or dynamic name = ... or TypeName name = ...
-        // This pattern matches any identifier (type name) followed by an identifier (variable name) and equals sign
+        // This pattern matches any identifier (type name, including nullable types like GameObject?) followed by an identifier (variable name) and equals sign
+        // Updated to handle nullable types: TypeName? variableName = ...
+        // Match nullable types explicitly first: TypeName? varName =
+        // Pattern: Match TypeName? varName = where TypeName is an identifier
+        // Use a pattern that works with or without word boundaries
+        var nullablePattern = @"([a-zA-Z_][a-zA-Z0-9_<>\[\]]*)\?\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=";
+        var nullableMatches = System.Text.RegularExpressions.Regex.Matches(code, nullablePattern);
+        
+        foreach (System.Text.RegularExpressions.Match match in nullableMatches)
+        {
+            if (match.Groups.Count > 2)
+            {
+                var typeName = match.Groups[1].Value;
+                var varName = match.Groups[2].Value;
+                
+                // Skip if variable name is a reserved keyword
+                if (IsReservedKeyword(varName))
+                    continue;
+                
+                // Skip if it's clearly a method call (check if there's a parenthesis right after =)
+                var matchEnd = match.Index + match.Length;
+                if (matchEnd < code.Length)
+                {
+                    var afterMatch = code.Substring(matchEnd, Math.Min(10, code.Length - matchEnd)).TrimStart();
+                    if (afterMatch.StartsWith("("))
+                        continue; // This is likely a method call, not a variable declaration
+                }
+                
+                // Accept if type name:
+                // 1. Starts with uppercase (like ObjectClass, StringBuilder, List<string>)
+                // 2. Is a known type
+                // 3. Is a known type keyword (var, string, int, etc.)
+                if (typeName.Length > 0 && (char.IsUpper(typeName[0]) || IsKnownType(typeName) || IsKnownTypeKeyword(typeName)))
+                {
+                    declared.Add(varName);
+                }
+            }
+        }
+        
+        // Then match non-nullable types: TypeName varName =
         var declarationPattern = @"\b([a-zA-Z_][a-zA-Z0-9_<>\[\]]*)\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=";
         var matches = System.Text.RegularExpressions.Regex.Matches(code, declarationPattern);
-
         foreach (System.Text.RegularExpressions.Match match in matches)
         {
             if (match.Groups.Count > 2)
@@ -546,6 +701,10 @@ public class ScriptPrecompiler : IScriptPrecompiler
                 
                 // Skip if variable name is a reserved keyword
                 if (IsReservedKeyword(varName))
+                    continue;
+                
+                // Skip if already added from nullable pattern
+                if (declared.Contains(varName))
                     continue;
                 
                 // Skip if it's clearly a method call (check if there's a parenthesis right after =)

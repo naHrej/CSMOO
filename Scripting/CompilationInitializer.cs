@@ -1,3 +1,4 @@
+using System.Linq;
 using CSMOO.Database;
 using CSMOO.Logging;
 using CSMOO.Verbs;
@@ -81,7 +82,8 @@ public class CompilationInitializer : ICompilationInitializer
                 else
                 {
                     _statistics.VerbsFailed++;
-                    _logger.Warning($"Failed to compile verb '{verb.Name}' (ID: {verb.Id}): {result.Errors.FirstOrDefault()?.Message ?? "Unknown error"}");
+                    var errorMessage = result.Errors.FirstOrDefault()?.Message ?? "Unknown error";
+                    _logger.Warning($"Failed to compile verb '{verb.Name}' (ID: {verb.Id}): {errorMessage}");
                 }
             }
             catch (Exception ex)
@@ -111,7 +113,7 @@ public class CompilationInitializer : ICompilationInitializer
                     continue; // Skip functions with no code
                 }
 
-                var result = _precompiler.PrecompileFunction(function.Code, function.ObjectId, function.ParameterTypes, function.ReturnType);
+                var result = _precompiler.PrecompileFunction(function.Code, function.ObjectId, function.ParameterTypes, function.ParameterNames, function.ReturnType);
 
                 if (result.Success && result.CompiledScript != null)
                 {

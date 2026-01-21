@@ -5,6 +5,11 @@ public class Player
     /// </summary>
     public string Description()
     {
+        if (This is null)
+        {
+            return "";
+        }
+        
         var desc = new StringBuilder();
         desc.Append($"<section class='player' style='margin:0'>");
         

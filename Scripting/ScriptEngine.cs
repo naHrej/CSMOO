@@ -639,50 +639,16 @@ public class ScriptEngine
     }
 
     /// <summary>
-    /// Preprocesses script code to fix collection expression syntax issues with dynamic types
+    /// Preprocesses script code (collection expression preprocessing removed - scripts should use proper types)
     /// </summary>
     private string PreprocessCollectionExpressions(string originalCode)
     {
         if (string.IsNullOrEmpty(originalCode))
             return originalCode;
 
-        var result = originalCode;
-
-        // Fix dynamic variable assignments with collection expressions
-        // Pattern: dynamic varName = []; -> dynamic varName = new List<object>();
-        var dynamicArrayPattern = @"(dynamic\s+\w+\s*=\s*)\[\s*\]";
-        result = System.Text.RegularExpressions.Regex.Replace(result, dynamicArrayPattern, 
-            match => match.Groups[1].Value + "new List<object>()");
-
-        // Pattern: dynamic varName = {}; -> dynamic varName = new Dictionary<string, object>();
-        var dynamicDictPattern = @"(dynamic\s+\w+\s*=\s*)\{\s*\}";
-        result = System.Text.RegularExpressions.Regex.Replace(result, dynamicDictPattern, 
-            match => match.Groups[1].Value + "new Dictionary<string, object>()");
-
-        // Fix dynamic variable assignments with collection initializers
-        // Pattern: dynamic varName = [item1, item2, ...]; -> dynamic varName = new List<object> { item1, item2, ... };
-        var dynamicArrayWithItemsPattern = @"(dynamic\s+\w+\s*=\s*)\[([^\]]+)\]";
-        result = System.Text.RegularExpressions.Regex.Replace(result, dynamicArrayWithItemsPattern, 
-            match => match.Groups[1].Value + "new List<object> { " + match.Groups[2].Value + " }");
-
-        // Fix dynamic property assignments with collection expressions
-        // Pattern: someVar.property = []; -> someVar.property = new List<object>();
-        var propertyArrayPattern = @"(\w+\.\w+\s*=\s*)\[\s*\]";
-        result = System.Text.RegularExpressions.Regex.Replace(result, propertyArrayPattern, 
-            match => match.Groups[1].Value + "new List<object>()");
-
-        // Pattern: someVar.property = {}; -> someVar.property = new Dictionary<string, object>();
-        var propertyDictPattern = @"(\w+\.\w+\s*=\s*)\{\s*\}";
-        result = System.Text.RegularExpressions.Regex.Replace(result, propertyDictPattern, 
-            match => match.Groups[1].Value + "new Dictionary<string, object>()");
-
-        // Fix property assignments with collection initializers
-        // Pattern: someVar.property = [item1, item2, ...]; -> someVar.property = new List<object> { item1, item2, ... };
-        var propertyArrayWithItemsPattern = @"(\w+\.\w+\s*=\s*)\[([^\]]+)\]";
-        result = System.Text.RegularExpressions.Regex.Replace(result, propertyArrayWithItemsPattern, 
-            match => match.Groups[1].Value + "new List<object> { " + match.Groups[2].Value + " }");
-
-        return result;
+        // Collection expression preprocessing removed - scripts should use proper types
+        // (List<GameObject>, List<string>, etc.) instead of dynamic
+        return originalCode;
     }
 
     /// <summary>
@@ -765,21 +731,22 @@ public class ScriptEngine
     {
         var scriptBuilder = new System.Text.StringBuilder();
 
+        // Enable nullable reference types for the script
+        scriptBuilder.AppendLine("#nullable enable");
+        scriptBuilder.AppendLine();
+
         // Add variable declarations from pattern matching
+        // IMPORTANT: Read from Variables dictionary at runtime instead of hardcoding values
+        // This allows cached scripts to work correctly with different runtime variable values
         if (variables != null && variables.Count > 0)
         {
             scriptBuilder.AppendLine("// Auto-generated variable declarations from pattern matching");
+            scriptBuilder.AppendLine("// Variables are read from Variables dictionary at runtime to support caching");
             foreach (var kvp in variables)
             {
-                // Use simple string escaping for C# string literals
-                var escapedValue = kvp.Value
-                    .Replace("\\", "\\\\")   // Escape backslashes
-                    .Replace("\"", "\\\"")   // Escape double quotes
-                    .Replace("\r", "\\r")    // Escape carriage returns
-                    .Replace("\n", "\\n")    // Escape newlines
-                    .Replace("\t", "\\t");   // Escape tabs
-
-                scriptBuilder.AppendLine($"string {kvp.Key} = \"{escapedValue}\";");
+                // Read from Variables dictionary instead of hardcoding the value
+                // This ensures cached scripts work with actual runtime values
+                scriptBuilder.AppendLine($"string {kvp.Key} = Variables.TryGetValue(\"{kvp.Key}\", out var _{kvp.Key}_val) ? _{kvp.Key}_val : \"\";");
             }
             scriptBuilder.AppendLine();
         }
@@ -833,6 +800,7 @@ public class ScriptEngine
 
         // Look for patterns like: identifier.something (property access or method call)
         // But not string endings like "word." or punctuation
+        // IMPORTANT: Exclude namespace-qualified identifiers like System.Text, System.Char, etc.
         var objectAccessPattern = @"\b([a-zA-Z_][a-zA-Z0-9_]*)\s*\.\s*[a-zA-Z_]";
         var matches = Regex.Matches(codeWithoutStrings, objectAccessPattern);
 
@@ -841,6 +809,15 @@ public class ScriptEngine
         foreach (Match match in matches)
         {
             var identifier = match.Groups[1].Value;
+            var fullMatch = match.Value;
+            
+            // Skip namespace-qualified identifiers (System.Text, System.Char, etc.)
+            // These are namespace references, not object instances that should be auto-resolved
+            if (identifier == "System" && (fullMatch.Contains("System.Text") || fullMatch.Contains("System.Char")))
+            {
+                continue; // Skip System when it's part of System.Text or System.Char
+            }
+            
             // Skip if it's a known static type (like StringComparer, StringComparison, etc.)
             if (!knownStaticTypes.Contains(identifier))
             {
@@ -1140,14 +1117,34 @@ public class ScriptEngine
         if (string.IsNullOrEmpty(code))
             return declaredVariables;
 
-        // Look for variable declarations: TYPE name; or TYPE name = ...;
-        var variableDeclarationPattern = @"\b(var|dynamic|string|int|bool|float|double|decimal|object|Player|GameObject)\s+([a-zA-Z_][a-zA-Z0-9_]*)\b";
+        // Look for variable declarations: TYPE name; or TYPE name = ...; or TYPE? name = ...; (nullable types)
+        // Updated to handle nullable types like GameObject? resolved = ...
+        // Match nullable types explicitly first: TypeName? varName =
+        var nullablePattern = @"\b([a-zA-Z_][a-zA-Z0-9_<>\[\]]*)\?\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=";
+        var nullableMatches = Regex.Matches(code, nullablePattern);
+        foreach (Match match in nullableMatches)
+        {
+            if (match.Groups.Count > 2)
+            {
+                var variableName = match.Groups[2].Value;
+                declaredVariables.Add(variableName);
+            }
+        }
+        
+        // Then match non-nullable types: TypeName varName = (including var, dynamic, string, etc.)
+        var variableDeclarationPattern = @"\b(var|dynamic|string|int|bool|float|double|decimal|object|Player|GameObject|Room|Exit|ObjectClass|[a-zA-Z_][a-zA-Z0-9_<>\[\]]*)\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=";
         var matches = Regex.Matches(code, variableDeclarationPattern);
-
         foreach (Match match in matches)
         {
-            var variableName = match.Groups[2].Value;
-            declaredVariables.Add(variableName);
+            if (match.Groups.Count > 2)
+            {
+                var variableName = match.Groups[2].Value;
+                // Skip if already added from nullable pattern
+                if (!declaredVariables.Contains(variableName))
+                {
+                    declaredVariables.Add(variableName);
+                }
+            }
         }
 
         // Look for assignments: name = ...;

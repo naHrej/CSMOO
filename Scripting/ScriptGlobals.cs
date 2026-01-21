@@ -33,9 +33,13 @@ public class ScriptGlobals
         
         // Initialize script managers with DI dependencies
         ObjectManager = new ScriptObjectManager(_objectManager);
-        PlayerManager = new ScriptPlayerManager(
-            CreateDefaultPlayerManager(), 
-            _objectManager);
+        var playerManager = CreateDefaultPlayerManager();
+        // PlayerManagerInstance requires ObjectManager to be set via SetObjectManager
+        if (playerManager is PlayerManagerInstance pmi)
+        {
+            pmi.SetObjectManager(_objectManager);
+        }
+        PlayerManager = new ScriptPlayerManager(playerManager, _objectManager);
     }
 
     // Backward compatibility constructor
@@ -80,11 +84,10 @@ public class ScriptGlobals
     public void InitializeObjectFactory()
     {
         ScriptHelpers? helpers = Helpers;
-        Player? dbPlayer = Player;
-        if (dbPlayer != null && CommandProcessor != null && helpers != null)
+        if (helpers != null)
         {
             _objectFactory = new ScriptObjectFactory(
-                dbPlayer, 
+                Player, 
                 CommandProcessor, 
                 helpers,
                 _objectManager,
@@ -113,11 +116,7 @@ public class ScriptGlobals
         var scriptObj = _objectFactory?.GetObject(objectReference);
         // ScriptObject wraps a GameObject, so we need to extract it
         // For now, resolve directly using ObjectResolver
-        if (Player != null)
-        {
-            return CSMOO.Core.ObjectResolver.ResolveObject(objectReference, Player);
-        }
-        return null;
+        return CSMOO.Core.ObjectResolver.ResolveObject(objectReference, Player);
     }
 
     /// <summary>
@@ -156,12 +155,12 @@ public class ScriptGlobals
     public void Say(string message)
     {
         if (Helpers != null) Helpers.Say(message);
-        else CommandProcessor?.SendToPlayer(message);
+        else CommandProcessor.SendToPlayer(message);
     }
     public void notify(Player targetPlayer, string message)
     {
         if (Helpers != null) Helpers.notify(targetPlayer, message);
-        else CommandProcessor?.SendToPlayer(message, targetPlayer.SessionGuid);
+        else CommandProcessor.SendToPlayer(message, targetPlayer.SessionGuid);
     }
     public void SayToRoom(string message, bool excludeSelf = true)
     {
@@ -177,9 +176,10 @@ public class ScriptGlobals
     
     /// <summary>
     /// The current player as GameObject (now with dynamic support)
+    /// Always set during verb/function execution
     /// </summary>
-    public Player? Player { get; set; }
-    public CommandProcessor? CommandProcessor { get; set; }
+    public Player Player { get; set; } = null!; // Initialized before use
+    public CommandProcessor CommandProcessor { get; set; } = null!; // Initialized before use
     public ScriptObjectManager ObjectManager { get; set; }
     public ScriptWorldManager WorldManager { get; set; } = new ScriptWorldManager();
     public ScriptPlayerManager PlayerManager { get; set; }
@@ -262,7 +262,7 @@ public class ScriptGlobals
     /// <summary>
     /// Get the underlying GameObject for Player (for internal use)
     /// </summary>
-    public GameObject? GetPlayerGameObject()
+    public GameObject GetPlayerGameObject()
     {
         return Player;
     }
@@ -272,8 +272,7 @@ public class ScriptGlobals
     /// </summary>
     public GameObject? GetPlayerLocation()
     {
-        var playerObj = GetPlayerGameObject();
-        return playerObj?.Location;
+        return Player.Location;
     }
 
     /// <summary>
@@ -426,7 +425,7 @@ public class ScriptGlobals
 
         if (dbPlayer != null)
         {
-            CommandProcessor?.SendToPlayer(message, dbPlayer.SessionGuid);
+            CommandProcessor.SendToPlayer(message, dbPlayer.SessionGuid);
         }
     }
 
@@ -485,12 +484,12 @@ public class ScriptGlobals
     /// <summary>
     /// The current location - typed version returns GameObject?
     /// </summary>
-    public GameObject? HereGameObject => Player?.Location;
+    public GameObject? HereGameObject => Player.Location;
 
     /// <summary>
     /// The current location - typed version as Room?
     /// </summary>
-    public Room? HereRoom => Player?.Location as Room;
+    public Room? HereRoom => Player.Location as Room;
 
     /// <summary>
     /// Check if an object is a room using class inheritance and properties

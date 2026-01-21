@@ -52,6 +52,11 @@ public static class Builtins
             }
             
             var playerManager = new PlayerManagerInstance(dbProvider);
+            // PlayerManagerInstance requires ObjectManager to be set via SetObjectManager
+            if (playerManager is PlayerManagerInstance pmi)
+            {
+                pmi.SetObjectManager(objectManager);
+            }
             var permissionManager = new PermissionManagerInstance(dbProvider, logger);
             var functionResolver = new FunctionResolverInstance(dbProvider, objectManager);
             var verbResolver = new VerbResolverInstance(dbProvider, objectManager, logger);
