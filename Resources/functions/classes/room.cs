@@ -43,15 +43,39 @@ public class Room
             // If Players() fails, use empty list
         }
         
-        // Get contents and filter out players
-        List<GameObject> contents = new List<GameObject>();
+        // Get all objects in the room (excluding exits)
+        List<GameObject> allObjects = new List<GameObject>();
         try
         {
-            contents = This.Contents();
+            // Get all objects in location
+            var allObjectsDynamic = Builtins.GetObjectsInLocation(This.Id);
+            foreach (var obj in allObjectsDynamic)
+            {
+                try
+                {
+                    GameObject? gameObject = obj as GameObject;
+                    if (gameObject == null && obj != null)
+                    {
+                        var id = obj.Id;
+                        if (id != null)
+                        {
+                            gameObject = Builtins.FindObject(id.ToString()) as GameObject;
+                        }
+                    }
+                    if (gameObject != null)
+                    {
+                        allObjects.Add(gameObject);
+                    }
+                }
+                catch
+                {
+                    // Skip if conversion fails
+                }
+            }
         }
         catch
         {
-            // If Contents() fails, use empty list
+            // If GetObjectsInLocation fails, use empty list
         }
         
         // Separate players from objects by checking if item is in players list
@@ -60,7 +84,7 @@ public class Room
         {
             try
             {
-                var playerId = Builtins.GetProperty(player, "id", "");
+                var playerId = player?.Id ?? "";
                 if (!string.IsNullOrEmpty(playerId))
                 {
                     playerIds.Add(playerId);
@@ -72,22 +96,47 @@ public class Room
             }
         }
         
+        // Filter out players and exits from all objects
+        var exitClassId = Builtins.GetClassByName("Exit")?.Id ?? "";
         var objects = new List<GameObject>();
-        foreach (var item in contents)
+        foreach (var item in allObjects)
         {
             try
             {
-                var itemId = Builtins.GetProperty(item, "id", "");
-                // Only add if it's not a player
-                if (!string.IsNullOrEmpty(itemId) && !playerIds.Contains(itemId))
+                if (item == null) continue;
+                
+                var itemId = item.Id ?? "";
+                var itemClassId = item.ClassId ?? "";
+                
+                // Skip if it's a player
+                if (!string.IsNullOrEmpty(itemId) && playerIds.Contains(itemId))
                 {
-                    objects.Add(item);
+                    continue;
                 }
-            }
-            catch
-            {
-                // If we can't check, assume it's an object
+                
+                // Skip if it's an exit
+                if (!string.IsNullOrEmpty(itemClassId) && itemClassId == exitClassId)
+                {
+                    continue;
+                }
+                
+                // Add all other objects (items, etc.)
                 objects.Add(item);
+            }
+            catch (Exception ex)
+            {
+                // If we can't check, try to add it anyway (might be an object)
+                try
+                {
+                    if (item != null)
+                    {
+                        objects.Add(item);
+                    }
+                }
+                catch
+                {
+                    // Skip if we can't add it
+                }
             }
         }
         
@@ -277,14 +326,32 @@ public class Room
         {
             return new List<GameObject>();
         }
-        // Get objects as dynamic list and convert each item to GameObject
-        var objectsDynamic = Builtins.GetObjectsInRoom(This);
+        // Get all objects in location (includes players, items, exits)
+        var allObjectsDynamic = Builtins.GetObjectsInLocation(This.Id);
         var objects = new List<GameObject>();
-        foreach (var obj in objectsDynamic)
+        foreach (var obj in allObjectsDynamic)
         {
-            if (obj is GameObject gameObject)
+            // The dynamic objects are actually GameObjects, try to cast directly
+            try
             {
-                objects.Add(gameObject);
+                GameObject? gameObject = obj as GameObject;
+                if (gameObject == null && obj != null)
+                {
+                    // Try accessing Id property to verify it's a GameObject
+                    var id = obj.Id;
+                    if (id != null)
+                    {
+                        gameObject = Builtins.FindObject(id.ToString()) as GameObject;
+                    }
+                }
+                if (gameObject != null)
+                {
+                    objects.Add(gameObject);
+                }
+            }
+            catch
+            {
+                // Skip if conversion fails
             }
         }
         return objects;
@@ -326,9 +393,27 @@ public class Room
         var players = new List<GameObject>();
         foreach (var player in playersDynamic)
         {
-            if (player is GameObject gameObject)
+            // The dynamic objects are actually GameObjects, try to cast directly
+            try
             {
-                players.Add(gameObject);
+                GameObject? gameObject = player as GameObject;
+                if (gameObject == null && player != null)
+                {
+                    // Try accessing Id property to verify it's a GameObject
+                    var id = player.Id;
+                    if (id != null)
+                    {
+                        gameObject = Builtins.FindObject(id.ToString()) as GameObject;
+                    }
+                }
+                if (gameObject != null)
+                {
+                    players.Add(gameObject);
+                }
+            }
+            catch
+            {
+                // Skip if conversion fails
             }
         }
         return players;
