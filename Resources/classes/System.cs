@@ -383,8 +383,10 @@ public class System
                 description = $"<p>You see something, but can't make out any details.</p>";
             }
         }
-        
-        notify(Player, description);
+        if(description is not null)
+        {
+            notify(Player, description);
+        }
         return true;
     }
 

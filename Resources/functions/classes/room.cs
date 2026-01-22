@@ -296,7 +296,7 @@ public class Room
                         
                         desc.Append("</div>");
                     }
-                    catch (Exception ex)
+                    catch
                     {
                         // Log the error and skip this exit - ensure we don't leave unclosed divs
                         // Skip this exit if we can't process it
