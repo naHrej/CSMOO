@@ -283,10 +283,10 @@ public class System
         {
             notify(Player, $"<p class='success'>You go <span class='param'>{chosenDirection}</span>.</p>");
             // Call Description() function if available, otherwise use property
-            // Precompiler will rewrite destination.Description() to CallFunctionOnObject(destination, "Description")
             try
             {
-                var description = destination.Description();
+                var descResult = CallFunctionOnObject(destination, "Description");
+                var description = descResult?.ToString() ?? "";
                 if (!string.IsNullOrEmpty(description))
                 {
                     notify(Player, description);
@@ -349,8 +349,9 @@ public class System
         string description;
         try
         {
-            // Precompiler will rewrite resolved.Description() to CallFunctionOnObject(resolved, "Description")
-            description = resolved.Description();
+            // Use CallFunctionOnObject to call Description() function on the object
+            var descResult = CallFunctionOnObject(resolved, "Description");
+            description = descResult?.ToString() ?? "";
         }
         catch (Exception)
         {
