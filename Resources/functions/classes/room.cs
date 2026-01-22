@@ -42,7 +42,7 @@ public class Room
             {
                 try
                 {
-                    GameObject? gameObject = obj as GameObject;
+                    GameObject gameObject = obj as GameObject;
                     if (gameObject == null && obj != null)
                     {
                         var id = obj.Id;
@@ -126,7 +126,7 @@ public class Room
                 // Add all other objects (items, etc.)
                 objects.Add(item);
             }
-            catch (Exception ex)
+            catch
             {
                 // If we can't check, try to add it anyway (might be an object)
                 try
@@ -337,7 +337,7 @@ public class Room
             // The dynamic objects are actually GameObjects, try to cast directly
             try
             {
-                GameObject? gameObject = obj as GameObject;
+                GameObject gameObject = obj as GameObject;
                 if (gameObject == null && obj != null)
                 {
                     // Try accessing Id property to verify it's a GameObject
@@ -399,7 +399,7 @@ public class Room
             // The dynamic objects are actually GameObjects, try to cast directly
             try
             {
-                GameObject? gameObject = player as GameObject;
+                GameObject gameObject = player as GameObject;
                 if (gameObject == null && player != null)
                 {
                     // Try accessing Id property to verify it's a GameObject
