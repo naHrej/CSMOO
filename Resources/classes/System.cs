@@ -24,7 +24,7 @@ public class System
         // Say command - speak to others in the room
         if (Args.Count == 0)
         {
-            notify(Player, "Say what?");
+            notify(Player, "<section class='InCharacter'>Say what?</section>");
             return;
         }
 
@@ -281,7 +281,7 @@ public class System
         // Move the player
         if (Builtins.MoveObject(Player, destination))
         {
-            notify(Player, $"<p class='success'>You go <span class='param'>{chosenDirection}</span>.</p>");
+            notify(Player, $"<section class='InCharacter'>You go <span class='object'>{chosenDirection}</span>.</section>");
             // Call Description() function if available, otherwise use property
             try
             {
@@ -416,7 +416,7 @@ public class System
             target = ObjectResolver.ResolveObject(targetName, Player);
             if (target is null)
             {
-                notify(Player, $"You can't see '{targetName}' here.");
+                notify(Player, $"<section class='InCharacter'>You can't see '<span class='object'>{targetName}</span>' here.</section>");
                 return true;
             }
             targetId = target.Id;
@@ -832,7 +832,7 @@ public class System
     {
         if (Args.Count == 0)
         {
-            notify(Player, "Get what?");
+            notify(Player, "<section class='InCharacter'>Get what?</section>");
             return false;
         }
 
@@ -840,18 +840,18 @@ public class System
         var resolved = ObjectResolver.ResolveObject(targetName, Player);
         if (resolved is null)
         {
-            notify(Player, $"You don't see '{targetName}' here.");
+            notify(Player, $"<section class='InCharacter'>You don't see '<span class='object'>{targetName}</span>' here.</section>");
             return false;
         }
 
         if (Builtins.MoveObject(resolved, Player))
         {
-            notify(Player, $"You pick up the {resolved.Name}.");
+            notify(Player, $"<section class='InCharacter'>You pick up the <span class='object'>{resolved.Name}</span>.</section>");
             return true;
         }
         else
         {
-            notify(Player, $"You can't pick up the {resolved.Name}.");
+            notify(Player, $"<section class='InCharacter'>You can't pick up the <span class='object'>{resolved.Name}</span>.</section>");
             return false;
         }
     }
@@ -864,7 +864,7 @@ public class System
     {
         if (Args.Count == 0)
         {
-            notify(Player, "Drop what?");
+            notify(Player, "<section class='InCharacter'>Drop what?</section>");
             return false;
         }
 
@@ -872,13 +872,13 @@ public class System
         var resolved = ObjectResolver.ResolveObject(targetName, Player);
         if (resolved is null)
         {
-            notify(Player, $"You don't have '{targetName}'.");
+            notify(Player, $"<section class='InCharacter'>You don't have '<span class='object'>{targetName}</span>'.</section>");
             return false;
         }
 
         if (Player.Location is null)
         {
-            notify(Player, "You are not in any location.");
+            notify(Player, "<section class='InCharacter'>You are not in any location.</section>");
             return false;
         }
         // Use pattern matching to ensure compiler recognizes location as non-null
@@ -886,16 +886,16 @@ public class System
         {
             if (Builtins.MoveObject(resolved, location))
             {
-                notify(Player, $"You drop the {resolved.Name}.");
+                notify(Player, $"<section class='InCharacter'>You drop the <span class='object'>{resolved.Name}</span>.</section>");
                 return true;
             }
             else
             {
-                notify(Player, $"You can't drop the {resolved.Name}.");
+                notify(Player, $"<section class='InCharacter'>You can't drop the <span class='object'>{resolved.Name}</span>.</section>");
                 return false;
             }
         }
-        notify(Player, "You are not in any location.");
+        notify(Player, "<section class='InCharacter'>You are not in any location.</section>");
         return false;
     }
 
@@ -999,7 +999,7 @@ public class System
         else
         {
             Builtins.Log($"[SCRIPT RESULT] Player '{Player.Name}' (ID: {Player.Id}): Script executed successfully (no result)");
-            notify(Player, "Script executed successfully.");
+            notify(Player, "<section class='Success'>Script executed successfully.</section>");
         }
     }
 }

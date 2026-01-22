@@ -383,7 +383,7 @@ public class CommandProcessor
             var stylesheetUrl = $"{cfg.Server.ServerUrl}:{stylePort}/stylesheet.less";
             SendToPlayer($"<MUjs style=\"{stylesheetUrl}\"></MUjs>");
 
-            SendToPlayer($"<section class='success'>Welcome back, <span class='object'>{playerName}</span>!</section>");
+            SendToPlayer($"<section class='InCharacter'>Welcome back, <span class='object'>{playerName}</span>!</section>");
             
             // Automatically show room description after login
             ShowRoomDescription();
@@ -658,7 +658,7 @@ public class CommandProcessor
         if (_objectManager.MoveObject(player, destination))
         {
             var exitDirection = _objectManager.GetProperty(exit, "direction")?.AsString ?? "that way";
-            SendToPlayer($"<p class='success'>You go <span class='param'>{exitDirection}</span>.</p>");
+            SendToPlayer($"<section class='InCharacter'>You go <span class='object'>{exitDirection}</span>.</section>");
             
             // Show destination description using the room's Description() function
             try

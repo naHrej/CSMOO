@@ -1,22 +1,24 @@
 
-section.success {
-    // <section class='success'>
-    //   You go 
-    //   <span class='object'>North</span> 
-    //   to  
-    //   <span class='context'>Next Room</span>
-    //   .
-    // </section>
+section.InCharacter {
 
-    // <section class='success'>
-    //   <span class='actor'>Player</span>
-    //   goes
-    //   <span class='object'>North</span> 
-    //   to  
-    //   <span class='context'>Next Room</span> 
-    //   .
-    // </section>
+    /*
+     <section class='InCharacter'>
+       You go 
+       <span class='object'>North</span> 
+       to  
+       <span class='context'>Next Room</span>
+       .
+     </section>
 
+     <section class='InCharacter'>
+       <span class='actor'>Player</span>
+       goes
+       <span class='object'>North</span> 
+       to  
+       <span class='context'>Next Room</span> 
+       .
+     </section>
+    */
     color: dodgerblue;
 
     span.actor {
@@ -29,6 +31,19 @@ section.success {
 
     span.context {
         color: yellow;
+    }
+}
+
+// Success messages for actual success/confirmation messages (not in-character)
+section.Success {
+    color: green;
+    
+    span.object {
+        color: lightgreen;
+    }
+    
+    span.context {
+        color: lightgreen;
     }
 }
 
@@ -66,7 +81,7 @@ section.Room {
     overflow: hidden; // Ensures child elements respect the border radius
 
     h3.Name {
-        background-color: dodgerblue;
+        background-color: blue;
         color: white;
         margin: -1px -1px 0 -1px; // Extend over border to eliminate gap
         padding-left: 0.5em;
@@ -143,7 +158,7 @@ section.Room {
     h4.ColumnHeader {
         margin: 0 0 0.5em 0;
         padding: 0.25em 0.5em;
-        background-color: dodgerblue;
+        background-color: blue;
         color: white;
         font-weight: bold;
         font-size: 1em;
@@ -286,5 +301,14 @@ section.Help {
 
     span.param {
         color: #997700;
+    }
+}
+
+// Informational/System messages (not in-character)
+section.Info {
+    color: cyan;
+    
+    span.object {
+        color: lightcyan;
     }
 }
