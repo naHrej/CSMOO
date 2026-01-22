@@ -32,18 +32,7 @@ public class Room
         desc.Append("<div class='RoomColumn ContentsColumn'>");
         desc.Append("<h4 class='ColumnHeader'>Contents</h4>");
         
-        // Get players (GetPlayersInRoom already filters to online players only)
-        List<GameObject> players = new List<GameObject>();
-        try
-        {
-            players = This.Players();
-        }
-        catch
-        {
-            // If Players() fails, use empty list
-        }
-        
-        // Get all objects in the room (excluding exits)
+        // Get all objects in the room (including players)
         List<GameObject> allObjects = new List<GameObject>();
         try
         {
@@ -78,21 +67,33 @@ public class Room
             // If GetObjectsInLocation fails, use empty list
         }
         
-        // Separate players from objects by checking if item is in players list
+        // Separate players from objects by checking class type
+        var playerClassId = Builtins.GetClassByName("Player")?.Id ?? "";
+        var players = new List<GameObject>();
         var playerIds = new HashSet<string>();
-        foreach (var player in players)
+        foreach (var obj in allObjects)
         {
             try
             {
-                var playerId = player?.Id ?? "";
-                if (!string.IsNullOrEmpty(playerId))
+                if (obj == null) continue;
+                
+                var objClassId = obj.ClassId ?? "";
+                var objId = obj.Id ?? "";
+                
+                // Check if it's a player by class type or IsPlayerObject
+                if ((!string.IsNullOrEmpty(objClassId) && objClassId == playerClassId) ||
+                    Builtins.IsPlayerObject(obj))
                 {
-                    playerIds.Add(playerId);
+                    players.Add(obj);
+                    if (!string.IsNullOrEmpty(objId))
+                    {
+                        playerIds.Add(objId);
+                    }
                 }
             }
             catch
             {
-                // Skip if we can't get ID
+                // Skip if we can't check
             }
         }
         
@@ -108,8 +109,10 @@ public class Room
                 var itemId = item.Id ?? "";
                 var itemClassId = item.ClassId ?? "";
                 
-                // Skip if it's a player
-                if (!string.IsNullOrEmpty(itemId) && playerIds.Contains(itemId))
+                // Skip if it's a player (check both ID list and class type)
+                if ((!string.IsNullOrEmpty(itemId) && playerIds.Contains(itemId)) ||
+                    (!string.IsNullOrEmpty(itemClassId) && itemClassId == playerClassId) ||
+                    Builtins.IsPlayerObject(item))
                 {
                     continue;
                 }
