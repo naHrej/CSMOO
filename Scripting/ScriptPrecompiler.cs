@@ -78,6 +78,8 @@ public class ScriptPrecompiler : IScriptPrecompiler
                 "System.Collections.Generic",
                 "CSMOO.Object",
                 "CSMOO.Exceptions",
+                "CSMOO.Verbs",
+                "CSMOO.Functions",
                 "HtmlAgilityPack"
             );
         
@@ -143,13 +145,16 @@ public class ScriptPrecompiler : IScriptPrecompiler
                 {
                     try
                     {
-                        typeNames.Add(type.Name);
-                        if (type.Namespace != null)
+                        if (type != null)
                         {
-                            var shortName = type.FullName?.Substring(type.Namespace.Length + 1);
-                            if (!string.IsNullOrEmpty(shortName))
+                            typeNames.Add(type.Name);
+                            if (type.Namespace != null && type.FullName != null)
                             {
-                                typeNames.Add(shortName);
+                                var shortName = type.FullName.Substring(type.Namespace.Length + 1);
+                                if (!string.IsNullOrEmpty(shortName))
+                                {
+                                    typeNames.Add(shortName);
+                                }
                             }
                         }
                     }
@@ -720,6 +725,9 @@ public class ScriptPrecompiler : IScriptPrecompiler
                 "CallVerb", "CallFunction", "ThisVerb", "Me", "Here", "System", "Object", "Class",
                 "Builtins", "ObjectResolver",
                 "string", "int", "bool", "var", "dynamic", "object", "void",
+                // Common parameter names that might be used in local functions
+                // These are added as a safety net in case parameter detection misses them
+                "usage", "summary", "category", "topic", "help", "description",
                 // Namespace-qualified types (to avoid matching partial names)
                 "ObjectManager", "ObjectResolver", "Builtins"
             };
@@ -927,6 +935,56 @@ public class ScriptPrecompiler : IScriptPrecompiler
                 if (char.IsUpper(typeName[0]) || IsKnownTypeKeyword(typeName))
                 {
                     declared.Add(varName);
+                }
+            }
+        }
+
+        // Check for function/method parameters: TypeName MethodName(TypeName? paramName) or TypeName MethodName(TypeName paramName, ...)
+        // This pattern matches: returnType methodName(paramType? paramName) or returnType methodName(paramType paramName)
+        // It handles nullable types, multiple parameters, and local functions
+        var functionParamPattern = @"(?:public\s+|private\s+|static\s+|verb\s+)?(?:[a-zA-Z_][a-zA-Z0-9_<>\[\]]*\??\s+)?([a-zA-Z_][a-zA-Z0-9_]*)\s*\([^)]*?([a-zA-Z_][a-zA-Z0-9_<>\[\]]*\??)\s+([a-zA-Z_][a-zA-Z0-9_]*)";
+        var functionParamMatches = System.Text.RegularExpressions.Regex.Matches(code, functionParamPattern);
+        foreach (System.Text.RegularExpressions.Match match in functionParamMatches)
+        {
+            // Group 1 is method name, Group 2 is param type, Group 3 is param name
+            if (match.Groups.Count > 3)
+            {
+                var paramType = match.Groups[2].Value;
+                var paramName = match.Groups[3].Value;
+                
+                // Skip if parameter name is a reserved keyword
+                if (IsReservedKeyword(paramName))
+                    continue;
+                
+                // Only add if param type looks like a type (starts with uppercase, is known type, or is nullable)
+                var baseType = paramType.TrimEnd('?');
+                if (baseType.Length > 0 && (char.IsUpper(baseType[0]) || IsKnownType(baseType) || IsKnownTypeKeyword(baseType)))
+                {
+                    declared.Add(paramName);
+                }
+            }
+        }
+        
+        // Also match simpler patterns for single parameters: (TypeName? paramName) or (TypeName paramName)
+        // This catches cases where the method name pattern didn't match
+        var simpleParamPattern = @"\(([a-zA-Z_][a-zA-Z0-9_<>\[\]]*\??)\s+([a-zA-Z_][a-zA-Z0-9_]*)\)";
+        var simpleParamMatches = System.Text.RegularExpressions.Regex.Matches(code, simpleParamPattern);
+        foreach (System.Text.RegularExpressions.Match match in simpleParamMatches)
+        {
+            if (match.Groups.Count > 2)
+            {
+                var paramType = match.Groups[1].Value;
+                var paramName = match.Groups[2].Value;
+                
+                // Skip if already declared or is a reserved keyword
+                if (declared.Contains(paramName) || IsReservedKeyword(paramName))
+                    continue;
+                
+                // Only add if param type looks like a type
+                var baseType = paramType.TrimEnd('?');
+                if (baseType.Length > 0 && (char.IsUpper(baseType[0]) || IsKnownType(baseType) || IsKnownTypeKeyword(baseType)))
+                {
+                    declared.Add(paramName);
                 }
             }
         }

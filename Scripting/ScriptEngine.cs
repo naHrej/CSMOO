@@ -91,6 +91,8 @@ public class ScriptEngine
                 "System.Collections.Generic",
                 "CSMOO.Object",
                 "CSMOO.Exceptions",
+                "CSMOO.Verbs",
+                "CSMOO.Functions",
                 "HtmlAgilityPack"
             );
         
@@ -156,13 +158,16 @@ public class ScriptEngine
                 {
                     try
                     {
-                        typeNames.Add(type.Name);
-                        if (type.Namespace != null)
+                        if (type != null)
                         {
-                            var shortName = type.FullName?.Substring(type.Namespace.Length + 1);
-                            if (!string.IsNullOrEmpty(shortName))
+                            typeNames.Add(type.Name);
+                            if (type.Namespace != null && type.FullName != null)
                             {
-                                typeNames.Add(shortName);
+                                var shortName = type.FullName.Substring(type.Namespace.Length + 1);
+                                if (!string.IsNullOrEmpty(shortName))
+                                {
+                                    typeNames.Add(shortName);
+                                }
                             }
                         }
                     }
@@ -446,7 +451,7 @@ public class ScriptEngine
             Script<object> script;
             bool useCache = cachedScript != null && cachedHash != null && currentHash == cachedHash;
 
-            if (useCache)
+            if (useCache && cachedScript != null)
             {
                 // Use cached compiled script (fast!)
                 script = cachedScript;
@@ -477,6 +482,10 @@ public class ScriptEngine
             using var cts = new CancellationTokenSource(_config.Scripting.MaxExecutionTimeMs);
             try
             {
+                if (script == null)
+                {
+                    throw new InvalidOperationException("Script compilation failed - script is null");
+                }
                 var scriptResult = script.RunAsync(globals, cts.Token).Result;
                 var returnValue = scriptResult.ReturnValue;
 
@@ -631,7 +640,7 @@ public class ScriptEngine
                 Caller = previousContext?.This ?? playerObject, // The object that called this function (or Player if no previous context)
                 CallerGameObject = previousContext?.ThisGameObject ?? playerObject, // Set typed version
                 CallDepth = (previousContext?.CallDepth ?? 0) + 1, // Track call depth
-                CommandProcessor = commandProcessor,
+                CommandProcessor = commandProcessor!, // May be null for some function calls, but Helpers will handle it
                 CallingObjectId = actualThisObjectId,
                 Parameters = parameters
             };
@@ -676,7 +685,7 @@ public class ScriptEngine
             Script<object> script;
             bool useCache = cachedScript != null && cachedHash != null && currentHash == cachedHash;
 
-            if (useCache)
+            if (useCache && cachedScript != null)
             {
                 // Use cached compiled script (fast!)
                 script = cachedScript;
@@ -721,6 +730,10 @@ public class ScriptEngine
             ScriptState<object> result;
             try
             {
+                if (script == null)
+                {
+                    throw new InvalidOperationException("Script compilation failed - script is null");
+                }
                 result = script.RunAsync(globals, cts.Token).Result;
             }
             catch (AggregateException ex) when (ex.InnerException is OperationCanceledException)
@@ -1109,6 +1122,9 @@ public class ScriptEngine
             "Char", "Int32", "Int64", "Double", "Single", "Boolean", "Decimal",
             // Common enum values
             "OrdinalIgnoreCase", "CurrentCulture", "InvariantCulture", "Ordinal",
+            // Common parameter names that might be used in local functions
+            // These are added as a safety net in case parameter detection misses them
+            "usage", "summary", "category", "topic", "help", "description",
             // Namespace-qualified types (to avoid matching partial names)
             "ObjectManager", "ObjectResolver", "Builtins"
         };
@@ -1598,6 +1614,66 @@ public class ScriptEngine
         {
             var variableName = match.Groups[2].Value;
             declaredVariables.Add(variableName);
+        }
+
+        // Check for function/method parameters: TypeName MethodName(TypeName? paramName) or TypeName MethodName(TypeName paramName, ...)
+        // This pattern matches: returnType methodName(paramType? paramName) or returnType methodName(paramType paramName)
+        // It handles nullable types, multiple parameters, and local functions
+        var functionParamPattern = @"(?:public\s+|private\s+|static\s+|verb\s+)?(?:[a-zA-Z_][a-zA-Z0-9_<>\[\]]*\??\s+)?([a-zA-Z_][a-zA-Z0-9_]*)\s*\([^)]*?([a-zA-Z_][a-zA-Z0-9_<>\[\]]*\??)\s+([a-zA-Z_][a-zA-Z0-9_]*)";
+        var functionParamMatches = Regex.Matches(code, functionParamPattern);
+        foreach (Match match in functionParamMatches)
+        {
+            // Group 1 is method name, Group 2 is param type, Group 3 is param name
+            if (match.Groups.Count > 3)
+            {
+                var paramType = match.Groups[2].Value;
+                var paramName = match.Groups[3].Value;
+                
+                // Skip if already declared
+                if (!declaredVariables.Contains(paramName))
+                {
+                    // Only add if param type looks like a type (starts with uppercase, is known type, or is nullable)
+                    var baseType = paramType.TrimEnd('?');
+                    if (baseType.Length > 0 && (char.IsUpper(baseType[0]) || 
+                        baseType.Equals("string", StringComparison.OrdinalIgnoreCase) || 
+                        baseType.Equals("int", StringComparison.OrdinalIgnoreCase) ||
+                        baseType.Equals("bool", StringComparison.OrdinalIgnoreCase) ||
+                        baseType.Equals("var", StringComparison.OrdinalIgnoreCase) ||
+                        baseType.Equals("dynamic", StringComparison.OrdinalIgnoreCase)))
+                    {
+                        declaredVariables.Add(paramName);
+                    }
+                }
+            }
+        }
+        
+        // Also match simpler patterns for single parameters: (TypeName? paramName) or (TypeName paramName)
+        // This catches cases where the method name pattern didn't match
+        var simpleParamPattern = @"\(([a-zA-Z_][a-zA-Z0-9_<>\[\]]*\??)\s+([a-zA-Z_][a-zA-Z0-9_]*)\)";
+        var simpleParamMatches = Regex.Matches(code, simpleParamPattern);
+        foreach (Match match in simpleParamMatches)
+        {
+            if (match.Groups.Count > 2)
+            {
+                var paramType = match.Groups[1].Value;
+                var paramName = match.Groups[2].Value;
+                
+                // Skip if already declared
+                if (!declaredVariables.Contains(paramName))
+                {
+                    // Only add if param type looks like a type
+                    var baseType = paramType.TrimEnd('?');
+                    if (baseType.Length > 0 && (char.IsUpper(baseType[0]) || 
+                        baseType.Equals("string", StringComparison.OrdinalIgnoreCase) || 
+                        baseType.Equals("int", StringComparison.OrdinalIgnoreCase) ||
+                        baseType.Equals("bool", StringComparison.OrdinalIgnoreCase) ||
+                        baseType.Equals("var", StringComparison.OrdinalIgnoreCase) ||
+                        baseType.Equals("dynamic", StringComparison.OrdinalIgnoreCase)))
+                    {
+                        declaredVariables.Add(paramName);
+                    }
+                }
+            }
         }
 
         return declaredVariables;

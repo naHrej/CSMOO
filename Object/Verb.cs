@@ -46,6 +46,28 @@ public class Verb
     public string Description { get; set; } = string.Empty;
     
     /// <summary>
+    /// Help categories this verb belongs to (from XML &lt;category&gt; tags)
+    /// Stored as comma-separated string for LiteDB compatibility
+    /// </summary>
+    public string Categories { get; set; } = string.Empty;
+    
+    /// <summary>
+    /// Help topics this verb is associated with (from XML &lt;topic&gt; tags)
+    /// Stored as comma-separated string for LiteDB compatibility
+    /// </summary>
+    public string Topics { get; set; } = string.Empty;
+    
+    /// <summary>
+    /// Usage example for this verb (from XML &lt;usage&gt; tag)
+    /// </summary>
+    public string? Usage { get; set; }
+    
+    /// <summary>
+    /// Detailed help text for this verb (from XML &lt;help&gt; tag)
+    /// </summary>
+    public string? HelpText { get; set; }
+    
+    /// <summary>
     /// Who created this verb
     /// </summary>
     public string CreatedBy { get; set; } = "system";

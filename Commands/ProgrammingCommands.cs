@@ -2010,7 +2010,8 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
 
         if (parts.Length < 2)
         {
-            _commandProcessor.SendToPlayer("Usage: @reload [verbs|functions|scripts|properties|status]");
+            _commandProcessor.SendToPlayer("Usage: @reload [all|verbs|functions|scripts|properties|status]");
+            _commandProcessor.SendToPlayer("  @reload all        - Reload everything (verbs, functions, scripts, properties)");
             _commandProcessor.SendToPlayer("  @reload verbs      - Reload all verb definitions");
             _commandProcessor.SendToPlayer("  @reload functions  - Reload all function definitions");
             _commandProcessor.SendToPlayer("  @reload scripts    - Reload script engine");
@@ -2022,6 +2023,81 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
         var target = parts[1].ToLower();
         switch (target)
         {
+            case "all":
+                _commandProcessor.SendToPlayer("🔄 Initiating full reload (verbs, functions, scripts, properties)...");
+                var allSuccess = true;
+                var allErrors = new List<string>();
+                
+                // Reload verbs
+                try
+                {
+                    _commandProcessor.SendToPlayer("  🔄 Reloading verbs...");
+                    _hotReloadManager?.ManualReloadVerbs();
+                    _commandProcessor.SendToPlayer("  ✅ Verbs reloaded");
+                }
+                catch (Exception ex)
+                {
+                    allSuccess = false;
+                    allErrors.Add($"Verbs: {ex.Message}");
+                    _commandProcessor.SendToPlayer($"  ❌ Verb reload failed: {ex.Message}");
+                    Logger.Error("Verb reload failed during @reload all", ex);
+                }
+                
+                // Reload functions
+                try
+                {
+                    _commandProcessor.SendToPlayer("  🔄 Reloading functions...");
+                    _hotReloadManager?.ManualReloadFunctions();
+                    _commandProcessor.SendToPlayer("  ✅ Functions reloaded");
+                }
+                catch (Exception ex)
+                {
+                    allSuccess = false;
+                    allErrors.Add($"Functions: {ex.Message}");
+                    _commandProcessor.SendToPlayer($"  ❌ Function reload failed: {ex.Message}");
+                    Logger.Error("Function reload failed during @reload all", ex);
+                }
+                
+                // Reload scripts
+                try
+                {
+                    _commandProcessor.SendToPlayer("  🔄 Reloading scripts...");
+                    _hotReloadManager?.ManualReloadScripts();
+                    _commandProcessor.SendToPlayer("  ✅ Scripts reloaded");
+                }
+                catch (Exception ex)
+                {
+                    allSuccess = false;
+                    allErrors.Add($"Scripts: {ex.Message}");
+                    _commandProcessor.SendToPlayer($"  ❌ Script reload failed: {ex.Message}");
+                    Logger.Error("Script reload failed during @reload all", ex);
+                }
+                
+                // Reload properties
+                try
+                {
+                    _commandProcessor.SendToPlayer("  🔄 Reloading properties...");
+                    _propertyInitializer?.ReloadProperties();
+                    _commandProcessor.SendToPlayer("  ✅ Properties reloaded");
+                }
+                catch (Exception ex)
+                {
+                    allSuccess = false;
+                    allErrors.Add($"Properties: {ex.Message}");
+                    _commandProcessor.SendToPlayer($"  ❌ Property reload failed: {ex.Message}");
+                    Logger.Error("Property reload failed during @reload all", ex);
+                }
+                
+                if (allSuccess)
+                {
+                    _commandProcessor.SendToPlayer("✅ Full reload completed successfully!");
+                }
+                else
+                {
+                    _commandProcessor.SendToPlayer($"⚠️ Full reload completed with errors: {string.Join(", ", allErrors)}");
+                }
+                break;
+
             case "verbs":
                 _commandProcessor.SendToPlayer("🔄 Initiating manual verb reload...");
                 try
@@ -2092,7 +2168,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
 
             default:
                 _commandProcessor.SendToPlayer($"Unknown reload target: {target}");
-                _commandProcessor.SendToPlayer("Valid targets: verbs, functions, scripts, properties, status");
+                _commandProcessor.SendToPlayer("Valid targets: all, verbs, functions, scripts, properties, status");
                 break;
         }
 

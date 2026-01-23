@@ -337,27 +337,27 @@ public static class Html
         // Use multiple fallback strategies to ensure cross-platform compatibility
         var possiblePaths = new List<string>();
         
-        // Strategy 1: Application base directory (check classes folder first, then root)
+        // Strategy 1: Application base directory (check root first, then classes folder for backward compatibility)
         var appDirectory = AppDomain.CurrentDomain.BaseDirectory;
-        possiblePaths.Add(Path.Combine(appDirectory, "Resources", "classes", "stylesheet.less"));
         possiblePaths.Add(Path.Combine(appDirectory, "Resources", "stylesheet.less"));
+        possiblePaths.Add(Path.Combine(appDirectory, "Resources", "classes", "stylesheet.less"));
         
-        // Strategy 2: Current working directory (check classes folder first, then root)
+        // Strategy 2: Current working directory (check root first, then classes folder for backward compatibility)
         var workingDirectory = Directory.GetCurrentDirectory();
-        possiblePaths.Add(Path.Combine(workingDirectory, "Resources", "classes", "stylesheet.less"));
         possiblePaths.Add(Path.Combine(workingDirectory, "Resources", "stylesheet.less"));
+        possiblePaths.Add(Path.Combine(workingDirectory, "Resources", "classes", "stylesheet.less"));
         
-        // Strategy 3: Relative path from current directory (check classes folder first, then root)
-        possiblePaths.Add(Path.Combine("Resources", "classes", "stylesheet.less"));
+        // Strategy 3: Relative path from current directory (check root first, then classes folder for backward compatibility)
         possiblePaths.Add(Path.Combine("Resources", "stylesheet.less"));
+        possiblePaths.Add(Path.Combine("Resources", "classes", "stylesheet.less"));
         
         // Strategy 4: Check if we're in a subdirectory and need to go up
         var currentDir = Directory.GetCurrentDirectory();
         var parentDir = Directory.GetParent(currentDir);
         if (parentDir != null)
         {
-            possiblePaths.Add(Path.Combine(parentDir.FullName, "Resources", "classes", "stylesheet.less"));
             possiblePaths.Add(Path.Combine(parentDir.FullName, "Resources", "stylesheet.less"));
+            possiblePaths.Add(Path.Combine(parentDir.FullName, "Resources", "classes", "stylesheet.less"));
         }
         
         string? lessPath = null;

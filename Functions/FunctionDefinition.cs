@@ -54,6 +54,30 @@ public class FunctionDefinition
     public List<Keyword> Accessors { get; set; } = new List<Keyword> { Keyword.Public };
 
     /// <summary>
+    /// Help categories this function belongs to (from XML &lt;category&gt; tags)
+    /// </summary>
+    [JsonPropertyName("categories")]
+    public List<string> Categories { get; set; } = new List<string>();
+
+    /// <summary>
+    /// Help topics this function is associated with (from XML &lt;topic&gt; tags)
+    /// </summary>
+    [JsonPropertyName("topics")]
+    public List<string> Topics { get; set; } = new List<string>();
+
+    /// <summary>
+    /// Usage example for this function (from XML &lt;usage&gt; tag)
+    /// </summary>
+    [JsonPropertyName("usage")]
+    public string? Usage { get; set; }
+
+    /// <summary>
+    /// Detailed help text for this function (from XML &lt;help&gt; tag)
+    /// </summary>
+    [JsonPropertyName("helpText")]
+    public string? HelpText { get; set; }
+
+    /// <summary>
     /// Get the code as a single string
     /// </summary>
     public string GetCodeString() => string.Join("\n", Code);

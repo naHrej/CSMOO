@@ -6,6 +6,7 @@ using LiteDB;
 using CSMOO.Object;
 using CSMOO.Scripting;
 using CSMOO.Configuration;
+using CSMOO.Init;
 
 namespace CSMOO.Core;
 
@@ -955,6 +956,77 @@ public static class Builtins
     public static List<(Function function, string source)> GetFunctionsOnObject(GameObject obj)
     {
         return GetFunctionsOnObject(obj.Id);
+    }
+
+    /// <summary>
+    /// Get all verbs from the database (for help system)
+    /// </summary>
+    public static List<Verb> GetAllVerbs()
+    {
+        return VerbManagerInstance.GetAllVerbs();
+    }
+
+    /// <summary>
+    /// Get all functions from the database (for help system)
+    /// </summary>
+    public static List<Function> GetAllFunctions()
+    {
+        return FunctionManager.GetAllFunctions();
+    }
+
+    /// <summary>
+    /// Get help metadata (description and summary) for a category or topic
+    /// </summary>
+    public static (string? Description, string? Summary) GetHelpMetadata(string name)
+    {
+        return CodeDefinitionParser.GetHelpMetadata(name);
+    }
+    
+    /// <summary>
+    /// Get the general help preamble text
+    /// </summary>
+    public static string? GetHelpPreamble()
+    {
+        return CodeDefinitionParser.GetHelpPreamble();
+    }
+    
+    /// <summary>
+    /// Get the class name for a function's ObjectId
+    /// For class functions, ObjectId points to an ObjectClass, not a GameObject
+    /// </summary>
+    public static string? GetFunctionClassName(string objectId)
+    {
+        try
+        {
+            // First try to get it as an ObjectClass (for class functions)
+            var objectClass = ObjectManagerInstance.GetClass(objectId);
+            if (objectClass != null)
+            {
+                return objectClass.Name;
+            }
+            
+            // If not found as a class, try as a GameObject (for instance functions)
+            var obj = ObjectManagerInstance.GetObject(objectId);
+            if (obj != null)
+            {
+                // For instance functions, get the class name from the object's ClassId
+                if (!string.IsNullOrEmpty(obj.ClassId))
+                {
+                    var objClass = ObjectManagerInstance.GetClass(obj.ClassId);
+                    if (objClass != null)
+                    {
+                        return objClass.Name;
+                    }
+                }
+                // Fallback to object name if no class found
+                return obj.Name;
+            }
+        }
+        catch
+        {
+            // If lookup fails, return null
+        }
+        return null;
     }
 
     /// <summary>

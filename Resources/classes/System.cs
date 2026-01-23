@@ -4,7 +4,7 @@ public class System
 {
 
 
-    public string[] less = LoadFile("stylesheet.less");
+    public string[] less = LoadFile("../stylesheet.less");
 
     public int test = 1;
 
@@ -18,7 +18,16 @@ public class System
     /// <summary>
     /// Speak to others in the room
     /// </summary>
-
+    /// <category>basics</category>
+    /// <category>communication</category>
+    /// <topic>social</topic>
+    /// <usage>say &lt;message&gt;</usage>
+    /// <usage>"&lt;message&gt;</usage>
+    /// <help>
+    /// The say command allows you to speak to other players in the same room.
+    /// You can use either say &lt;message&gt; or just "&lt;message&gt; (quotes).
+    /// Your message will be visible to all players in the room.
+    /// </help>
     public verb Say(string message)
     {
         // Say command - speak to others in the room
@@ -54,13 +63,19 @@ public class System
     /// </summary>
     public verb Who()
     {
+        var output = new StringBuilder();
+        output.Append("<section class='Who'>");
+        output.Append("<h3>Online Players</h3>");
+        output.Append("<ul>");  
         // Who command - list online players
         var onlinePlayers = Builtins.GetOnlinePlayers();
-        notify(Player, "Online players:");
         foreach (var onlinePlayer in onlinePlayers)
         {
-            notify(Player, $"  {onlinePlayer.Name}");
+            output.Append($"<li class='player'>{onlinePlayer.Name}</li>");
         }
+        output.Append("</ul>");
+        output.Append("</section>");
+        notify(Player, output.ToString());
     }
 
     [VerbAliases("i inv")]
@@ -82,72 +97,635 @@ public class System
     /// </summary>
     public verb Help(string topic)
     {
-        // Help categories and topics (expand as needed)
-        var helpCategories = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase)
+        // Get all verbs and functions to build dynamic help
+        var allVerbs = Builtins.GetAllVerbs();
+        var allFunctions = Builtins.GetAllFunctions();
+        
+        // Debug: Check if we're getting verbs and if they have categories
+        var verbsWithCategories = allVerbs.Where(v => !string.IsNullOrEmpty(v.Categories)).ToList();
+        var verbsWithTopics = allVerbs.Where(v => !string.IsNullOrEmpty(v.Topics)).ToList();
+        
+        // Build categories and topics dynamically from verb and function metadata
+        var helpCategories = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+        var topicToVerbs = new Dictionary<string, List<Verb>>(StringComparer.OrdinalIgnoreCase);
+        var topicToFunctions = new Dictionary<string, List<Function>>(StringComparer.OrdinalIgnoreCase);
+        var categoryToVerbs = new Dictionary<string, List<Verb>>(StringComparer.OrdinalIgnoreCase);
+        var categoryToFunctions = new Dictionary<string, List<Function>>(StringComparer.OrdinalIgnoreCase);
+        
+        // Helper function to format Usage strings - decodes HTML entities for display
+        // Usage strings are now automatically styled during parsing, so we just need to decode entities
+        string FormatUsage(string? usage)
         {
-            { "basics", new List<string> { "movement", "communication", "objects" } },
-            { "building", new List<string> { "rooms", "exits", "properties" } },
-            { "programming", new List<string> { "verbs", "flags", "permissions" } }
-        };
+            if (string.IsNullOrEmpty(usage)) return "";
+            
+            // Usage strings are stored with HTML entities escaped (e.g., &lt;span class='param'&gt;&amp;lt;message&amp;gt;&lt;/span&gt;)
+            // We need to decode them for display (e.g., <span class='param'>&lt;message&gt;</span>)
+            var result = usage
+                .Replace("&lt;", "<")
+                .Replace("&gt;", ">")
+                .Replace("&amp;", "&")
+                .Replace("&quot;", "\"")
+                .Replace("&apos;", "'");
+            
+            return result;
+        }
+        
+        foreach (var verb in allVerbs)
+        {
+            // Parse categories (stored as comma-separated string)
+            if (!string.IsNullOrEmpty(verb.Categories))
+            {
+                var categoryParts = verb.Categories.Split(',');
+                foreach (var catRaw in categoryParts)
+                {
+                    var cat = catRaw?.Trim();
+                    if (!string.IsNullOrWhiteSpace(cat))
+                    {
+                        if (!helpCategories.ContainsKey(cat))
+                        {
+                            helpCategories[cat] = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                            categoryToVerbs[cat] = new List<Verb>();
+                        }
+                        categoryToVerbs[cat].Add(verb);
+                    }
+                }
+            }
+            
+            // Parse topics (stored as comma-separated string)
+            if (!string.IsNullOrEmpty(verb.Topics))
+            {
+                var topicParts = verb.Topics.Split(',');
+                foreach (var topRaw in topicParts)
+                {
+                    var top = topRaw?.Trim();
+                    if (!string.IsNullOrWhiteSpace(top))
+                    {
+                        if (!topicToVerbs.ContainsKey(top))
+                        {
+                            topicToVerbs[top] = new List<Verb>();
+                        }
+                        topicToVerbs[top].Add(verb);
+                        
+                        // Add topics to their categories
+                        if (!string.IsNullOrEmpty(verb.Categories))
+                        {
+                            var categoryParts2 = verb.Categories.Split(',');
+                            foreach (var catRaw in categoryParts2)
+                            {
+                                var cat = catRaw?.Trim();
+                                if (!string.IsNullOrWhiteSpace(cat) && helpCategories.ContainsKey(cat))
+                                {
+                                    helpCategories[cat].Add(top);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Process functions similarly
+        foreach (var func in allFunctions)
+        {
+            // Parse categories (stored as comma-separated string)
+            if (!string.IsNullOrEmpty(func.Categories))
+            {
+                var categoryParts = func.Categories.Split(',');
+                foreach (var catRaw in categoryParts)
+                {
+                    var cat = catRaw?.Trim();
+                    if (!string.IsNullOrWhiteSpace(cat))
+                    {
+                        if (!helpCategories.ContainsKey(cat))
+                        {
+                            helpCategories[cat] = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                            categoryToVerbs[cat] = new List<Verb>();
+                            categoryToFunctions[cat] = new List<Function>();
+                        }
+                        categoryToFunctions[cat].Add(func);
+                    }
+                }
+            }
+            
+            // Parse topics (stored as comma-separated string)
+            if (!string.IsNullOrEmpty(func.Topics))
+            {
+                var topicParts = func.Topics.Split(',');
+                foreach (var topRaw in topicParts)
+                {
+                    var top = topRaw?.Trim();
+                    if (!string.IsNullOrWhiteSpace(top))
+                    {
+                        if (!topicToFunctions.ContainsKey(top))
+                        {
+                            topicToFunctions[top] = new List<Function>();
+                        }
+                        topicToFunctions[top].Add(func);
+                        
+                        // Add topics to their categories
+                        if (!string.IsNullOrEmpty(func.Categories))
+                        {
+                            var categoryParts2 = func.Categories.Split(',');
+                            foreach (var catRaw in categoryParts2)
+                            {
+                                var cat = catRaw?.Trim();
+                                if (!string.IsNullOrWhiteSpace(cat) && helpCategories.ContainsKey(cat))
+                                {
+                                    helpCategories[cat].Add(top);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Add automatic "Verbs" category - all verbs belong to it
+        if (!helpCategories.ContainsKey("verbs"))
+        {
+            helpCategories["verbs"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            categoryToVerbs["verbs"] = new List<Verb>();
+        }
+        foreach (var verb in allVerbs)
+        {
+            if (!categoryToVerbs["verbs"].Contains(verb))
+            {
+                categoryToVerbs["verbs"].Add(verb);
+            }
+        }
+        
+        // Add automatic "Functions" category - all functions belong to it
+        if (!helpCategories.ContainsKey("functions"))
+        {
+            helpCategories["functions"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            categoryToFunctions["functions"] = new List<Function>();
+        }
+        foreach (var func in allFunctions)
+        {
+            if (!categoryToFunctions["functions"].Contains(func))
+            {
+                categoryToFunctions["functions"].Add(func);
+            }
+        }
 
         if (Args.Count == 0)
         {
+            // Show help preamble and horizontal list of categories
             var output = new StringBuilder();
-            output.AppendLine("<section class='Help'>");
-            output.AppendLine("<h3>Help Categories</h3>");
-            foreach (var cat in helpCategories.Keys.OrderBy(x => x))
+            output.Append("<section class='Help'>");
+            output.Append("<h3>Help</h3>");
+            
+            // Display help preamble if available
+            var preamble = Builtins.GetHelpPreamble();
+            if (!string.IsNullOrEmpty(preamble))
             {
-                var topics = string.Join(", ", helpCategories[cat].Select(t => $"<span class='topic'>{t}</span>"));
-                output.AppendLine($"<div><span class='category'>{cat}</span>: {topics}</div>");
+                output.Append($"<div class='description'>{preamble}</div>");
             }
-            output.AppendLine("<div><span class='usage'>Use: '<span class='command'>help <span class='param'>&lt;category&gt;</span></span>" +
-            "' or '<span class='command'>help <span class='param'>&lt;topic&gt;</span></span>'</span></div>");
-            output.AppendLine("</section>");
+            
+            // Display horizontal list of categories
+            if (helpCategories.Count > 0)
+            {
+                var categoryList = helpCategories.Keys.OrderBy(x => x)
+                    .Select(cat => $"<li><span class='category'>{cat}</span></li>");
+                output.Append("<ul class='help-list'>");
+                output.Append(string.Join("", categoryList));
+                output.Append("</ul>");
+            }
+            else
+            {
+                output.Append("<div>No help categories available.</div>");
+            }
+            
+            output.Append("</section>");
             notify(Player, output.ToString());
             return;
         }
 
         var searchTerm = string.Join(" ", Args).ToLower();
+        
+        // Parse search term for object prefix (e.g., "room.description()" or "room.description")
+        string? objectPrefix = null;
+        string functionSearchTerm = searchTerm;
+        var isFunctionLookup = searchTerm.Contains("(") || searchTerm.Contains(")");
+        
+        // Check for object prefix (e.g., "room.description()" or "exit.description")
+        var dotIndex = searchTerm.IndexOf('.');
+        if (dotIndex > 0)
+        {
+            objectPrefix = searchTerm.Substring(0, dotIndex).Trim();
+            functionSearchTerm = searchTerm.Substring(dotIndex + 1).Trim();
+        }
+        
+        // Remove parentheses from function search term
+        if (isFunctionLookup || functionSearchTerm.Contains("(") || functionSearchTerm.Contains(")"))
+        {
+            isFunctionLookup = true;
+            functionSearchTerm = functionSearchTerm.Replace("(", "").Replace(")", "").Trim();
+        }
 
         // Check if it's a category
-        if (helpCategories.ContainsKey(searchTerm))
+        if (categoryToVerbs.ContainsKey(searchTerm) || categoryToFunctions.ContainsKey(searchTerm))
         {
             var output = new StringBuilder();
             var prettyCategory = char.ToUpper(searchTerm[0]) + searchTerm.Substring(1);
-            output.AppendLine("<section class='Help'>");
-            output.AppendLine($"<h3>{prettyCategory} Help</h3>");
-            foreach (var topic in helpCategories[searchTerm])
+            output.Append("<section class='Help'>");
+            output.Append($"<h3>{prettyCategory}</h3>");
+            
+            // Display category description if available
+            var (description, summary) = Builtins.GetHelpMetadata(searchTerm);
+            if (!string.IsNullOrEmpty(description))
             {
-                output.AppendLine($"<div><span class='topic'>{topic}</span></div>");
+                output.Append($"<div class='description'>{description}</div>");
             }
-            output.AppendLine("<div><span class='usage'>Use: '<span class='command'>help <span class='param'>&lt;topic&gt;</span></span>' for specific help</span></div>");
-            output.AppendLine("</section>");
+            else if (!string.IsNullOrEmpty(summary))
+            {
+                output.Append($"<div class='description'>{summary}</div>");
+            }
+            
+            // Build separate lists for topics, verbs, and functions
+            var topicItems = new List<string>();
+            var verbItems = new List<string>();
+            var functionItems = new List<string>();
+            
+            // Add topics
+            if (helpCategories.ContainsKey(searchTerm))
+            {
+                foreach (var topic in helpCategories[searchTerm].OrderBy(t => t))
+                {
+                    topicItems.Add($"<span class='topic'>{topic}</span>");
+                }
+            }
+            
+            // Add verbs
+            if (categoryToVerbs.ContainsKey(searchTerm))
+            {
+                foreach (var verb in categoryToVerbs[searchTerm].OrderBy(v => v.Name))
+                {
+                    verbItems.Add($"<span class='command'>{verb.Name}</span>");
+                }
+            }
+            
+            // Add functions with class name
+            if (categoryToFunctions.ContainsKey(searchTerm))
+            {
+                foreach (var func in categoryToFunctions[searchTerm].OrderBy(f => f.Name))
+                {
+                    var className = Builtins.GetFunctionClassName(func.ObjectId);
+                    if (!string.IsNullOrEmpty(className))
+                    {
+                        var trimmedClassName = className.Trim().ToLower();
+                        functionItems.Add($"<span class='param'>{trimmedClassName}</span>.<span class='command'>{func.Name}</span>()");
+                    }
+                    else
+                    {
+                        functionItems.Add($"<span class='command'>{func.Name}</span>()");
+                    }
+                }
+            }
+            
+            if (topicItems.Count > 0)
+            {
+                output.Append("<div><h4>Topics:</h4> <ul class='help-list'>");
+                output.Append(string.Join("", topicItems.Select(item => $"<li>{item}</li>")));
+                output.Append("</ul></div>");
+            }
+            
+            if (verbItems.Count > 0)
+            {
+                output.Append("<div><h4>Verbs:</h4> <ul class='help-list'>");
+                output.Append(string.Join("", verbItems.Select(item => $"<li>{item}</li>")));
+                output.Append("</ul></div>");
+            }
+            
+            if (functionItems.Count > 0)
+            {
+                output.Append("<div><h4>Functions:</h4> <ul class='help-list'>");
+                output.Append(string.Join("", functionItems.Select(item => $"<li>{item}</li>")));
+                output.Append("</ul></div>");
+            }
+            
+            output.Append("</section>");
             notify(Player, output.ToString());
             return;
         }
 
-        // Check if it's a specific topic
-        var foundInCategory = helpCategories.FirstOrDefault(kvp =>
-            kvp.Value.Any(topic => topic.Equals(searchTerm, StringComparison.OrdinalIgnoreCase)));
-
-        if (!foundInCategory.Equals(default(KeyValuePair<string, List<string>>)))
+        // Check if it's a topic
+        if (topicToVerbs.ContainsKey(searchTerm) || topicToFunctions.ContainsKey(searchTerm))
         {
-            // Provide specific help for the topic
-            // NOTE: verb scripts run in Roslyn scripting context (not inside a C# instance method),
-            // so `this` isn't available here. Keep the topic help inline.
-            var helpText = searchTerm switch
+            var output = new StringBuilder();
+            var prettyTopic = char.ToUpper(searchTerm[0]) + searchTerm.Substring(1);
+            output.Append("<section class='Help'>");
+            output.Append($"<h3>{prettyTopic}</h3>");
+            
+            // Display topic description if available
+            var (description, summary) = Builtins.GetHelpMetadata(searchTerm);
+            if (!string.IsNullOrEmpty(description))
             {
-                "movement" => "<section class='Help'><h3>Movement</h3><div>Movement commands: <span class='command'>go</span>, <span class='command'>north</span>, <span class='command'>south</span>, <span class='command'>east</span>, <span class='command'>west</span>, etc.</div><div>Use <span class='command'>look</span> to see available exits.</div></section>",
-                "communication" => "<section class='Help'><h3>Communication</h3><div>Communication: <span class='command'>say</span> (or <span class='command'>\"</span>), <span class='command'>tell</span>, <span class='command'>ooc</span></div></section>",
-                "objects" => "<section class='Help'><h3>Objects</h3><div>Object commands: <span class='command'>look</span>, <span class='command'>examine</span>, <span class='command'>get</span>, <span class='command'>drop</span>, <span class='command'>inventory</span></div></section>",
-                _ => $"Help for '{searchTerm}' is not yet available."
-            };
-            notify(Player, helpText);
+                output.Append($"<div class='description'>{description}</div>");
+            }
+            else if (!string.IsNullOrEmpty(summary))
+            {
+                output.Append($"<div class='description'>{summary}</div>");
+            }
+            
+            // Build separate lists for verbs and functions
+            var verbItems = new List<string>();
+            var functionItems = new List<string>();
+            
+            // Add verbs
+            if (topicToVerbs.ContainsKey(searchTerm))
+            {
+                foreach (var verb in topicToVerbs[searchTerm].OrderBy(v => v.Name))
+                {
+                    verbItems.Add($"<span class='command'>{verb.Name}</span>");
+                }
+            }
+            
+            // Add functions with class name
+            if (topicToFunctions.ContainsKey(searchTerm))
+            {
+                foreach (var func in topicToFunctions[searchTerm].OrderBy(f => f.Name))
+                {
+                    var className = Builtins.GetFunctionClassName(func.ObjectId);
+                    if (!string.IsNullOrEmpty(className))
+                    {
+                        var trimmedClassName = className.Trim().ToLower();
+                        functionItems.Add($"<span class='param'>{trimmedClassName}</span>.<span class='command'>{func.Name}</span>()");
+                    }
+                    else
+                    {
+                        functionItems.Add($"<span class='command'>{func.Name}</span>()");
+                    }
+                }
+            }
+            
+            if (verbItems.Count > 0)
+            {
+                output.Append("<div class='help-list'><h4>Verbs:</h4> ");
+                output.Append(string.Join(" ", verbItems));
+                output.Append("</div>");
+            }
+            
+            if (functionItems.Count > 0)
+            {
+                output.Append("<div class='help-list'><h4>Functions:</h4> ");
+                output.Append(string.Join(" ", functionItems));
+                output.Append("</div>");
+            }
+            
+            // Find associated categories and display them horizontally
+            var associatedCategories = new List<string>();
+            foreach (var verb in allVerbs)
+            {
+                if (!string.IsNullOrEmpty(verb.Topics) && verb.Topics.Split(',').Any(t => t.Trim().Equals(searchTerm, StringComparison.OrdinalIgnoreCase)))
+                {
+                    if (!string.IsNullOrEmpty(verb.Categories))
+                    {
+                        foreach (var cat in verb.Categories.Split(',').Select(c => c?.Trim()).Where(c => !string.IsNullOrWhiteSpace(c)))
+                        {
+                            if (!associatedCategories.Contains(cat, StringComparer.OrdinalIgnoreCase))
+                            {
+                                associatedCategories.Add(cat);
+                            }
+                        }
+                    }
+                }
+            }
+            foreach (var func in allFunctions)
+            {
+                if (!string.IsNullOrEmpty(func.Topics) && func.Topics.Split(',').Any(t => t.Trim().Equals(searchTerm, StringComparison.OrdinalIgnoreCase)))
+                {
+                    if (!string.IsNullOrEmpty(func.Categories))
+                    {
+                        foreach (var cat in func.Categories.Split(',').Select(c => c?.Trim()).Where(c => !string.IsNullOrWhiteSpace(c)))
+                        {
+                            if (!associatedCategories.Contains(cat, StringComparer.OrdinalIgnoreCase))
+                            {
+                                associatedCategories.Add(cat);
+                            }
+                        }
+                    }
+                }
+            }
+            
+            if (associatedCategories.Count > 0)
+            {
+                output.Append("<div style='margin-top: 0.5em;'><h4>Categories:</h4> <ul class='help-list'>");
+                output.Append(string.Join("", associatedCategories.OrderBy(c => c).Select(c => $"<li><span class='category'>{c}</span></li>")));
+                output.Append("</ul></div>");
+            }
+            
+            output.Append("</section>");
+            notify(Player, output.ToString());
+            return;
+        }
+
+        // Helper function to get function display name
+        string GetFunctionDisplayName(Function func)
+        {
+            var className = Builtins.GetFunctionClassName(func.ObjectId);
+            if (!string.IsNullOrEmpty(className))
+            {
+                return $"<span class='param'>{className.Trim().ToLower()}</span>.<span class='command'>{func.Name}</span>()";
+            }
+            return $"<span class='command'>{func.Name}</span>()";
+        }
+        
+        // Check if it's a function or verb
+        // Priority: If object prefix or parentheses present, prefer function; otherwise prefer verb, then function as fallback
+        List<Function> matchingFunctions = new List<Function>();
+        Verb? matchingVerb = null;
+        
+        if (isFunctionLookup || !string.IsNullOrEmpty(objectPrefix))
+        {
+            // Function lookup - search with object prefix if specified
+            if (!string.IsNullOrEmpty(objectPrefix))
+            {
+                // Search functions on specific object type
+                matchingFunctions = allFunctions.Where(f =>
+                {
+                    var className = Builtins.GetFunctionClassName(f.ObjectId);
+                    if (string.IsNullOrEmpty(className)) return false;
+                    var normalizedClassName = className.Trim().ToLower();
+                    return normalizedClassName.Equals(objectPrefix, StringComparison.OrdinalIgnoreCase) &&
+                           (f.Name.Equals(functionSearchTerm, StringComparison.OrdinalIgnoreCase) ||
+                            f.Name.StartsWith(functionSearchTerm, StringComparison.OrdinalIgnoreCase));
+                }).ToList();
+            }
+            else
+            {
+                // Search all functions with partial matching
+                matchingFunctions = allFunctions.Where(f =>
+                    f.Name.Equals(functionSearchTerm, StringComparison.OrdinalIgnoreCase) ||
+                    f.Name.StartsWith(functionSearchTerm, StringComparison.OrdinalIgnoreCase)).ToList();
+            }
         }
         else
         {
-            notify(Player, $"<section class='Help'><div>No help found for '{searchTerm}'. Try <span class='command'>help</span> for available categories.</div></section>");
+            // No parentheses or object prefix - prefer verb first
+            matchingVerb = allVerbs.FirstOrDefault(v =>
+                v.Name.Equals(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                (!string.IsNullOrEmpty(v.Aliases) && v.Aliases.Split(' ')
+                    .Where(a => !string.IsNullOrWhiteSpace(a))
+                    .Any(a => a.Equals(searchTerm, StringComparison.OrdinalIgnoreCase))));
+            
+            // If no verb found, try function with partial matching
+            if (matchingVerb == null)
+            {
+                matchingFunctions = allFunctions.Where(f =>
+                    f.Name.Equals(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                    f.Name.StartsWith(searchTerm, StringComparison.OrdinalIgnoreCase)).ToList();
+            }
         }
+        
+        // If multiple functions match, show list
+        if (matchingFunctions.Count > 1)
+        {
+            var output = new StringBuilder();
+            output.Append("<section class='Help'>");
+            output.Append($"<h3>Help {searchTerm}</h3>");
+            output.Append("<div><h4>Functions:</h4> <ul class='help-list'>");
+            foreach (var func in matchingFunctions.OrderBy(f => Builtins.GetFunctionClassName(f.ObjectId) ?? "").ThenBy(f => f.Name))
+            {
+                output.Append($"<li>{GetFunctionDisplayName(func)}</li>");
+            }
+            output.Append("</ul></div>");
+            output.Append("</section>");
+            notify(Player, output.ToString());
+            return;
+        }
+        
+        // Single function match
+        Function? matchingFunction = matchingFunctions.FirstOrDefault();
+
+        // Display function help if found
+        if (matchingFunction != null)
+        {
+            var output = new StringBuilder();
+            var funcDisplayName = GetFunctionDisplayName(matchingFunction);
+            
+            output.Append("<section class='Help'>");
+            output.Append($"<h3>Help for {funcDisplayName}</h3>");
+            
+            // Display help text (description, usage, helpText)
+            if (!string.IsNullOrEmpty(matchingFunction.HelpText))
+            {
+                output.Append($"<div class='description'>{matchingFunction.HelpText}</div>");
+            }
+            else if (!string.IsNullOrEmpty(matchingFunction.Description))
+            {
+                output.Append($"<div class='description'>{matchingFunction.Description}</div>");
+            }
+            
+            if (!string.IsNullOrEmpty(matchingFunction.Usage))
+            {
+                output.Append($"<div><span class='usage'>Usage: <span class='command'>{FormatUsage(matchingFunction.Usage)}</span></span></div>");
+            }
+            
+            // Display horizontal lists of topics and categories
+            var topicList = new List<string>();
+            var categoryList = new List<string>();
+            
+            if (!string.IsNullOrEmpty(matchingFunction.Topics))
+            {
+                var topicParts = matchingFunction.Topics.Split(',');
+                topicList = topicParts.Select(t => t?.Trim()).Where(t => !string.IsNullOrWhiteSpace(t))
+                    .Select(t => $"<span class='topic'>{t}</span>").ToList();
+            }
+            
+            if (!string.IsNullOrEmpty(matchingFunction.Categories))
+            {
+                var categoryParts = matchingFunction.Categories.Split(',');
+                categoryList = categoryParts.Select(c => c?.Trim()).Where(c => !string.IsNullOrWhiteSpace(c))
+                    .Select(c => $"<span class='category'>{c}</span>").ToList();
+            }
+            
+            if (topicList.Count > 0)
+            {
+                output.Append("<div><h4>Topics:</h4> <ul class='help-list'>");
+                output.Append(string.Join("", topicList.Select(item => $"<li>{item}</li>")));
+                output.Append("</ul></div>");
+            }
+            
+            if (categoryList.Count > 0)
+            {
+                output.Append("<div><h4>Categories:</h4> <ul class='help-list'>");
+                output.Append(string.Join("", categoryList.Select(item => $"<li>{item}</li>")));
+                output.Append("</ul></div>");
+            }
+            
+            output.Append("</section>");
+            notify(Player, output.ToString());
+            return;
+        }
+
+        if (matchingVerb != null)
+        {
+            var output = new StringBuilder();
+            output.Append("<section class='Help'>");
+            output.Append($"<h3>Help for <span class='command'>{matchingVerb.Name}</span></h3>");
+            
+            // Display help text (helpText, description, usage, aliases)
+            if (!string.IsNullOrEmpty(matchingVerb.HelpText))
+            {
+                output.Append($"<div class='description'>{matchingVerb.HelpText}</div>");
+            }
+            else if (!string.IsNullOrEmpty(matchingVerb.Description))
+            {
+                output.Append($"<div class='description'>{matchingVerb.Description}</div>");
+            }
+            
+            if (!string.IsNullOrEmpty(matchingVerb.Usage))
+            {
+                output.Append($"<div><span class='usage'>Usage: <span class='command'>{FormatUsage(matchingVerb.Usage)}</span></span></div>");
+            }
+            
+            if (!string.IsNullOrEmpty(matchingVerb.Aliases))
+            {
+                var aliasParts = matchingVerb.Aliases.Split(' ');
+                var aliases = aliasParts.Where(a => !string.IsNullOrWhiteSpace(a));
+                output.Append($"<div><span class='usage'>Aliases: {string.Join(", ", aliases.Select(a => $"<span class='command'>{a}</span>"))}</span></div>");
+            }
+            
+            // Display horizontal lists of topics and categories
+            var topicList = new List<string>();
+            var categoryList = new List<string>();
+            
+            if (!string.IsNullOrEmpty(matchingVerb.Topics))
+            {
+                var topicParts = matchingVerb.Topics.Split(',');
+                topicList = topicParts.Select(t => t?.Trim()).Where(t => !string.IsNullOrWhiteSpace(t))
+                    .Select(t => $"<span class='topic'>{t}</span>").ToList();
+            }
+            
+            if (!string.IsNullOrEmpty(matchingVerb.Categories))
+            {
+                var categoryParts = matchingVerb.Categories.Split(',');
+                categoryList = categoryParts.Select(c => c?.Trim()).Where(c => !string.IsNullOrWhiteSpace(c))
+                    .Select(c => $"<span class='category'>{c}</span>").ToList();
+            }
+            
+            if (topicList.Count > 0)
+            {
+                output.Append("<div><h4>Topics:</h4> <ul class='help-list'>");
+                output.Append(string.Join("", topicList.Select(item => $"<li>{item}</li>")));
+                output.Append("</ul></div>");
+            }
+            
+            if (categoryList.Count > 0)
+            {
+                output.Append("<div><h4>Categories:</h4> <ul class='help-list'>");
+                output.Append(string.Join("", categoryList.Select(item => $"<li>{item}</li>")));
+                output.Append("</ul></div>");
+            }
+            
+            output.Append("</section>");
+            notify(Player, output.ToString());
+            return;
+        }
+
+        // No match found
+        notify(Player, $"<section class='Help'><div>No help found for '<span class='param'>{searchTerm}</span>'. Try <span class='command'>help</span> for available categories.</div></section>");
     }
 
     private string GetTopicHelp(string topic)
@@ -167,6 +745,16 @@ public class System
     /// <summary>
     /// Smart go command - move in any available direction
     /// </summary>
+    /// <category>basics</category>
+    /// <category>movement</category>
+    /// <topic>navigation</topic>
+    /// <usage>go &lt;direction&gt;</usage>
+    /// <usage>&lt;direction&gt;</usage>
+    /// <help>
+    /// The go command allows you to move between rooms using exits.
+    /// You can use "go &lt;direction&gt;" or just type the direction name (north, south, east, west, etc.).
+    /// Use the look command to see available exits from your current location.
+    /// </help>
     public verb Go(string direction)
     {
         // Smart go command - move in any available direction.
@@ -206,7 +794,7 @@ public class System
             }
             else
             {
-                notify(Player, availableExits);
+                notify(Player, $"<section class='Info'><div>{availableExits}</div></section>");
                 notify(Player, "<p class='usage'>Usage: <span class='command'>go <span class='param'>&lt;direction&gt;</span></span></p>");
             }
             return true; // Successfully handled the command (showed help)
@@ -289,14 +877,22 @@ public class System
                 var description = descResult?.ToString() ?? "";
                 if (!string.IsNullOrEmpty(description))
                 {
-                    notify(Player, description);
+                    // Description should already be HTML from Room.Description(), but ensure it's wrapped if needed
+                    if (!description.TrimStart().StartsWith("<"))
+                    {
+                        notify(Player, $"<section class='Room'>{description}</section>");
+                    }
+                    else
+                    {
+                        notify(Player, description);
+                    }
                 }
             }
             catch
             {
                 // Fallback to property access if function call fails
                 var description = Builtins.GetProperty(destination, "longDescription", "") ?? Builtins.GetProperty(destination, "description", "") ?? "You see nothing special.";
-                notify(Player, description);
+                notify(Player, $"<section class='Room'><div class='description'>{description}</div></section>");
             }
             return true; // Successfully moved
         }
@@ -313,6 +909,18 @@ public class System
     /// <summary>
     /// Look at the room or a specific object
     /// </summary>
+    /// <category>basics</category>
+    /// <category>objects</category>
+    /// <topic>examination</topic>
+    /// <topic>navigation</topic>
+    /// <usage>look</usage>
+    /// <usage>look &lt;object&gt;</usage>
+    /// <alias>l</alias>
+    /// <help>
+    /// The look command shows you information about your current location or a specific object.
+    /// Use "look" to see the room description, exits, and contents.
+    /// Use "look &lt;object&gt;" to examine a specific object in detail.
+    /// </help>
     public verb Look(string target)
     {
         // Look command - shows room or looks at specific object.
@@ -346,12 +954,12 @@ public class System
         var resolved = resolution.Match;
         
         // Try to call Description() function, but fall back to property access if object has no owner
-        string description;
+        string lookDescHtml = "";
         try
         {
             // Use CallFunctionOnObject to call Description() function on the object
             var descResult = CallFunctionOnObject(resolved, "Description");
-            description = descResult?.ToString() ?? "";
+            lookDescHtml = descResult?.ToString() ?? "";
         }
         catch (Exception)
         {
@@ -366,26 +974,34 @@ public class System
                 
                 if (!string.IsNullOrEmpty(longDesc))
                 {
-                    description = $"<h3>{name}</h3><p>{longDesc}</p>";
+                    lookDescHtml = $"<h3>{name}</h3><p>{longDesc}</p>";
                 }
                 else if (!string.IsNullOrEmpty(shortDesc))
                 {
-                    description = $"<h3>{name}</h3><p>{shortDesc}</p>";
+                    lookDescHtml = $"<h3>{name}</h3><p>{shortDesc}</p>";
                 }
                 else
                 {
-                    description = $"<h3>{name}</h3><p>You see nothing special about this {classId}.</p>";
+                    lookDescHtml = $"<h3>{name}</h3><p>You see nothing special about this {classId}.</p>";
                 }
             }
             catch
             {
                 // If even property access fails, show a generic message
-                description = $"<p>You see something, but can't make out any details.</p>";
+                lookDescHtml = $"<p>You see something, but can't make out any details.</p>";
             }
         }
-        if(description is not null)
+        if(!string.IsNullOrEmpty(lookDescHtml))
         {
-            notify(Player, description);
+            // Description should already be HTML from Room.Description(), but ensure it's wrapped if needed
+            if (!lookDescHtml.TrimStart().StartsWith("<"))
+            {
+                notify(Player, $"<section class='Room'>{lookDescHtml}</section>");
+            }
+            else
+            {
+                notify(Player, lookDescHtml);
+            }
         }
         return true;
     }
@@ -396,6 +1012,15 @@ public class System
     /// <summary>
     /// Examine an object in detail
     /// </summary>
+    /// <category>basics</category>
+    /// <category>objects</category>
+    /// <topic>examination</topic>
+    /// <usage>examine &lt;object&gt;</usage>
+    /// <alias>ex</alias>
+    /// <help>
+    /// The examine command provides detailed information about an object.
+    /// This is more detailed than the look command and shows object properties, class information, and other metadata.
+    /// </help>
     public verb Examine(string targetName)
     {
         // First, try to resolve as a class name
@@ -410,7 +1035,7 @@ public class System
             // Examining a class definition
             objectClass = classTarget;
             targetId = classTarget.Id;
-            notify(Player, $"<hr/><p>Examining class '{classTarget.Name}' ({classTarget.Id})</p>");
+            notify(Player, $"<section class='Examine'><div class='header'>Examining class '<span class='name'>{classTarget.Name}</span>' ({classTarget.Id})</div></section>");
         }
         else
         {
@@ -424,7 +1049,7 @@ public class System
             targetId = target.Id;
             objectClass = Builtins.GetObjectClass(target);
             var targetNameProp = Builtins.GetProperty(target, "name", "") ?? target.Name ?? "something";
-            notify(Player, $"<hr/><p>Examining {targetNameProp} '{targetName}' ({target.Id})</p>");
+            notify(Player, $"<section class='Examine'><div class='header'>Examining {targetNameProp} '<span class='name'>{targetName}</span>' ({target.Id})</div></section>");
             // Check if target is a player (only for object instances)
             if (Builtins.IsPlayerObject(target))
             {
@@ -446,7 +1071,7 @@ public class System
             // target is already checked for null in the else block above
             if (target is null)
             {
-                notify(Player, "Error: Object information not available.");
+                notify(Player, "<section class='error'><div>Error: Object information not available.</div></section>");
                 return false;
             }
             name = target.Name ?? Builtins.GetObjectName(target);
@@ -455,23 +1080,24 @@ public class System
         }
         // Build the examination output
         var output = new StringBuilder();
+        output.Append("<section class='Examine'>");
         // Object name and short description
         if (!string.IsNullOrEmpty(shortDesc))
         {
-            output.AppendLine($"{name} ({shortDesc})");
+            output.Append($"<div class='name'>{name} ({shortDesc})</div>");
         }
         else
         {
-            output.AppendLine(name);
+            output.Append($"<div class='name'>{name}</div>");
         }
         // Long description
         if (!string.IsNullOrEmpty(longDesc))
         {
-            output.AppendLine(longDesc);
+            output.Append($"<div class='description'>{longDesc}</div>");
         }
         else
         {
-            output.AppendLine("You see nothing special.");
+            output.Append("<div class='description'>You see nothing special.</div>");
         }
         // Show contents if it's a container (only for object instances)
         if (!isExaminingClass)
@@ -479,46 +1105,45 @@ public class System
             var contents = Helpers.GetObjectsInLocation(targetId);
             if (contents.Any())
             {
-                output.AppendLine();
-                output.AppendLine("Contents:");
+                output.Append("<p>");
+                output.Append("<span class='header'>Contents:</span>");
                 foreach (var item in contents)
                 {
                     var itemName = item.Name ?? "unknown object";
                     var itemShort = item.shortDescription ?? "";
                     var displayName = !string.IsNullOrEmpty(itemShort) ? $"{itemName} ({itemShort})" : itemName;
-                    output.AppendLine($"  {displayName}");
+                    output.Append($"<div>  {displayName}</div>");
                 }
+                output.Append("</p>");
             }
         }
         // For class definitions, show default properties and instances
         if (isExaminingClass && objectClass is not null)
         {
-            output.AppendLine();
-            output.AppendLine("=== Class Information ===");
+            output.Append("<div class='class-info'><h4>Class Information</h4>");
             // Show inheritance
             if (!string.IsNullOrEmpty(objectClass.ParentClassId))
             {
                 var parentClass = Builtins.GetClass(objectClass.ParentClassId);
-                output.AppendLine($"Inherits from: {parentClass?.Name ?? objectClass.ParentClassId}");
+                output.Append($"<div>Inherits from: {parentClass?.Name ?? objectClass.ParentClassId}</div>");
             }
             else
             {
-                output.AppendLine("Inherits from: (none - root class)");
+                output.Append("<div>Inherits from: (none - root class)</div>");
             }
             // Show if it's abstract
             if (objectClass.IsAbstract)
             {
-                output.AppendLine("Type: Abstract class (cannot be instantiated)");
+                output.Append("<div>Type: Abstract class (cannot be instantiated)</div>");
             }
             else
             {
-                output.AppendLine("Type: Concrete class");
+                output.Append("<div>Type: Concrete class</div>");
             }
             // Show default properties
             if (objectClass.Properties?.Count > 0)
             {
-                output.AppendLine();
-                output.AppendLine("Default Properties:");
+                output.Append("<div><strong>Default Properties:</strong>");
                 foreach (var prop in objectClass.Properties)
                 {
                     var value = prop.Value?.ToString() ?? "null";
@@ -526,66 +1151,66 @@ public class System
                     {
                         value = value.Substring(0, 47) + "...";
                     }
-                    output.AppendLine($"  {prop.Key}: {value}");
+                    output.Append($"<div>  {prop.Key}: {value}</div>");
                 }
+                output.Append("</div>");
             }
             // Show instances of this class
             var instances = Builtins.GetObjectsByClass(objectClass.Id);
-            output.AppendLine();
-            output.AppendLine($"Instances: {instances.Count()}");
+            output.Append($"<div>Instances: {instances.Count()}");
             if (instances.Count > 0 && (Builtins.IsAdmin(Player) || Builtins.IsModerator(Player)))
             {
                 var limitedInstances = instances.Take(10);
                 foreach (var instance in limitedInstances)
                 {
                     var instName = instance.Name ?? "unnamed";
-                    output.AppendLine($"  #{instance.DbRef}: {instName}");
+                    output.Append($"<div>  #{instance.DbRef}: {instName}</div>");
                 }
                 if (instances.Count() > 10)
                 {
-                    output.AppendLine($"  ... and {instances.Count() - 10} more");
+                    output.Append($"<div>  ... and {instances.Count() - 10} more</div>");
                 }
             }
+            output.Append("</div></div>");
         }
         // Administrative information for Admin/Moderator users
         if (Builtins.IsAdmin(Player) || Builtins.IsModerator(Player))
         {
-            output.AppendLine();
-            output.AppendLine("=== Administrative Information ===");
+            output.Append("<div class='admin-info'><h4>Administrative Information</h4>");
             if (isExaminingClass && objectClass is not null)
             {
                 // Administrative info for class definitions
-                output.AppendLine($"Class ID: {objectClass.Id}");
-                output.AppendLine($"Class Name: {objectClass.Name}");
-                output.AppendLine($"Created: {objectClass.CreatedAt}");
-                output.AppendLine($"Modified: {objectClass.ModifiedAt}");
+                output.Append($"<div>Class ID: {objectClass.Id}</div>");
+                output.Append($"<div>Class Name: {objectClass.Name}</div>");
+                output.Append($"<div>Created: {objectClass.CreatedAt}</div>");
+                output.Append($"<div>Modified: {objectClass.ModifiedAt}</div>");
             }
             else if (!isExaminingClass && target is not null)
             {
                 // Administrative info for object instances
-                output.AppendLine($"Owner: {target.Owner}(#{target.DbRef})");
-                output.AppendLine($"Object ID: {target.Id}");
-                output.AppendLine($"DB Reference: #{target.DbRef}");
-                output.AppendLine($"Created: {target.CreatedAt}");
-                output.AppendLine($"Modified: {target.ModifiedAt}");
+                output.Append($"<div>Owner: {target.Owner}(#{target.DbRef})</div>");
+                output.Append($"<div>Object ID: {target.Id}</div>");
+                output.Append($"<div>DB Reference: #{target.DbRef}</div>");
+                output.Append($"<div>Created: {target.CreatedAt}</div>");
+                output.Append($"<div>Modified: {target.ModifiedAt}</div>");
                 // Show player flags if examining a player
                 if (targetPlayer != null)
                 {
                     var flags = Builtins.GetPlayerFlags(targetPlayer);
                     if (flags.Count > 0)
                     {
-                        output.AppendLine($"Player Flags: {string.Join(", ", flags)}");
+                        output.Append($"<div>Player Flags: {string.Join(", ", flags)}</div>");
                     }
                     else
                     {
-                        output.AppendLine("Player Flags: none");
+                        output.Append("<div>Player Flags: none</div>");
                     }
                 }
             }
             // Show object class for both cases
             if (objectClass != null)
             {
-                output.AppendLine($"Class: {objectClass.Name}");
+                output.Append($"<div>Class: {objectClass.Name}</div>");
             }
             // Show verbs (different approach for classes vs instances)
             if (isExaminingClass && objectClass is not null)
@@ -593,7 +1218,7 @@ public class System
                 var verbs = Builtins.GetVerbsOnClass(objectClass.Id);
                 if (verbs.Count > 0)
                 {
-                    output.AppendLine("Class Verbs:");
+                    output.Append("<div><strong>Class Verbs:</strong>");
                     foreach (var verb in verbs.OrderBy(v => v.Name))
                     {
                         var verbInfo = $"  {verb.Name}";
@@ -605,12 +1230,13 @@ public class System
                         {
                             verbInfo += $" [{verb.Pattern}]";
                         }
-                        output.AppendLine(verbInfo);
+                        output.Append($"<div>{verbInfo}</div>");
                     }
+                    output.Append("</div>");
                 }
                 else
                 {
-                    output.AppendLine("Class Verbs: none");
+                    output.Append("<div>Class Verbs: none</div>");
                 }
             }
             else
@@ -622,7 +1248,7 @@ public class System
                 // Show instance-specific verbs
                 if (instanceVerbs.Count > 0)
                 {
-                    output.AppendLine("Instance Verbs:");
+                    output.Append("<div><strong>Instance Verbs:</strong>");
                     foreach (var (verb, source) in instanceVerbs.OrderBy(v => v.verb.Name))
                     {
                         var verbInfo = $"  {verb.Name}";
@@ -634,17 +1260,18 @@ public class System
                         {
                             verbInfo += $" [{verb.Pattern}]";
                         }
-                        output.AppendLine(verbInfo);
+                        output.Append($"<div>{verbInfo}</div>");
                     }
+                    output.Append("</div>");
                 }
                 else
                 {
-                    output.AppendLine("Instance Verbs: none");
+                    output.Append("<div>Instance Verbs: none</div>");
                 }
                 // Show inherited verbs
                 if (inheritedVerbs.Count > 0)
                 {
-                    output.AppendLine("Inherited Verbs:");
+                    output.Append("<div><strong>Inherited Verbs:</strong>");
                     foreach (var (verb, source) in inheritedVerbs.OrderBy(v => v.verb.Name))
                     {
                         var verbInfo = $"  {verb.Name}";
@@ -657,12 +1284,13 @@ public class System
                             verbInfo += $" [{verb.Pattern}]";
                         }
                         verbInfo += $" (from {source})";
-                        output.AppendLine(verbInfo);
+                        output.Append($"<div>{verbInfo}</div>");
                     }
+                    output.Append("</div>");
                 }
                 else
                 {
-                    output.AppendLine("Inherited Verbs: none");
+                    output.Append("<div>Inherited Verbs: none</div>");
                 }
             }
             // Show functions (different approach for classes vs instances)
@@ -671,7 +1299,7 @@ public class System
                 var functions = Builtins.GetFunctionsOnClass(objectClass.Id);
                 if (functions.Count > 0)
                 {
-                    output.AppendLine("Class Functions:");
+                    output.Append("<div><strong>Class Functions:</strong>");
                     foreach (var func in functions.OrderBy(f => f.Name))
                     {
                         var paramString = string.Join(", ", func.ParameterTypes.Zip(func.ParameterNames, (type, name) => $"{type} {name}"));
@@ -680,12 +1308,13 @@ public class System
                         {
                             funcInfo += $" - {func.Description}";
                         }
-                        output.AppendLine(funcInfo);
+                        output.Append($"<div>{funcInfo}</div>");
                     }
+                    output.Append("</div>");
                 }
                 else
                 {
-                    output.AppendLine("Class Functions: none");
+                    output.Append("<div>Class Functions: none</div>");
                 }
             }
             else
@@ -697,7 +1326,7 @@ public class System
                 // Show instance-specific functions
                 if (instanceFunctions.Count > 0)
                 {
-                    output.AppendLine("Instance Functions:");
+                    output.Append("<div><strong>Instance Functions:</strong>");
                     foreach (var (func, source) in instanceFunctions.OrderBy(f => f.function.Name))
                     {
                         var paramString = string.Join(", ", func.ParameterTypes.Zip(func.ParameterNames, (type, name) => $"{type} {name}"));
@@ -706,17 +1335,18 @@ public class System
                         {
                             funcInfo += $" - {func.Description}";
                         }
-                        output.AppendLine(funcInfo);
+                        output.Append($"<div>{funcInfo}</div>");
                     }
+                    output.Append("</div>");
                 }
                 else
                 {
-                    output.AppendLine("Instance Functions: none");
+                    output.Append("<div>Instance Functions: none</div>");
                 }
                 // Show inherited functions
                 if (inheritedFunctions.Count > 0)
                 {
-                    output.AppendLine("Inherited Functions:");
+                    output.Append("<div><strong>Inherited Functions:</strong>");
                     foreach (var (func, source) in inheritedFunctions.OrderBy(f => f.function.Name))
                     {
                         var paramString = string.Join(", ", func.ParameterTypes.Zip(func.ParameterNames, (type, name) => $"{type} {name}"));
@@ -726,12 +1356,13 @@ public class System
                             funcInfo += $" - {func.Description}";
                         }
                         funcInfo += $" (from {source})";
-                        output.AppendLine(funcInfo);
+                        output.Append($"<div>{funcInfo}</div>");
                     }
+                    output.Append("</div>");
                 }
                 else
                 {
-                    output.AppendLine("Inherited Functions: none");
+                    output.Append("<div>Inherited Functions: none</div>");
                 }
             }
             // Show properties (only for object instances, classes already show default properties above)
@@ -773,7 +1404,7 @@ public class System
                 // Show instance properties
                 if (instanceProperties.Count > 0)
                 {
-                    output.AppendLine("Instance Properties:");
+                    output.Append("<div><strong>Instance Properties:</strong>");
                     foreach (var prop in instanceProperties.OrderBy(p => p.Key))
                     {
                         var value = prop.Value?.ToString() ?? "null";
@@ -786,22 +1417,23 @@ public class System
                             List<Keyword> accList = target.PropAccessors[prop.Key];
                             string accessor = string.Join(" ", accList.Select(k => k.ToString()));
                             accessor = accessor.TrimEnd();
-                            output.AppendLine($"  {prop.Key} [{accessor}]: {value}");
+                            output.Append($"<div>  {prop.Key} [{accessor}]: {value}</div>");
                         }
                         else
                         {
-                            output.AppendLine($"  {prop.Key} [{"Public"}]: {value}");
+                            output.Append($"<div>  {prop.Key} [{"Public"}]: {value}</div>");
                         }
                     }
+                    output.Append("</div>");
                 }
                 else
                 {
-                    output.AppendLine("Instance Properties: none");
+                    output.Append("<div>Instance Properties: none</div>");
                 }
                 // Show inherited properties
                 if (inheritedProperties.Count > 0)
                 {
-                    output.AppendLine("Inherited Properties:");
+                    output.Append("<div><strong>Inherited Properties:</strong>");
                     foreach (var prop in inheritedProperties.OrderBy(p => p.Key))
                     {
                         var value = prop.Value?.ToString() ?? "null";
@@ -809,16 +1441,19 @@ public class System
                         {
                             value = value.Substring(0, 47) + "...";
                         }
-                        output.AppendLine($"  {prop.Key}: {value} (from class)");
+                        output.Append($"<div>  {prop.Key}: {value} (from class)</div>");
                     }
+                    output.Append("</div>");
                 }
                 else
                 {
-                    output.AppendLine("Inherited Properties: none");
+                    output.Append("<div>Inherited Properties: none</div>");
                 }
             }
+            output.Append("</div>"); // Close admin-info div
         }
-        notify(Player, output.ToString().TrimEnd());
+        output.Append("</section>"); // Close Examine section
+        notify(Player, output.ToString());
 
 
 
@@ -830,6 +1465,16 @@ public class System
     /// <summary>
     /// Pick up an object
     /// </summary>
+    /// <category>basics</category>
+    /// <category>objects</category>
+    /// <topic>inventory</topic>
+    /// <usage>get &lt;object&gt;</usage>
+    /// <usage>take &lt;object&gt;</usage>
+    /// <help>
+    /// The get command allows you to pick up objects from your current location and add them to your inventory.
+    /// You can only get objects that are in the same room as you.
+    /// Use the inventory command to see what you're carrying.
+    /// </help>
     public verb Get(string target)
     {
         if (Args.Count == 0)
@@ -862,6 +1507,14 @@ public class System
     /// <summary>
     /// Drop an object from inventory
     /// </summary>
+    /// <category>basics</category>
+    /// <category>objects</category>
+    /// <topic>inventory</topic>
+    /// <usage>drop &lt;object&gt;</usage>
+    /// <help>
+    /// The drop command allows you to remove an object from your inventory and place it in your current location.
+    /// The object will be visible to other players in the room after you drop it.
+    /// </help>
     public verb Drop(string target)
     {
         if (Args.Count == 0)
@@ -979,12 +1632,17 @@ public class System
         // Check if any code was provided
         if (Args.Count == 0 || string.Join(" ", Args).Trim().Length == 0)
         {
-            notify(Player, "Usage: script { C# code here }");
-            notify(Player, "Aliases: ;, th, think");
-            notify(Player, "Available variables: Player, This, Args, Input, Verb");
-            notify(Player, "All Builtins methods accept either objectId strings or dynamic objects");
-            notify(Player, "Example: ; notify(Player, $\"Hello {Player.Name}!\"); ");
-            notify(Player, "Example: ; SetProperty(This, \"test\", \"value\"); ");
+            var output = new StringBuilder();
+            output.Append("<section class='Help'><h3>Script Command</h3>");
+            output.Append("<div><strong>Usage:</strong> <span class='command'>script</span> { C# code here }</div>");
+            output.Append("<div><strong>Aliases:</strong> <span class='command'>;</span>, <span class='command'>th</span>, <span class='command'>think</span></div>");
+            output.Append("<div><strong>Available variables:</strong> <span class='code'>Player</span>, <span class='code'>This</span>, <span class='code'>Args</span>, <span class='code'>Input</span>, <span class='code'>Verb</span></div>");
+            output.Append("<div>All Builtins methods accept either objectId strings or dynamic objects</div>");
+            output.Append("<div><strong>Examples:</strong></div>");
+            output.Append("<div><span class='code'>; notify(Player, $\"Hello {Player.Name}!\");</span></div>");
+            output.Append("<div><span class='code'>; SetProperty(This, \"test\", \"value\");</span></div>");
+            output.Append("</section>");
+            notify(Player, output.ToString());
             return;
         }
 
@@ -996,7 +1654,15 @@ public class System
         if (!string.IsNullOrEmpty(result) && result != "null")
         {
             Builtins.Log($"[SCRIPT RESULT] Player '{Player.Name}' (ID: {Player.Id}): Script result: {result}");
-            notify(Player, $"Script result: {result}");
+            // Wrap result in HTML - check if it's already HTML
+            if (result.TrimStart().StartsWith("<"))
+            {
+                notify(Player, $"<section class='ScriptResult'><div><strong>Script result:</strong> {result}</div></section>");
+            }
+            else
+            {
+                notify(Player, $"<section class='ScriptResult'><div><strong>Script result:</strong> <span class='code'>{result}</span></div></section>");
+            }
         }
         else
         {

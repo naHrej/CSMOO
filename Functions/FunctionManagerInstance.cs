@@ -230,7 +230,9 @@ public class FunctionManagerInstance : IFunctionManager
     /// </summary>
     public List<Function> GetAllFunctions()
     {
-        var functionCollection = _gameDatabase.GetCollection<Function>("functions");
-        return functionCollection.FindAll().ToList();
+        // Use IDbProvider to avoid database connection conflicts
+        // This ensures we use the same connection as other database operations
+        var dbProvider = DbProvider.Instance;
+        return dbProvider.FindAll<Function>("functions").ToList();
     }
 }

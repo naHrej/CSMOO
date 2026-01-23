@@ -32,9 +32,9 @@ public static class FunctionManager
     {
         if (_instance == null)
         {
-            // Create default instances for backward compatibility
-            var config = Config.Instance;
-            var gameDatabase = new GameDatabase(config.Database.GameDataFile);
+            // Use existing GameDatabase instance if available to avoid connection conflicts
+            // GameDatabase.Instance will reuse existing instance or create one if needed
+            var gameDatabase = GameDatabase.Instance;
             _instance = new FunctionManagerInstance(gameDatabase);
         }
     }
@@ -171,6 +171,16 @@ public static class FunctionManager
     {
         EnsureInstance();
         return Instance.SetFunctionPermissions(functionId, permissions);
+    }
+
+    /// <summary>
+    /// Gets all functions from the database (for help system)
+    /// </summary>
+    public static List<Function> GetAllFunctions()
+    {
+        // Use DbProvider directly to avoid creating new database connections
+        // This prevents "file is being used by another process" errors
+        return DbProvider.Instance.FindAll<Function>("functions").ToList();
     }
 }
 

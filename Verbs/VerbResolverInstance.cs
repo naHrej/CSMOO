@@ -595,8 +595,9 @@ public class VerbResolverInstance : IVerbResolver
             }
             else
             {
-                _logger.Error($"Error executing verb '{verb.Name}': {ex.Message}");
-                var errorMessage = $"Error executing command \"{verb.Name.ToUpperInvariant()}\":{ex.Message}";
+                var verbName = verb.Name ?? "unknown";
+                _logger.Error($"Error executing verb '{verbName}': {ex.Message}");
+                var errorMessage = $"Error executing command \"{verbName.ToUpperInvariant()}\":{ex.Message}";
                 
                 // Send to command processor
                 commandProcessor?.SendToPlayer(errorMessage);

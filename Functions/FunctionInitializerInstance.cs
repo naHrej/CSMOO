@@ -224,16 +224,15 @@ public class FunctionInitializerInstance : IFunctionInitializer
                 Code = functionDef.GetCodeString(),
                 CreatedBy = "system",
                 CreatedAt = DateTime.UtcNow,
-                ModifiedAt = DateTime.UtcNow
+                ModifiedAt = DateTime.UtcNow,
+                Description = functionDef.Description ?? string.Empty,
+                Categories = string.Join(",", functionDef.Categories),
+                Topics = string.Join(",", functionDef.Topics),
+                Usage = functionDef.Usage,
+                HelpText = functionDef.HelpText
             };
 
             _dbProvider.Insert("functions", function);
-            // Set description if provided
-            if (!string.IsNullOrEmpty(functionDef.Description))
-            {
-                function.Description = functionDef.Description;
-                _dbProvider.Update("functions", function);
-            }
             return (1, 0);
         }
         else
@@ -246,11 +245,11 @@ public class FunctionInitializerInstance : IFunctionInitializer
                 existingFunction.ReturnType = functionDef.ReturnType;
                 existingFunction.Code = functionDef.GetCodeString();
                 existingFunction.ModifiedAt = DateTime.UtcNow;
-                
-                if (!string.IsNullOrEmpty(functionDef.Description))
-                {
-                    existingFunction.Description = functionDef.Description;
-                }
+                existingFunction.Description = functionDef.Description ?? string.Empty;
+                existingFunction.Categories = string.Join(",", functionDef.Categories);
+                existingFunction.Topics = string.Join(",", functionDef.Topics);
+                existingFunction.Usage = functionDef.Usage;
+                existingFunction.HelpText = functionDef.HelpText;
                 
                 _dbProvider.Update("functions", existingFunction);
                 _logger.Info($"Updated existing system function '{functionDef.Name}' on class '{functionDef.TargetClass}'");
@@ -294,11 +293,11 @@ public class FunctionInitializerInstance : IFunctionInitializer
                     existingFunction.ReturnType = functionDef.ReturnType;
                     existingFunction.Code = functionDef.GetCodeString();
                     existingFunction.ModifiedAt = DateTime.UtcNow;
-                    
-                    if (!string.IsNullOrEmpty(functionDef.Description))
-                    {
-                        existingFunction.Description = functionDef.Description;
-                    }
+                    existingFunction.Description = functionDef.Description ?? string.Empty;
+                    existingFunction.Categories = string.Join(",", functionDef.Categories);
+                    existingFunction.Topics = string.Join(",", functionDef.Topics);
+                    existingFunction.Usage = functionDef.Usage;
+                    existingFunction.HelpText = functionDef.HelpText;
                     
                     _dbProvider.Update("functions", existingFunction);
                     _logger.Info($"Updated existing system function '{functionDef.Name}' on system object");
@@ -328,12 +327,13 @@ public class FunctionInitializerInstance : IFunctionInitializer
             functionDef.GetCodeString(), 
             "system"
         );
-        // Set description if provided
-        if (!string.IsNullOrEmpty(functionDef.Description))
-        {
-            function.Description = functionDef.Description;
-            _dbProvider.Update("functions", function);
-        }
+        // Set description and help metadata
+        function.Description = functionDef.Description ?? string.Empty;
+        function.Categories = string.Join(",", functionDef.Categories);
+        function.Topics = string.Join(",", functionDef.Topics);
+        function.Usage = functionDef.Usage;
+        function.HelpText = functionDef.HelpText;
+        _dbProvider.Update("functions", function);
         return (1, 0);
     }
 

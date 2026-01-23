@@ -65,6 +65,26 @@ public class Function
     /// When this function was last modified
     /// </summary>
     public DateTime ModifiedAt { get; set; } = DateTime.UtcNow;
+    
+    /// <summary>
+    /// Help categories this function belongs to (from XML &lt;category&gt; tags)
+    /// </summary>
+    public string Categories { get; set; } = string.Empty;
+    
+    /// <summary>
+    /// Help topics this function is associated with (from XML &lt;topic&gt; tags)
+    /// </summary>
+    public string Topics { get; set; } = string.Empty;
+    
+    /// <summary>
+    /// Usage example for this function (from XML &lt;usage&gt; tag)
+    /// </summary>
+    public string? Usage { get; set; }
+    
+    /// <summary>
+    /// Detailed help text for this function (from XML &lt;help&gt; tag)
+    /// </summary>
+    public string? HelpText { get; set; }
 }
 
 

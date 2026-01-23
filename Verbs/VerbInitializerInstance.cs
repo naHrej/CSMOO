@@ -114,6 +114,13 @@ public class VerbInitializerInstance : IVerbInitializer
         // Get all .cs files recursively from Resources directory
         var csFiles = Directory.GetFiles(_resourcesPath, "*.cs", SearchOption.AllDirectories);
 
+        // First, parse HelpMetadata if it exists
+        var helpMetadataFile = csFiles.FirstOrDefault(f => Path.GetFileName(f) == "HelpMetadata.cs");
+        if (helpMetadataFile != null)
+        {
+            CodeDefinitionParser.ParseHelpMetadata(helpMetadataFile);
+        }
+
         foreach (var file in csFiles)
         {
             try
@@ -176,9 +183,10 @@ public class VerbInitializerInstance : IVerbInitializer
         }
 
         var existingVerbs = _dbProvider.FindAll<Verb>("verbs").ToList();
-        // Only create if it doesn't already exist
-        if (!existingVerbs.Any(v => v.ObjectId == targetClass.Id && v.Name == verbDef.Name))
+        var existingVerb = existingVerbs.FirstOrDefault(v => v.ObjectId == targetClass.Id && v.Name == verbDef.Name);
+        if (existingVerb == null)
         {
+            // Create new verb
             var verb = VerbManager.CreateVerb(
                 targetClass.Id, 
                 verbDef.Name, 
@@ -190,19 +198,40 @@ public class VerbInitializerInstance : IVerbInitializer
             if (!string.IsNullOrEmpty(verbDef.Aliases))
             {
                 verb.Aliases = verbDef.Aliases;
-                _dbProvider.Update("verbs", verb);
             }
             // Set description if provided
             if (!string.IsNullOrEmpty(verbDef.Description))
             {
                 verb.Description = verbDef.Description;
-                _dbProvider.Update("verbs", verb);
             }
+            // Set help metadata
+            verb.Categories = string.Join(",", verbDef.Categories);
+            verb.Topics = string.Join(",", verbDef.Topics);
+            verb.Usage = verbDef.Usage;
+            verb.HelpText = verbDef.HelpText;
+            _dbProvider.Update("verbs", verb);
             stats.Loaded = 1;
         }
         else
         {
-            stats.Skipped = 1;
+            // Update existing verb with new metadata (especially help metadata)
+            existingVerb.Pattern = verbDef.Pattern;
+            existingVerb.Code = verbDef.GetCodeString();
+            if (!string.IsNullOrEmpty(verbDef.Aliases))
+            {
+                existingVerb.Aliases = verbDef.Aliases;
+            }
+            if (!string.IsNullOrEmpty(verbDef.Description))
+            {
+                existingVerb.Description = verbDef.Description;
+            }
+            // Always update help metadata (this is the key fix)
+            existingVerb.Categories = string.Join(",", verbDef.Categories);
+            existingVerb.Topics = string.Join(",", verbDef.Topics);
+            existingVerb.Usage = verbDef.Usage;
+            existingVerb.HelpText = verbDef.HelpText;
+            _dbProvider.Update("verbs", existingVerb);
+            stats.Skipped = 1; // Still count as skipped since we didn't create it
         }
         
         return stats;
@@ -215,9 +244,10 @@ public class VerbInitializerInstance : IVerbInitializer
     {
         var stats = new VerbLoadStats();
         var existingVerbs = _dbProvider.FindAll<Verb>("verbs").ToList();
-        // Only create if it doesn't already exist
-        if (!existingVerbs.Any(v => v.ObjectId == systemObjectId && v.Name == verbDef.Name))
+        var existingVerb = existingVerbs.FirstOrDefault(v => v.ObjectId == systemObjectId && v.Name == verbDef.Name);
+        if (existingVerb == null)
         {
+            // Create new verb
             var verb = VerbManager.CreateVerb(
                 systemObjectId, 
                 verbDef.Name, 
@@ -229,19 +259,40 @@ public class VerbInitializerInstance : IVerbInitializer
             if (!string.IsNullOrEmpty(verbDef.Aliases))
             {
                 verb.Aliases = verbDef.Aliases;
-                _dbProvider.Update("verbs", verb);
             }
             // Set description if provided
             if (!string.IsNullOrEmpty(verbDef.Description))
             {
                 verb.Description = verbDef.Description;
-                _dbProvider.Update("verbs", verb);
             }
+            // Set help metadata
+            verb.Categories = string.Join(",", verbDef.Categories);
+            verb.Topics = string.Join(",", verbDef.Topics);
+            verb.Usage = verbDef.Usage;
+            verb.HelpText = verbDef.HelpText;
+            _dbProvider.Update("verbs", verb);
             stats.Loaded = 1;
         }
         else
         {
-            stats.Skipped = 1;
+            // Update existing verb with new metadata (especially help metadata)
+            existingVerb.Pattern = verbDef.Pattern;
+            existingVerb.Code = verbDef.GetCodeString();
+            if (!string.IsNullOrEmpty(verbDef.Aliases))
+            {
+                existingVerb.Aliases = verbDef.Aliases;
+            }
+            if (!string.IsNullOrEmpty(verbDef.Description))
+            {
+                existingVerb.Description = verbDef.Description;
+            }
+            // Always update help metadata (this is the key fix)
+            existingVerb.Categories = string.Join(",", verbDef.Categories);
+            existingVerb.Topics = string.Join(",", verbDef.Topics);
+            existingVerb.Usage = verbDef.Usage;
+            existingVerb.HelpText = verbDef.HelpText;
+            _dbProvider.Update("verbs", existingVerb);
+            stats.Skipped = 1; // Still count as skipped since we didn't create it
         }
         
         return stats;
