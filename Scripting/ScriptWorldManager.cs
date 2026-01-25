@@ -1,30 +1,32 @@
+using CSMOO.Database;
 using CSMOO.Object;
 
 namespace CSMOO.Scripting;
 
 /// <summary>
-/// Script-safe wrapper for WorldManager
+/// Script-safe wrapper for RoomManager and WorldInitializer
+/// Returns string IDs instead of GameObject references (script-safe)
 /// </summary>
 public class ScriptWorldManager
 {
     public string? GetStartingRoom()
     {
-        return Database.WorldManager.GetStartingRoom()?.Id;
+        return RoomManager.GetStartingRoom()?.Id;
     }
 
     public List<string> GetAllRooms()
     {
-        return [.. Database.WorldManager.GetAllRooms().Select(room => room.Id)];
+        return [.. RoomManager.GetAllRooms().Select(room => room.Id)];
     }
 
     public void CreateExit(GameObject fromRoom, GameObject toRoom, string direction, string returnDirection)
     {
-        Database.WorldManager.CreateExit(fromRoom, toRoom, direction, returnDirection);
+        RoomManager.CreateExit(fromRoom, toRoom, direction, returnDirection);
     }
 
     public string CreateSimpleItem(string name, string shortDesc, string longDesc, string? locationId = null)
     {
-        return Database.WorldManager.CreateSimpleItem(name, shortDesc, longDesc, locationId).Id;
+        return RoomManager.CreateSimpleItem(name, shortDesc, longDesc, locationId).Id;
     }
 }
 

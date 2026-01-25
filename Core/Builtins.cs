@@ -25,149 +25,19 @@ public static class Builtins
     }
     
     /// <summary>
-    /// Ensures an instance exists (creates default if not set)
+    /// Gets the instance, throwing if not set (DI must be used)
     /// </summary>
-    private static void EnsureInstance()
-    {
-        if (_instance == null)
-        {
-            // Create default instances for backward compatibility
-            var dbProvider = DbProvider.Instance;
-            var config = Config.Instance;
-            var logger = new LoggerInstance(config);
-            var classManager = new ClassManagerInstance(dbProvider, logger);
-            var objectManager = new ObjectManagerInstance(dbProvider, classManager);
-            
-            // Create PropertyManager and InstanceManager and set them on ObjectManagerInstance
-            var propertyManager = new PropertyManagerInstance(dbProvider, classManager, objectManager);
-            if (objectManager is ObjectManagerInstance omi)
-            {
-                omi.SetPropertyManager(propertyManager);
-            }
-            
-            var instanceManager = new InstanceManagerInstance(dbProvider, classManager, objectManager, propertyManager);
-            if (objectManager is ObjectManagerInstance omi2)
-            {
-                omi2.SetInstanceManager(instanceManager);
-            }
-            
-            var playerManager = new PlayerManagerInstance(dbProvider);
-            // PlayerManagerInstance requires ObjectManager to be set via SetObjectManager
-            if (playerManager is PlayerManagerInstance pmi)
-            {
-                pmi.SetObjectManager(objectManager);
-            }
-            var permissionManager = new PermissionManagerInstance(dbProvider, logger);
-            var functionResolver = new FunctionResolverInstance(dbProvider, objectManager);
-            var verbResolver = new VerbResolverInstance(dbProvider, objectManager, logger);
-            var verbManager = new VerbManagerInstance(dbProvider);
-            var roomManager = new RoomManagerInstance(dbProvider, logger, objectManager);
-            var objectResolver = CreateDefaultObjectResolver();
-            var compilationCache = new CompilationCache();
-            var scriptEngineFactory = new ScriptEngineFactory(objectManager, logger, config, objectResolver, verbResolver, functionResolver, dbProvider, playerManager, verbManager, roomManager, compilationCache);
-            _instance = new BuiltinsInstance(
-                objectManager,
-                playerManager,
-                permissionManager,
-                functionResolver,
-                verbManager,
-                roomManager,
-                logger,
-                scriptEngineFactory);
-        }
-    }
+    private static IBuiltinsInstance Instance => _instance ?? throw new InvalidOperationException("Builtins instance not set. Call Builtins.SetInstance() first. Use dependency injection to set the instance.");
     
-    private static IObjectResolver CreateDefaultObjectResolver()
-    {
-        var dbProvider = DbProvider.Instance;
-        var config = Config.Instance;
-        var logger = new LoggerInstance(config);
-        var classManager = new ClassManagerInstance(dbProvider, logger);
-        var objectManager = new ObjectManagerInstance(dbProvider, classManager);
-        var coreClassFactory = new CoreClassFactoryInstance(dbProvider, logger);
-        return new ObjectResolverInstance(objectManager, coreClassFactory);
-    }
-    
-    // Helper properties to get managers (from instance if available, otherwise create default instances)
-    private static IObjectManager ObjectManagerInstance
-    {
-        get
-        {
-            if (_instance != null) return _instance.ObjectManager;
-            EnsureInstance();
-            return _instance!.ObjectManager;
-        }
-    }
-    
-    private static IPlayerManager PlayerManagerInstance
-    {
-        get
-        {
-            if (_instance != null) return _instance.PlayerManager;
-            EnsureInstance();
-            return _instance!.PlayerManager;
-        }
-    }
-    
-    private static IPermissionManager PermissionManagerInstance
-    {
-        get
-        {
-            if (_instance != null) return _instance.PermissionManager;
-            EnsureInstance();
-            return _instance!.PermissionManager;
-        }
-    }
-    
-    private static IFunctionResolver FunctionResolverInstance
-    {
-        get
-        {
-            if (_instance != null) return _instance.FunctionResolver;
-            EnsureInstance();
-            return _instance!.FunctionResolver;
-        }
-    }
-    
-    private static IVerbManager VerbManagerInstance
-    {
-        get
-        {
-            if (_instance != null) return _instance.VerbManager;
-            EnsureInstance();
-            return _instance!.VerbManager;
-        }
-    }
-    
-    private static IRoomManager RoomManagerInstance
-    {
-        get
-        {
-            if (_instance != null) return _instance.RoomManager;
-            EnsureInstance();
-            return _instance!.RoomManager;
-        }
-    }
-    
-    private static ILogger LoggerInstance
-    {
-        get
-        {
-            if (_instance != null) return _instance.Logger;
-            EnsureInstance();
-            return _instance!.Logger;
-        }
-    }
-    
-    private static IScriptEngineFactory ScriptEngineFactoryInstance
-    {
-        get
-        {
-            if (_instance != null) return _instance.ScriptEngineFactory;
-            EnsureInstance();
-            return _instance!.ScriptEngineFactory;
-        }
-    }
+    // Helper properties to get managers (from DI instance)
+    private static IObjectManager ObjectManagerInstance => Instance.ObjectManager;
+    private static IPlayerManager PlayerManagerInstance => Instance.PlayerManager;
+    private static IPermissionManager PermissionManagerInstance => Instance.PermissionManager;
+    private static IFunctionResolver FunctionResolverInstance => Instance.FunctionResolver;
+    private static IVerbManager VerbManagerInstance => Instance.VerbManager;
+    private static IRoomManager RoomManagerInstance => Instance.RoomManager;
+    private static ILogger LoggerInstance => Instance.Logger;
+    public static IScriptEngineFactory ScriptEngineFactoryInstance => Instance.ScriptEngineFactory;
     
     /// <summary>
     /// Current script context - set by the script engine before execution (legacy, now UnifiedScriptGlobals)
@@ -929,7 +799,7 @@ public static class Builtins
     /// </summary>
     public static List<(Verb verb, string source)> GetVerbsOnObject(string objectId)
     {
-        return CreateDefaultVerbResolver().GetAllVerbsOnObject(objectId);
+        return Instance.VerbResolver.GetAllVerbsOnObject(objectId);
     }
 
     /// <summary>
@@ -973,14 +843,6 @@ public static class Builtins
         return FindFunction(obj.Id, functionName);
     }
     
-    private static IVerbResolver CreateDefaultVerbResolver()
-    {
-        var dbProvider = DbProvider.Instance;
-        var logger = new LoggerInstance(Config.Instance);
-        var classManager = new ClassManagerInstance(dbProvider, logger);
-        var objectManager = new ObjectManagerInstance(dbProvider, classManager);
-        return new VerbResolverInstance(dbProvider, objectManager, logger);
-    }
     
     #endregion
     

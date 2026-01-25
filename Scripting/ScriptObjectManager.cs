@@ -19,19 +19,6 @@ public class ScriptObjectManager
         _objectManager = objectManager ?? throw new ArgumentNullException(nameof(objectManager));
     }
 
-    // Backward compatibility constructor
-    public ScriptObjectManager()
-        : this(CreateDefaultObjectManager())
-    {
-    }
-
-    private static IObjectManager CreateDefaultObjectManager()
-    {
-        var dbProvider = DbProvider.Instance;
-        var logger = new LoggerInstance(Config.Instance);
-        var classManager = new ClassManagerInstance(dbProvider, logger);
-        return new ObjectManagerInstance(dbProvider, classManager);
-    }
 
     public object? GetProperty(string objectId, string propertyName)
     {

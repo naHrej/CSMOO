@@ -33,6 +33,7 @@ public class ProgrammingCommands
     private readonly IPropertyInitializer? _propertyInitializer;
     private readonly IScriptPrecompiler _scriptPrecompiler;
     private readonly ICompilationCache _compilationCache;
+    private readonly IVerbResolver _verbResolver;
     
     // For multi-line programming
     private bool _isInProgrammingMode = false;
@@ -55,6 +56,7 @@ public class ProgrammingCommands
         IFunctionManager functionManager,
         IScriptPrecompiler scriptPrecompiler,
         ICompilationCache compilationCache,
+        IVerbResolver verbResolver,
         IHotReloadManager? hotReloadManager = null,
         ICoreHotReloadManager? coreHotReloadManager = null,
         IFunctionInitializer? functionInitializer = null,
@@ -73,136 +75,11 @@ public class ProgrammingCommands
         _functionManager = functionManager ?? throw new ArgumentNullException(nameof(functionManager));
         _scriptPrecompiler = scriptPrecompiler ?? throw new ArgumentNullException(nameof(scriptPrecompiler));
         _compilationCache = compilationCache ?? throw new ArgumentNullException(nameof(compilationCache));
+        _verbResolver = verbResolver ?? throw new ArgumentNullException(nameof(verbResolver));
         _hotReloadManager = hotReloadManager;
         _coreHotReloadManager = coreHotReloadManager;
         _functionInitializer = functionInitializer;
         _propertyInitializer = propertyInitializer;
-    }
-
-    // Backward compatibility constructor
-    public ProgrammingCommands(CommandProcessor commandProcessor, Player player)
-        : this(commandProcessor, player,
-               CreateDefaultPermissionManager(), CreateDefaultVerbManager(), CreateDefaultFunctionResolver(),
-               CreateDefaultObjectManager(), CreateDefaultPlayerManager(), CreateDefaultDbProvider(),
-               CreateDefaultLogger(), CreateDefaultRoomManager(), CreateDefaultFunctionManager(),
-               CreateDefaultScriptPrecompiler(), CreateDefaultCompilationCache(),
-               CreateDefaultHotReloadManager(), CreateDefaultCoreHotReloadManager(),
-               CreateDefaultFunctionInitializer(), CreateDefaultPropertyInitializer())
-    {
-    }
-
-    // Helper methods for backward compatibility
-    private static IPermissionManager CreateDefaultPermissionManager()
-    {
-        return new PermissionManagerInstance(DbProvider.Instance, new LoggerInstance(Config.Instance));
-    }
-
-    private static IVerbManager CreateDefaultVerbManager()
-    {
-        return new VerbManagerInstance(DbProvider.Instance);
-    }
-
-    private static IFunctionResolver CreateDefaultFunctionResolver()
-    {
-        return new FunctionResolverInstance(DbProvider.Instance, CreateDefaultObjectManager());
-    }
-
-    private static IObjectManager CreateDefaultObjectManager()
-    {
-        var dbProvider = DbProvider.Instance;
-        var logger = new LoggerInstance(Config.Instance);
-        var classManager = new ClassManagerInstance(dbProvider, logger);
-        return new ObjectManagerInstance(dbProvider, classManager);
-    }
-
-    private static IPlayerManager CreateDefaultPlayerManager()
-    {
-        return new PlayerManagerInstance(DbProvider.Instance);
-    }
-
-    private static IDbProvider CreateDefaultDbProvider()
-    {
-        return DbProvider.Instance;
-    }
-
-
-    private static ILogger CreateDefaultLogger()
-    {
-        return new LoggerInstance(Config.Instance);
-    }
-
-    private static IRoomManager CreateDefaultRoomManager()
-    {
-        return new RoomManagerInstance(DbProvider.Instance, CreateDefaultLogger(), CreateDefaultObjectManager());
-    }
-
-    private static IFunctionManager CreateDefaultFunctionManager()
-    {
-        return new FunctionManagerInstance(DbProvider.Instance);
-    }
-
-    private static IHotReloadManager? CreateDefaultHotReloadManager()
-    {
-        // Create default instance using the same pattern as EnsureInstance
-        var config = Config.Instance;
-        var logger = new LoggerInstance(config);
-        var dbProvider = DbProvider.Instance;
-        var classManager = new ClassManagerInstance(dbProvider, logger);
-        var objectManager = new ObjectManagerInstance(dbProvider, classManager);
-        var playerManager = new PlayerManagerInstance(dbProvider);
-        var verbInitializer = new VerbInitializerInstance(dbProvider, logger, objectManager);
-        var functionManager = CreateDefaultFunctionManager();
-        var functionInitializer = new FunctionInitializerInstance(dbProvider, logger, objectManager, functionManager);
-        return new HotReloadManagerInstance(logger, config, verbInitializer, functionInitializer, playerManager);
-    }
-
-    private static ICoreHotReloadManager? CreateDefaultCoreHotReloadManager()
-    {
-        var logger = new LoggerInstance(Config.Instance);
-        var playerManager = new PlayerManagerInstance(DbProvider.Instance);
-        var permissionManager = new PermissionManagerInstance(DbProvider.Instance, logger);
-        return new CoreHotReloadManagerInstance(logger, playerManager, permissionManager);
-    }
-
-    private static IFunctionInitializer? CreateDefaultFunctionInitializer()
-    {
-        var dbProvider = DbProvider.Instance;
-        var logger = new LoggerInstance(Config.Instance);
-        var classManager = new ClassManagerInstance(dbProvider, logger);
-        var objectManager = new ObjectManagerInstance(dbProvider, classManager);
-        var functionManager = CreateDefaultFunctionManager();
-        return new FunctionInitializerInstance(dbProvider, logger, objectManager, functionManager);
-    }
-
-    private static IPropertyInitializer? CreateDefaultPropertyInitializer()
-    {
-        var dbProvider = DbProvider.Instance;
-        var logger = new LoggerInstance(Config.Instance);
-        var classManager = new ClassManagerInstance(dbProvider, logger);
-        var objectManager = new ObjectManagerInstance(dbProvider, classManager);
-        return new PropertyInitializerInstance(dbProvider, logger, objectManager);
-    }
-
-    private static IScriptPrecompiler CreateDefaultScriptPrecompiler()
-    {
-        var dbProvider = DbProvider.Instance;
-        var logger = new LoggerInstance(Config.Instance);
-        var config = Config.Instance;
-        var classManager = new ClassManagerInstance(dbProvider, logger);
-        var objectManager = new ObjectManagerInstance(dbProvider, classManager);
-        var coreClassFactory = new CoreClassFactoryInstance(dbProvider, logger);
-        var objectResolver = new ObjectResolverInstance(objectManager, coreClassFactory);
-        var verbResolver = new VerbResolverInstance(dbProvider, objectManager, logger);
-        var functionResolver = new FunctionResolverInstance(dbProvider, objectManager);
-        var playerManager = new PlayerManagerInstance(dbProvider);
-        var verbManager = new VerbManagerInstance(dbProvider);
-        var roomManager = new RoomManagerInstance(dbProvider, logger, objectManager);
-        return new ScriptPrecompiler(objectManager, logger, config, objectResolver, verbResolver, functionResolver, dbProvider, playerManager, verbManager, roomManager);
-    }
-
-    private static ICompilationCache CreateDefaultCompilationCache()
-    {
-        return new CompilationCache();
     }
 
     public bool IsInProgrammingMode => _isInProgrammingMode;
@@ -1138,7 +1015,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
             return true;
         }
 
-        var allVerbs = VerbResolver.GetAllVerbsOnObject(objectId);
+        var allVerbs = _verbResolver.GetAllVerbsOnObject(objectId);
         var allFunctions = _functionResolver.GetAllFunctionsOnObject(objectId);
         
         _commandProcessor.SendToPlayer($"=== Verbs and Functions on {GetObjectName(objectId)} ===");

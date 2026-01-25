@@ -3,7 +3,6 @@ using Moq;
 using CSMOO.Database;
 using CSMOO.Tests.TestHelpers;
 using Microsoft.Extensions.DependencyInjection;
-using LiteDB;
 
 namespace CSMOO.Tests.Database;
 
@@ -16,8 +15,8 @@ public class DbProviderTests
     public void DbProvider_Implements_IDbProvider()
     {
         // Arrange
-        var mockDatabase = new Mock<IGameDatabase>();
-        var mockCollection = new Mock<ILiteCollection<string>>();
+        var mockDatabase = new Mock<IDatabase>();
+        var mockCollection = new Mock<CSMOO.Database.ICollection<string>>();
         mockDatabase.Setup(d => d.GetCollection<string>(It.IsAny<string>()))
             .Returns(mockCollection.Object);
         
@@ -46,7 +45,7 @@ public class DbProviderTests
     public void DbProvider_Is_Singleton_In_DI()
     {
         // Arrange - Use mocks to avoid database file locking issues
-        var mockDatabase = new Mock<IGameDatabase>();
+        var mockDatabase = new Mock<IDatabase>();
         var serviceProvider = ServiceProviderHelper.CreateServiceProviderWithMocks(
             mockDatabase: mockDatabase);
         
@@ -59,10 +58,10 @@ public class DbProviderTests
     }
     
     [Fact]
-    public void DbProvider_Receives_GameDatabase_From_DI()
+    public void DbProvider_Receives_IDatabase_From_DI()
     {
         // Arrange
-        var mockDatabase = new Mock<IGameDatabase>();
+        var mockDatabase = new Mock<IDatabase>();
         var serviceProvider = ServiceProviderHelper.CreateServiceProviderWithMocks(
             mockDatabase: mockDatabase);
         

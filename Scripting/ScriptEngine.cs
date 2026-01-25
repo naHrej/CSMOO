@@ -278,90 +278,6 @@ public class ScriptEngine
         return null;
     }
 
-    // Backward compatibility constructor
-    public ScriptEngine()
-        : this(CreateDefaultObjectManager(), CreateDefaultLogger(), CreateDefaultConfig(), CreateDefaultObjectResolver(),
-               CreateDefaultVerbResolver(), CreateDefaultFunctionResolver(), CreateDefaultDbProvider(),
-               CreateDefaultPlayerManager(), CreateDefaultVerbManager(), CreateDefaultRoomManager(), CreateDefaultCompilationCache())
-    {
-    }
-
-    private static IDbProvider CreateDefaultDbProvider()
-    {
-        return DbProvider.Instance;
-    }
-
-    private static IPlayerManager CreateDefaultPlayerManager()
-    {
-        return new PlayerManagerInstance(DbProvider.Instance);
-    }
-
-    private static IVerbManager CreateDefaultVerbManager()
-    {
-        return new VerbManagerInstance(DbProvider.Instance);
-    }
-
-    private static IRoomManager CreateDefaultRoomManager()
-    {
-        var dbProvider = DbProvider.Instance;
-        var logger = new LoggerInstance(Config.Instance);
-        var classManager = new ClassManagerInstance(dbProvider, logger);
-        var objectManager = new ObjectManagerInstance(dbProvider, classManager);
-        return new RoomManagerInstance(dbProvider, logger, objectManager);
-    }
-
-    private static ICompilationCache CreateDefaultCompilationCache()
-    {
-        return new CompilationCache();
-    }
-
-    // Helper methods for backward compatibility
-    private static IObjectManager CreateDefaultObjectManager()
-    {
-        var dbProvider = DbProvider.Instance;
-        var logger = new LoggerInstance(Config.Instance);
-        var classManager = new ClassManagerInstance(dbProvider, logger);
-        return new ObjectManagerInstance(dbProvider, classManager);
-    }
-
-    private static ILogger CreateDefaultLogger()
-    {
-        return new LoggerInstance(Config.Instance);
-    }
-
-    private static IConfig CreateDefaultConfig()
-    {
-        return Config.Instance;
-    }
-
-    private static IObjectResolver CreateDefaultObjectResolver()
-    {
-        var dbProvider = DbProvider.Instance;
-        var config = Config.Instance;
-        var logger = new LoggerInstance(config);
-        var classManager = new ClassManagerInstance(dbProvider, logger);
-        var objectManager = new ObjectManagerInstance(dbProvider, classManager);
-        var coreClassFactory = new CoreClassFactoryInstance(dbProvider, logger);
-        return new ObjectResolverInstance(objectManager, coreClassFactory);
-    }
-
-    private static IVerbResolver CreateDefaultVerbResolver()
-    {
-        var dbProvider = DbProvider.Instance;
-        var logger = new LoggerInstance(Config.Instance);
-        var classManager = new ClassManagerInstance(dbProvider, logger);
-        var objectManager = new ObjectManagerInstance(dbProvider, classManager);
-        return new VerbResolverInstance(dbProvider, objectManager, logger);
-    }
-
-    private static IFunctionResolver CreateDefaultFunctionResolver()
-    {
-        var dbProvider = DbProvider.Instance;
-        var logger = new LoggerInstance(Config.Instance);
-        var classManager = new ClassManagerInstance(dbProvider, logger);
-        var objectManager = new ObjectManagerInstance(dbProvider, classManager);
-        return new FunctionResolverInstance(dbProvider, objectManager);
-    }
 
     /// <summary>
     /// Execute a verb with unified script globals
@@ -398,9 +314,10 @@ public class ScriptEngine
             // check if thisObject has an admin flag
             var isAdmin = (thisObject?.Permissions.Contains("admin") == true);
 
+            var scriptEngineFactory = new ScriptEngineFactory(_objectManager, _logger, _config, _objectResolver, _verbResolver, _functionResolver, _dbProvider, _playerManager, _verbManager, _roomManager, _compilationCache);
             var globals = isAdmin 
-                ? new AdminScriptGlobals(_objectManager, _objectResolver, _verbResolver, _functionResolver, _dbProvider)
-                : new ScriptGlobals(_objectManager, _verbResolver, _functionResolver, _dbProvider);
+                ? new AdminScriptGlobals(_objectManager, _objectResolver, _verbResolver, _functionResolver, _dbProvider, scriptEngineFactory, _logger, _playerManager)
+                : new ScriptGlobals(_objectManager, _objectResolver, _verbResolver, _functionResolver, _dbProvider, scriptEngineFactory, _logger, _playerManager);
 
 
             globals.Player = player; // Always the Database.Player
@@ -623,7 +540,8 @@ public class ScriptEngine
             }
 
             // Create globals for function execution
-            var globals = new ScriptGlobals(_objectManager, _verbResolver, _functionResolver, _dbProvider)
+            var scriptEngineFactory = new ScriptEngineFactory(_objectManager, _logger, _config, _objectResolver, _verbResolver, _functionResolver, _dbProvider, _playerManager, _verbManager, _roomManager, _compilationCache);
+            var globals = new ScriptGlobals(_objectManager, _objectResolver, _verbResolver, _functionResolver, _dbProvider, scriptEngineFactory, _logger, _playerManager)
             {
                 Player = player, // Always the Database.Player
                 This = thisObject ?? CreateNullGameObject(actualThisObjectId),

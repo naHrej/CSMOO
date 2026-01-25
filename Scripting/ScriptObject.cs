@@ -23,6 +23,8 @@ public class ScriptObject : DynamicObject
     private readonly IObjectManager _objectManager;
     private readonly IFunctionResolver _functionResolver;
     private readonly IDbProvider _dbProvider;
+    private readonly IScriptEngineFactory _scriptEngineFactory;
+    private readonly ILogger _logger;
 
     // Primary constructor with DI dependencies
     public ScriptObject(
@@ -32,7 +34,9 @@ public class ScriptObject : DynamicObject
         ScriptHelpers helpers,
         IObjectManager objectManager,
         IFunctionResolver functionResolver,
-        IDbProvider dbProvider)
+        IDbProvider dbProvider,
+        IScriptEngineFactory scriptEngineFactory,
+        ILogger logger)
     {
         _objectId = objectId ?? throw new ArgumentNullException(nameof(objectId));
         _currentPlayer = currentPlayer ?? throw new ArgumentNullException(nameof(currentPlayer));
@@ -41,36 +45,10 @@ public class ScriptObject : DynamicObject
         _objectManager = objectManager ?? throw new ArgumentNullException(nameof(objectManager));
         _functionResolver = functionResolver ?? throw new ArgumentNullException(nameof(functionResolver));
         _dbProvider = dbProvider ?? throw new ArgumentNullException(nameof(dbProvider));
+        _scriptEngineFactory = scriptEngineFactory ?? throw new ArgumentNullException(nameof(scriptEngineFactory));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    // Backward compatibility constructor
-    public ScriptObject(string objectId, Player currentPlayer, CommandProcessor commandProcessor, ScriptHelpers helpers)
-        : this(objectId, currentPlayer, commandProcessor, helpers, 
-               CreateDefaultObjectManager(), CreateDefaultFunctionResolver(), CreateDefaultDbProvider())
-    {
-    }
-
-    private static IObjectManager CreateDefaultObjectManager()
-    {
-        var dbProvider = DbProvider.Instance;
-        var logger = new LoggerInstance(Config.Instance);
-        var classManager = new ClassManagerInstance(dbProvider, logger);
-        return new ObjectManagerInstance(dbProvider, classManager);
-    }
-
-    private static IFunctionResolver CreateDefaultFunctionResolver()
-    {
-        var dbProvider = DbProvider.Instance;
-        var logger = new LoggerInstance(Config.Instance);
-        var classManager = new ClassManagerInstance(dbProvider, logger);
-        var objectManager = new ObjectManagerInstance(dbProvider, classManager);
-        return new FunctionResolverInstance(dbProvider, objectManager);
-    }
-
-    private static IDbProvider CreateDefaultDbProvider()
-    {
-        return DbProvider.Instance;
-    }
 
     /// <summary>
     /// The object ID this wrapper represents
@@ -221,7 +199,7 @@ public class ScriptObject : DynamicObject
         }
 
         // Execute the verb using the unified script engine
-        var scriptEngine = ScriptEngineFactoryStatic.Create();
+        var scriptEngine = _scriptEngineFactory.Create();
         return scriptEngine.ExecuteVerb(verb, input, _currentPlayer, _commandProcessor, _objectId);
     }
 
@@ -240,7 +218,7 @@ public class ScriptObject : DynamicObject
             }
 
             // Execute the function using the unified script engine
-            var functionEngine = ScriptEngineFactoryStatic.Create();
+            var functionEngine = _scriptEngineFactory.Create();
             var result = functionEngine.ExecuteFunction(function, args ?? new object[0], _currentPlayer, _commandProcessor, _objectId);
             return result;
         }
@@ -248,7 +226,7 @@ public class ScriptObject : DynamicObject
         {
             // Just log and re-throw - don't wrap in additional ScriptExecutionException
             // This prevents nested error message chains
-            Logger.Error($"Exception in ScriptObject.CallFunction for {_objectId}.{functionName}: {ex.Message}");
+            _logger.Error($"Exception in ScriptObject.CallFunction for {_objectId}.{functionName}: {ex.Message}");
             throw;
         }
     }

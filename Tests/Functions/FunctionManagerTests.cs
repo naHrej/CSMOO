@@ -84,10 +84,10 @@ public class FunctionManagerTests
     public void FunctionManagerInstance_Requires_Dependencies()
     {
         // Arrange
-        var mockGameDatabase = new Mock<IGameDatabase>();
+        var mockDbProvider = new Mock<IDbProvider>();
         
         // Act
-        var functionManager = new FunctionManagerInstance(mockGameDatabase.Object);
+        var functionManager = new FunctionManagerInstance(mockDbProvider.Object);
         
         // Assert
         Assert.NotNull(functionManager);
@@ -109,8 +109,8 @@ public class FunctionManagerTests
     public void FunctionManager_IsValidFunctionName_Validates_Correctly()
     {
         // Arrange
-        var mockGameDatabase = new Mock<IGameDatabase>();
-        var functionManager = new FunctionManagerInstance(mockGameDatabase.Object);
+        var mockDbProvider = new Mock<IDbProvider>();
+        var functionManager = new FunctionManagerInstance(mockDbProvider.Object);
         
         // Act & Assert
         Assert.True(functionManager.IsValidFunctionName("test"));
@@ -124,8 +124,8 @@ public class FunctionManagerTests
     public void FunctionManager_IsValidParameterType_Validates_Correctly()
     {
         // Arrange
-        var mockGameDatabase = new Mock<IGameDatabase>();
-        var functionManager = new FunctionManagerInstance(mockGameDatabase.Object);
+        var mockDbProvider = new Mock<IDbProvider>();
+        var functionManager = new FunctionManagerInstance(mockDbProvider.Object);
         
         // Act & Assert
         Assert.True(functionManager.IsValidParameterType("string"));
@@ -138,8 +138,8 @@ public class FunctionManagerTests
     public void FunctionManager_IsValidReturnType_Validates_Correctly()
     {
         // Arrange
-        var mockGameDatabase = new Mock<IGameDatabase>();
-        var functionManager = new FunctionManagerInstance(mockGameDatabase.Object);
+        var mockDbProvider = new Mock<IDbProvider>();
+        var functionManager = new FunctionManagerInstance(mockDbProvider.Object);
         
         // Act & Assert
         Assert.True(functionManager.IsValidReturnType("void"));

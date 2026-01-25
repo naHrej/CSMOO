@@ -99,165 +99,11 @@ public class CommandProcessor
         
         if (_player != null)
         {
-            _programmingCommands = new ProgrammingCommands(this, _player, _permissionManager, _verbManager, _functionResolver, _objectManager, _playerManager, _dbProvider, _logger, _roomManager, _functionManager, _scriptPrecompiler, _compilationCache, _hotReloadManager, _coreHotReloadManager, _functionInitializer, _propertyInitializer);
+            _programmingCommands = new ProgrammingCommands(this, _player, _permissionManager, _verbManager, _functionResolver, _objectManager, _playerManager, _dbProvider, _logger, _roomManager, _functionManager, _scriptPrecompiler, _compilationCache, _verbResolver, _hotReloadManager, _coreHotReloadManager, _functionInitializer, _propertyInitializer);
         }
     }
 
-    // Backward compatibility constructor for Telnet
-    public CommandProcessor(Guid sessionGuid, TcpClient client)
-        : this(sessionGuid, new TelnetConnection(sessionGuid, client), 
-               CreateDefaultPlayerManager(), CreateDefaultVerbResolver(), CreateDefaultPermissionManager(), 
-               CreateDefaultObjectManager(), CreateDefaultObjectResolver(), CreateDefaultFunctionResolver(), CreateDefaultDbProvider(), 
-               CreateDefaultLogger(), CreateDefaultRoomManager(), new ScriptEngineFactory(),
-               CreateDefaultVerbManager(), CreateDefaultFunctionManager(), CreateDefaultScriptPrecompiler(), CreateDefaultCompilationCache(), CreateDefaultHotReloadManager(), CreateDefaultCoreHotReloadManager(), CreateDefaultFunctionInitializer(), CreateDefaultPropertyInitializer())
-    {
-    }
 
-    // Backward compatibility constructor for WebSocket
-    public CommandProcessor(Guid sessionGuid, IClientConnection connection)
-        : this(sessionGuid, connection,
-               CreateDefaultPlayerManager(), CreateDefaultVerbResolver(), CreateDefaultPermissionManager(),
-               CreateDefaultObjectManager(), CreateDefaultObjectResolver(), CreateDefaultFunctionResolver(), CreateDefaultDbProvider(),
-               CreateDefaultLogger(), CreateDefaultRoomManager(), new ScriptEngineFactory(),
-               CreateDefaultVerbManager(), CreateDefaultFunctionManager(), CreateDefaultScriptPrecompiler(), CreateDefaultCompilationCache(), CreateDefaultHotReloadManager(), CreateDefaultCoreHotReloadManager(), CreateDefaultFunctionInitializer(), CreateDefaultPropertyInitializer())
-    {
-    }
-
-    private static CSMOO.Core.IObjectResolver CreateDefaultObjectResolver()
-    {
-        var dbProvider = DbProvider.Instance;
-        var config = Config.Instance;
-        var logger = new LoggerInstance(config);
-        var classManager = new ClassManagerInstance(dbProvider, logger);
-        var objectManager = new ObjectManagerInstance(dbProvider, classManager);
-        var coreClassFactory = new CoreClassFactoryInstance(dbProvider, logger);
-        return new CSMOO.Core.ObjectResolverInstance(objectManager, coreClassFactory);
-    }
-
-    // Helper methods for backward compatibility - create default instances
-    private static IPlayerManager CreateDefaultPlayerManager()
-    {
-        return new PlayerManagerInstance(DbProvider.Instance);
-    }
-
-    private static IVerbResolver CreateDefaultVerbResolver()
-    {
-        return new VerbResolverInstance(DbProvider.Instance, CreateDefaultObjectManager(), CreateDefaultLogger());
-    }
-
-    private static IPermissionManager CreateDefaultPermissionManager()
-    {
-        return new PermissionManagerInstance(DbProvider.Instance, CreateDefaultLogger());
-    }
-
-    private static IObjectManager CreateDefaultObjectManager()
-    {
-        var dbProvider = DbProvider.Instance;
-        var logger = new LoggerInstance(Config.Instance);
-        var classManager = new ClassManagerInstance(dbProvider, logger);
-        return new ObjectManagerInstance(dbProvider, classManager);
-    }
-
-    private static IFunctionResolver CreateDefaultFunctionResolver()
-    {
-        return new FunctionResolverInstance(DbProvider.Instance, CreateDefaultObjectManager());
-    }
-
-    private static IDbProvider CreateDefaultDbProvider()
-    {
-        return DbProvider.Instance;
-    }
-
-    private static ILogger CreateDefaultLogger()
-    {
-        return new LoggerInstance(Config.Instance);
-    }
-
-    private static IRoomManager CreateDefaultRoomManager()
-    {
-        return new RoomManagerInstance(DbProvider.Instance, CreateDefaultLogger(), CreateDefaultObjectManager());
-    }
-
-    private static IVerbManager CreateDefaultVerbManager()
-    {
-        return new VerbManagerInstance(DbProvider.Instance);
-    }
-
-    private static IGameDatabase CreateDefaultGameDatabase()
-    {
-        // Legacy method - should use IDatabase via DI instead
-        // For backward compatibility, return a wrapper around DbProvider
-        throw new NotSupportedException("CreateDefaultGameDatabase is no longer supported. Use IDatabase via DI instead.");
-    }
-
-    private static IFunctionManager CreateDefaultFunctionManager()
-    {
-        return new FunctionManagerInstance(DbProvider.Instance);
-    }
-
-    private static IHotReloadManager? CreateDefaultHotReloadManager()
-    {
-        // Create default instance using the same pattern as EnsureInstance
-        var config = Config.Instance;
-        var logger = new LoggerInstance(config);
-        var dbProvider = DbProvider.Instance;
-        var classManager = new ClassManagerInstance(dbProvider, logger);
-        var objectManager = new ObjectManagerInstance(dbProvider, classManager);
-        var playerManager = new PlayerManagerInstance(dbProvider);
-        var verbInitializer = new VerbInitializerInstance(dbProvider, logger, objectManager);
-        var functionManager = CreateDefaultFunctionManager();
-        var functionInitializer = new FunctionInitializerInstance(dbProvider, logger, objectManager, functionManager);
-        return new HotReloadManagerInstance(logger, config, verbInitializer, functionInitializer, playerManager);
-    }
-
-    private static ICoreHotReloadManager? CreateDefaultCoreHotReloadManager()
-    {
-        var logger = new LoggerInstance(Config.Instance);
-        var playerManager = new PlayerManagerInstance(DbProvider.Instance);
-        var permissionManager = new PermissionManagerInstance(DbProvider.Instance, logger);
-        return new CoreHotReloadManagerInstance(logger, playerManager, permissionManager);
-    }
-
-    private static IFunctionInitializer? CreateDefaultFunctionInitializer()
-    {
-        var dbProvider = DbProvider.Instance;
-        var logger = new LoggerInstance(Config.Instance);
-        var classManager = new ClassManagerInstance(dbProvider, logger);
-        var objectManager = new ObjectManagerInstance(dbProvider, classManager);
-        var functionManager = CreateDefaultFunctionManager();
-        return new FunctionInitializerInstance(dbProvider, logger, objectManager, functionManager);
-    }
-
-    private static IPropertyInitializer? CreateDefaultPropertyInitializer()
-    {
-        var dbProvider = DbProvider.Instance;
-        var logger = new LoggerInstance(Config.Instance);
-        var classManager = new ClassManagerInstance(dbProvider, logger);
-        var objectManager = new ObjectManagerInstance(dbProvider, classManager);
-        return new PropertyInitializerInstance(dbProvider, logger, objectManager);
-    }
-
-    private static CSMOO.Scripting.IScriptPrecompiler CreateDefaultScriptPrecompiler()
-    {
-        var dbProvider = DbProvider.Instance;
-        var logger = new LoggerInstance(Config.Instance);
-        var config = Config.Instance;
-        var classManager = new ClassManagerInstance(dbProvider, logger);
-        var objectManager = new ObjectManagerInstance(dbProvider, classManager);
-        var coreClassFactory = new CoreClassFactoryInstance(dbProvider, logger);
-        var objectResolver = new ObjectResolverInstance(objectManager, coreClassFactory);
-        var verbResolver = new VerbResolverInstance(dbProvider, objectManager, logger);
-        var functionResolver = new FunctionResolverInstance(dbProvider, objectManager);
-        var playerManager = new PlayerManagerInstance(dbProvider);
-        var verbManager = new VerbManagerInstance(dbProvider);
-        var roomManager = new RoomManagerInstance(dbProvider, logger, objectManager);
-        return new CSMOO.Scripting.ScriptPrecompiler(objectManager, logger, config, objectResolver, verbResolver, functionResolver, dbProvider, playerManager, verbManager, roomManager);
-    }
-
-    private static CSMOO.Scripting.ICompilationCache CreateDefaultCompilationCache()
-    {
-        return new CSMOO.Scripting.CompilationCache();
-    }
 
     /// <summary>
     /// Processes a command from the player
@@ -358,7 +204,7 @@ public class CommandProcessor
             _player = _playerManager.GetPlayerBySession(_sessionGuid);
             if (_player != null)
             {
-                _programmingCommands = new ProgrammingCommands(this, _player, _permissionManager, _verbManager, _functionResolver, _objectManager, _playerManager, _dbProvider, _logger, _roomManager, _functionManager, _scriptPrecompiler, _compilationCache, _hotReloadManager, _coreHotReloadManager, _functionInitializer, _propertyInitializer);
+                _programmingCommands = new ProgrammingCommands(this, _player, _permissionManager, _verbManager, _functionResolver, _objectManager, _playerManager, _dbProvider, _logger, _roomManager, _functionManager, _scriptPrecompiler, _compilationCache, _verbResolver, _hotReloadManager, _coreHotReloadManager, _functionInitializer, _propertyInitializer);
                 
                 // Log player connection and check for admin flag
                 var hasAdmin = _permissionManager.HasFlag(_player, PermissionManager.Flag.Admin);
@@ -414,7 +260,7 @@ public class CommandProcessor
             // Auto-login the new player
             _playerManager.ConnectPlayerToSession(newPlayer.Id, _sessionGuid);
             _player = newPlayer;
-            _programmingCommands = new ProgrammingCommands(this, _player, _permissionManager, _verbManager, _functionResolver, _objectManager, _playerManager, _dbProvider, _logger, _roomManager, _functionManager, _scriptPrecompiler, _compilationCache, _hotReloadManager, _coreHotReloadManager, _functionInitializer, _propertyInitializer);
+            _programmingCommands = new ProgrammingCommands(this, _player, _permissionManager, _verbManager, _functionResolver, _objectManager, _playerManager, _dbProvider, _logger, _roomManager, _functionManager, _scriptPrecompiler, _compilationCache, _verbResolver, _hotReloadManager, _coreHotReloadManager, _functionInitializer, _propertyInitializer);
             
             // Log player creation and check for admin flag
             var hasAdmin = _permissionManager.HasFlag(_player, PermissionManager.Flag.Admin);
@@ -450,7 +296,7 @@ public class CommandProcessor
                 _player = _playerManager.GetPlayerBySession(_sessionGuid);
                 if (_player != null && _programmingCommands == null)
                 {
-                    _programmingCommands = new ProgrammingCommands(this, _player, _permissionManager, _verbManager, _functionResolver, _objectManager, _playerManager, _dbProvider, _logger, _roomManager, _functionManager, _scriptPrecompiler, _compilationCache, _hotReloadManager, _coreHotReloadManager, _functionInitializer, _propertyInitializer);
+                    _programmingCommands = new ProgrammingCommands(this, _player, _permissionManager, _verbManager, _functionResolver, _objectManager, _playerManager, _dbProvider, _logger, _roomManager, _functionManager, _scriptPrecompiler, _compilationCache, _verbResolver, _hotReloadManager, _coreHotReloadManager, _functionInitializer, _propertyInitializer);
                 }
             }
 

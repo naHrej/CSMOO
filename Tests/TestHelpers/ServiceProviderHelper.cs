@@ -32,7 +32,7 @@ public static class ServiceProviderHelper
     public static ServiceProvider CreateServiceProviderWithMocks(
         Mock<IConfig>? mockConfig = null,
         Mock<ILogger>? mockLogger = null,
-        Mock<IGameDatabase>? mockDatabase = null,
+        Mock<IDatabase>? mockDatabase = null,
         Mock<IDbProvider>? mockDbProvider = null)
     {
         var services = new ServiceCollection();
@@ -81,7 +81,7 @@ public static class ServiceProviderHelper
         {
             services.AddSingleton<IDbProvider>(sp =>
             {
-                var db = sp.GetRequiredService<IGameDatabase>();
+                var db = sp.GetRequiredService<IDatabase>();
                 return new DbProvider(db);
             });
         }
@@ -114,7 +114,7 @@ public static class ServiceProviderHelper
         // DbProvider - singleton
         services.AddSingleton<IDbProvider>(sp =>
         {
-            var db = sp.GetRequiredService<IGameDatabase>();
+            var db = sp.GetRequiredService<IDatabase>();
             return new DbProvider(db);
         });
         
@@ -251,8 +251,8 @@ public static class ServiceProviderHelper
         // FunctionManager - singleton
         services.AddSingleton<IFunctionManager>(sp =>
         {
-            var gameDatabase = sp.GetRequiredService<IGameDatabase>();
-            return new FunctionManagerInstance(gameDatabase);
+            var dbProvider = sp.GetRequiredService<IDbProvider>();
+            return new FunctionManagerInstance(dbProvider);
         });
         
         // VerbResolver - singleton

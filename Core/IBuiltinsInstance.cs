@@ -16,6 +16,7 @@ public interface IBuiltinsInstance
     IPlayerManager PlayerManager { get; }
     IPermissionManager PermissionManager { get; }
     IFunctionResolver FunctionResolver { get; }
+    IVerbResolver VerbResolver { get; }
     IVerbManager VerbManager { get; }
     IRoomManager RoomManager { get; }
     ILogger Logger { get; }

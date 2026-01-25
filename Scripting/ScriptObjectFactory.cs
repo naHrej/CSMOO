@@ -18,6 +18,8 @@ public class ScriptObjectFactory
     private readonly IObjectManager _objectManager;
     private readonly IFunctionResolver _functionResolver;
     private readonly IDbProvider _dbProvider;
+    private readonly IScriptEngineFactory _scriptEngineFactory;
+    private readonly ILogger _logger;
 
     // Primary constructor with DI dependencies
     public ScriptObjectFactory(
@@ -26,7 +28,9 @@ public class ScriptObjectFactory
         ScriptHelpers helpers,
         IObjectManager objectManager,
         IFunctionResolver functionResolver,
-        IDbProvider dbProvider)
+        IDbProvider dbProvider,
+        IScriptEngineFactory scriptEngineFactory,
+        ILogger logger)
     {
         _currentPlayer = currentPlayer ?? throw new ArgumentNullException(nameof(currentPlayer));
         _commandProcessor = commandProcessor ?? throw new ArgumentNullException(nameof(commandProcessor));
@@ -34,36 +38,10 @@ public class ScriptObjectFactory
         _objectManager = objectManager ?? throw new ArgumentNullException(nameof(objectManager));
         _functionResolver = functionResolver ?? throw new ArgumentNullException(nameof(functionResolver));
         _dbProvider = dbProvider ?? throw new ArgumentNullException(nameof(dbProvider));
+        _scriptEngineFactory = scriptEngineFactory ?? throw new ArgumentNullException(nameof(scriptEngineFactory));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    // Backward compatibility constructor
-    public ScriptObjectFactory(Player currentPlayer, CommandProcessor commandProcessor, ScriptHelpers helpers)
-        : this(currentPlayer, commandProcessor, helpers, 
-               CreateDefaultObjectManager(), CreateDefaultFunctionResolver(), CreateDefaultDbProvider())
-    {
-    }
-
-    private static IObjectManager CreateDefaultObjectManager()
-    {
-        var dbProvider = DbProvider.Instance;
-        var logger = new LoggerInstance(Config.Instance);
-        var classManager = new ClassManagerInstance(dbProvider, logger);
-        return new ObjectManagerInstance(dbProvider, classManager);
-    }
-
-    private static IFunctionResolver CreateDefaultFunctionResolver()
-    {
-        var dbProvider = DbProvider.Instance;
-        var logger = new LoggerInstance(Config.Instance);
-        var classManager = new ClassManagerInstance(dbProvider, logger);
-        var objectManager = new ObjectManagerInstance(dbProvider, classManager);
-        return new FunctionResolverInstance(dbProvider, objectManager);
-    }
-
-    private static IDbProvider CreateDefaultDbProvider()
-    {
-        return DbProvider.Instance;
-    }
 
     /// <summary>
     /// Create a ScriptObject for the given object reference
@@ -74,7 +52,7 @@ public class ScriptObjectFactory
         var objectId = _helpers.ResolveObject(objectReference);
         if (objectId == null) return null;
         
-        return new ScriptObject(objectId, _currentPlayer, _commandProcessor, _helpers, _objectManager, _functionResolver, _dbProvider);
+        return new ScriptObject(objectId, _currentPlayer, _commandProcessor, _helpers, _objectManager, _functionResolver, _dbProvider, _scriptEngineFactory, _logger);
     }
 
     /// <summary>
@@ -84,7 +62,7 @@ public class ScriptObjectFactory
     {
         var obj = _objectManager.GetObject(objectId);
         if (obj == null) return null;
-        return new ScriptObject(objectId, _currentPlayer, _commandProcessor, _helpers, _objectManager, _functionResolver, _dbProvider);
+        return new ScriptObject(objectId, _currentPlayer, _commandProcessor, _helpers, _objectManager, _functionResolver, _dbProvider, _scriptEngineFactory, _logger);
     }
 }
 

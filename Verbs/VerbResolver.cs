@@ -42,7 +42,10 @@ public static class VerbResolver
             var dbProvider = DbProvider.Instance;
             var classManager = new ClassManagerInstance(dbProvider, logger);
             var objectManager = new ObjectManagerInstance(dbProvider, classManager);
-            _instance = new VerbResolverInstance(dbProvider, objectManager, logger);
+            // Note: ScriptEngineFactory requires many dependencies - this fallback will fail
+            // In normal operation, VerbResolverInstance should be created via DI
+            // This is a temporary workaround - the static wrapper should not be used
+            throw new InvalidOperationException("VerbResolver static wrapper requires DI. Use VerbResolver.SetInstance() or inject IVerbResolver via DI.");
         }
     }
     

@@ -18,12 +18,14 @@ internal class TelnetServer
     private TcpListener _listener;
     private bool _isRunning;
     private readonly IServiceProvider? _serviceProvider;
+    private readonly ILogger? _logger;
     
     public TelnetServer(int port)
     {
         _listener = new TcpListener(System.Net.IPAddress.Any, port);
         _isRunning = false;
         _serviceProvider = null;
+        _logger = null;
     }
 
     public TelnetServer(int port, IServiceProvider serviceProvider)
@@ -31,6 +33,7 @@ internal class TelnetServer
         _listener = new TcpListener(System.Net.IPAddress.Any, port);
         _isRunning = false;
         _serviceProvider = serviceProvider;
+        _logger = serviceProvider.GetService<ILogger>();
     }
     
     public void Start()
@@ -38,8 +41,11 @@ internal class TelnetServer
         _listener.Start();
         _isRunning = true;
         
-        Logger.DisplaySectionHeader("TELNET SERVER");
-        Logger.Game("Telnet server started...");
+        if (_logger != null)
+        {
+            _logger.DisplaySectionHeader("TELNET SERVER");
+            _logger.Game("Telnet server started...");
+        }
         
         while (_isRunning)
         {
@@ -81,8 +87,7 @@ internal class TelnetServer
         }
         else
         {
-            // Backward compatibility - use static constructor
-            commandProcessor = new CommandProcessor(clientGuid, client);
+            throw new InvalidOperationException("TelnetServer requires ServiceProvider for dependency injection. Backward compatibility constructors have been removed.");
         }
         
         // Send dynamic login banner
@@ -134,7 +139,7 @@ internal class TelnetServer
         }
         catch (Exception ex)
         {
-            Logger.Error($"Client disconnected with error: {ex.Message}");
+            _logger?.Error($"Client disconnected with error: {ex.Message}");
         }
         finally
         {
@@ -147,7 +152,7 @@ internal class TelnetServer
     {
         _isRunning = false;
         _listener.Stop();
-        Logger.Game("Telnet server stopped.");
+        _logger?.Game("Telnet server stopped.");
     }
 }
 

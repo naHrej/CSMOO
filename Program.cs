@@ -71,7 +71,8 @@ internal class Program
             var sessionHandler = serviceProvider.GetRequiredService<ISessionHandler>();
             SessionHandler.SetInstance(sessionHandler);
             
-            // Set Logger static instance (used by ServerInitializer and other components)
+            // Set Logger static instance (used by static classes: Html, CodeDefinitionParser, Config, and data class: Container)
+            // These are acceptable exceptions - static classes and data classes can't use DI
             Logger.SetInstance(logger);
             
             // Set RoomManager static instance (used by ServerInitializer)
@@ -82,13 +83,15 @@ internal class Program
             var permissionManager = serviceProvider.GetRequiredService<IPermissionManager>();
             PermissionManager.SetInstance(permissionManager);
             
-            // Set ObjectResolver static instance (used by System.cs verbs: Look, Examine, Get, Drop)
+            // Set ObjectResolver static instance (used by GameObject data class)
             var objectResolver = serviceProvider.GetRequiredService<IObjectResolver>();
             ObjectResolver.SetInstance(objectResolver);
             
-            // Set VerbResolver static instance (used by @verbs command)
-            var verbResolver = serviceProvider.GetRequiredService<IVerbResolver>();
-            VerbResolver.SetInstance(verbResolver);
+            // Set Builtins static instance (used by scripts via Builtins static methods)
+            var builtinsInstance = serviceProvider.GetRequiredService<CSMOO.Core.IBuiltinsInstance>();
+            CSMOO.Core.Builtins.SetInstance(builtinsInstance);
+            
+            // VerbResolver no longer uses static wrapper - use DI instead
             
             // GameDatabase static instance removed - use IDatabase via DI
             // If @cleanup command needs it, update to use IDatabase
@@ -387,7 +390,8 @@ internal class Program
             var dbProvider = sp.GetRequiredService<IDbProvider>();
             var objectManager = sp.GetRequiredService<IObjectManager>();
             var logger = sp.GetRequiredService<ILogger>();
-            return new VerbResolverInstance(dbProvider, objectManager, logger);
+            // Use factory function to break circular dependency - IScriptEngineFactory will be resolved lazily
+            return new VerbResolverInstance(dbProvider, objectManager, logger, () => sp.GetRequiredService<IScriptEngineFactory>());
         });
         
         // ObjectResolver - singleton (one object resolver instance for the entire application)
@@ -414,6 +418,33 @@ internal class Program
         
         // CompilationCache - singleton (one cache instance for the entire application)
         services.AddSingleton<CSMOO.Scripting.ICompilationCache>(sp => new CSMOO.Scripting.CompilationCache());
+        
+        // BuiltinsInstance - singleton (one builtins instance for the entire application)
+        services.AddSingleton<CSMOO.Core.IBuiltinsInstance>(sp =>
+        {
+            // Force InstanceManager to be created first to ensure it's set on ObjectManager
+            var _ = sp.GetRequiredService<IInstanceManager>();
+            
+            var objectManager = sp.GetRequiredService<IObjectManager>();
+            var playerManager = sp.GetRequiredService<IPlayerManager>();
+            var permissionManager = sp.GetRequiredService<IPermissionManager>();
+            var functionResolver = sp.GetRequiredService<IFunctionResolver>();
+            var verbResolver = sp.GetRequiredService<IVerbResolver>();
+            var verbManager = sp.GetRequiredService<IVerbManager>();
+            var roomManager = sp.GetRequiredService<IRoomManager>();
+            var logger = sp.GetRequiredService<ILogger>();
+            var scriptEngineFactory = sp.GetRequiredService<IScriptEngineFactory>();
+            return new CSMOO.Core.BuiltinsInstance(
+                objectManager,
+                playerManager,
+                permissionManager,
+                functionResolver,
+                verbResolver,
+                verbManager,
+                roomManager,
+                logger,
+                scriptEngineFactory);
+        });
         
         // ScriptPrecompiler - singleton (one precompiler instance for the entire application)
         services.AddSingleton<CSMOO.Scripting.IScriptPrecompiler>(sp =>

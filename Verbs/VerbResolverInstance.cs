@@ -19,12 +19,14 @@ public class VerbResolverInstance : IVerbResolver
     private readonly IDbProvider _dbProvider;
     private readonly IObjectManager _objectManager;
     private readonly ILogger _logger;
+    private readonly Func<IScriptEngineFactory> _scriptEngineFactoryFactory;
     
-    public VerbResolverInstance(IDbProvider dbProvider, IObjectManager objectManager, ILogger logger)
+    public VerbResolverInstance(IDbProvider dbProvider, IObjectManager objectManager, ILogger logger, Func<IScriptEngineFactory> scriptEngineFactoryFactory)
     {
         _dbProvider = dbProvider;
         _objectManager = objectManager;
         _logger = logger;
+        _scriptEngineFactoryFactory = scriptEngineFactoryFactory ?? throw new ArgumentNullException(nameof(scriptEngineFactoryFactory));
     }
     
     /// <summary>
@@ -571,7 +573,7 @@ public class VerbResolverInstance : IVerbResolver
     {
         try
         {
-            var scriptEngine = new ScriptEngine();
+            var scriptEngine = _scriptEngineFactoryFactory().Create();
             var result = scriptEngine.ExecuteVerbWithResult(verb, input, player, commandProcessor, thisObjectId, variables);
             return result.success;
         }

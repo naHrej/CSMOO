@@ -55,7 +55,7 @@ public static class ObjectSystemExample
         Logger.Info($"\nFound {allWeapons.Count} weapon(s) in the world (including subclasses)");
 
         // Create a room and place the sword there
-        var startingRoom = WorldManager.GetStartingRoom();
+        var startingRoom = RoomManager.GetStartingRoom();
         if (startingRoom != null)
         {
             ObjectManager.MoveObject(sword.Id, startingRoom.Id);

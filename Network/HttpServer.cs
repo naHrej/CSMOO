@@ -45,30 +45,6 @@ public class HttpServer
         _listener.Prefixes.Add(prefix);
     }
 
-    // Backward compatibility constructor
-    public HttpServer()
-        : this(CreateDefaultConfig(), CreateDefaultLogger(), CreateDefaultObjectManager())
-    {
-    }
-
-    // Helper methods for backward compatibility
-    private static IConfig CreateDefaultConfig()
-    {
-        return Config.Instance;
-    }
-
-    private static ILogger CreateDefaultLogger()
-    {
-        return new LoggerInstance(Config.Instance);
-    }
-
-    private static IObjectManager CreateDefaultObjectManager()
-    {
-        var dbProvider = DbProvider.Instance;
-        var logger = new LoggerInstance(Config.Instance);
-        var classManager = new ClassManagerInstance(dbProvider, logger);
-        return new ObjectManagerInstance(dbProvider, classManager);
-    }
 
     public async Task StartAsync()
     {
