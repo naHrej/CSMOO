@@ -90,12 +90,8 @@ internal class Program
             var verbResolver = serviceProvider.GetRequiredService<IVerbResolver>();
             VerbResolver.SetInstance(verbResolver);
             
-            // Set GameDatabase static instance (used by @cleanup command)
-            var gameDatabase = serviceProvider.GetRequiredService<IGameDatabase>();
-            if (gameDatabase is GameDatabase gdb)
-            {
-                GameDatabase.SetInstance(gdb);
-            }
+            // GameDatabase static instance removed - use IDatabase via DI
+            // If @cleanup command needs it, update to use IDatabase
             
             // Initialize logging system (sets up log rotation and directories)
             logger.Initialize();
@@ -168,17 +164,16 @@ internal class Program
         });
         
         // Database - singleton (one database connection for the entire application)
-        services.AddSingleton<IGameDatabase>(sp =>
+        services.AddSingleton<IDatabase>(sp =>
         {
             var config = sp.GetRequiredService<IConfig>();
-            return new GameDatabase(config.Database.GameDataFile);
+            return new Database.Implementations.LiteDbDatabase(config.Database.GameDataFile);
         });
         
         // DbProvider - singleton (one provider instance for the entire application)
-        // Note: ObjectManager will be set later to resolve circular dependency
         services.AddSingleton<IDbProvider>(sp =>
         {
-            var db = sp.GetRequiredService<IGameDatabase>();
+            var db = sp.GetRequiredService<IDatabase>();
             return new DbProvider(db);
         });
         
@@ -207,13 +202,8 @@ internal class Program
             var classManager = sp.GetRequiredService<IClassManager>();
             var objectManager = new ObjectManagerInstance(dbProvider, classManager);
             
-            // Set the object manager in DbProvider to resolve circular dependency
-            if (dbProvider is DbProvider dbp)
-            {
-                dbp.SetObjectManager(objectManager);
-            }
-            
-            // Set the object manager in PlayerManager to resolve circular dependency
+            // Circular dependency resolved - DbProvider no longer needs ObjectManager
+            // Set the object manager in PlayerManager (for GetOnlinePlayers, etc.)
             var playerManager = sp.GetRequiredService<IPlayerManager>();
             if (playerManager is PlayerManagerInstance pmi)
             {
@@ -384,8 +374,8 @@ internal class Program
         // FunctionManager - singleton (one function manager instance for the entire application)
         services.AddSingleton<IFunctionManager>(sp =>
         {
-            var gameDatabase = sp.GetRequiredService<IGameDatabase>();
-            return new FunctionManagerInstance(gameDatabase);
+            var dbProvider = sp.GetRequiredService<IDbProvider>();
+            return new FunctionManagerInstance(dbProvider);
         });
         
         // VerbResolver - singleton (one verb resolver instance for the entire application)

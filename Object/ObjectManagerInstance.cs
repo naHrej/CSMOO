@@ -89,13 +89,14 @@ public class ObjectManagerInstance : IObjectManager
     }
     
     // Cache Management
+    /// <summary>
+    /// Load all objects into cache (lazy loading - no-op, objects load on demand)
+    /// </summary>
     public void LoadAllObjectsToCache()
     {
-        var allObjects = _dbProvider.FindAll<GameObject>("gameobjects");
-        foreach (var obj in allObjects)
-        {
-            CacheGameObject(obj);
-        }
+        // NO-OP: Lazy loading - objects load on demand when accessed
+        // This method is kept for backward compatibility but does nothing
+        // Objects will be cached automatically when accessed via GetObject()
     }
 
     public void LoadAllObjectClassesToCache()

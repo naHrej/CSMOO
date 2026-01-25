@@ -65,7 +65,6 @@ internal class TelnetServer
             var objectManager = _serviceProvider.GetRequiredService<IObjectManager>();
             var functionResolver = _serviceProvider.GetRequiredService<IFunctionResolver>();
             var dbProvider = _serviceProvider.GetRequiredService<IDbProvider>();
-            var gameDatabase = _serviceProvider.GetRequiredService<IGameDatabase>();
             var logger = _serviceProvider.GetRequiredService<ILogger>();
             var roomManager = _serviceProvider.GetRequiredService<IRoomManager>();
             var scriptEngineFactory = _serviceProvider.GetRequiredService<IScriptEngineFactory>();
@@ -78,7 +77,7 @@ internal class TelnetServer
             var propertyInitializer = _serviceProvider.GetService<IPropertyInitializer>();
             var scriptPrecompiler = _serviceProvider.GetRequiredService<CSMOO.Scripting.IScriptPrecompiler>();
             var compilationCache = _serviceProvider.GetRequiredService<CSMOO.Scripting.ICompilationCache>();
-            commandProcessor = new CommandProcessor(clientGuid, connection, playerManager, verbResolver, permissionManager, objectManager, objectResolver, functionResolver, dbProvider, gameDatabase, logger, roomManager, scriptEngineFactory, verbManager, functionManager, scriptPrecompiler, compilationCache, hotReloadManager, coreHotReloadManager, functionInitializer, propertyInitializer);
+            commandProcessor = new CommandProcessor(clientGuid, connection, playerManager, verbResolver, permissionManager, objectManager, objectResolver, functionResolver, dbProvider, logger, roomManager, scriptEngineFactory, verbManager, functionManager, scriptPrecompiler, compilationCache, hotReloadManager, coreHotReloadManager, functionInitializer, propertyInitializer);
         }
         else
         {

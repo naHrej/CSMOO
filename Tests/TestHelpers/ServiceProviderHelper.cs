@@ -62,14 +62,14 @@ public static class ServiceProviderHelper
         
         if (mockDatabase != null)
         {
-            services.AddSingleton<IGameDatabase>(mockDatabase.Object);
+            services.AddSingleton<IDatabase>(mockDatabase.Object);
         }
         else
         {
-            services.AddSingleton<IGameDatabase>(sp =>
+            services.AddSingleton<IDatabase>(sp =>
             {
                 var config = sp.GetRequiredService<IConfig>();
-                return new GameDatabase(config.Database.GameDataFile);
+                return new Database.Implementations.LiteDbDatabase(config.Database.GameDataFile);
             });
         }
         
@@ -105,10 +105,10 @@ public static class ServiceProviderHelper
         });
         
         // Database - singleton
-        services.AddSingleton<IGameDatabase>(sp =>
+        services.AddSingleton<IDatabase>(sp =>
         {
             var config = sp.GetRequiredService<IConfig>();
-            return new GameDatabase(config.Database.GameDataFile);
+            return new Database.Implementations.LiteDbDatabase(config.Database.GameDataFile);
         });
         
         // DbProvider - singleton

@@ -41,8 +41,7 @@ public static class HotReloadManager
             var objectManager = new ObjectManagerInstance(dbProvider, classManager);
             var playerManager = new PlayerManagerInstance(dbProvider);
             var verbInitializer = new VerbInitializerInstance(dbProvider, logger, objectManager);
-            var gameDatabase = GameDatabase.Instance;
-            var functionManager = new FunctionManagerInstance(gameDatabase);
+            var functionManager = new FunctionManagerInstance(dbProvider);
             var functionInitializer = new FunctionInitializerInstance(dbProvider, logger, objectManager, functionManager);
             _instance = new HotReloadManagerInstance(logger, config, verbInitializer, functionInitializer, playerManager);
         }

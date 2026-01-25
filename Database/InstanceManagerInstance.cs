@@ -151,7 +151,7 @@ public class InstanceManagerInstance : IInstanceManager
         {
             return _dbProvider.Find<GameObject>("gameobjects", obj => obj.Location == null).ToList();
         }
-        return _dbProvider.Find<GameObject>("gameobjects", obj => obj.Location?.Id == locationId).ToList();
+        return _dbProvider.Find<GameObject>("gameobjects", obj => obj.Location != null && obj.Location.Id == locationId).ToList();
     }
     
     /// <summary>
@@ -163,7 +163,7 @@ public class InstanceManagerInstance : IInstanceManager
         {
             return _dbProvider.Find<GameObject>("gameobjects", obj => obj.Location == null).ToList();
         }
-        return _dbProvider.Find<GameObject>("gameobjects", obj => obj.Location?.Id == location.Id).ToList();
+        return _dbProvider.Find<GameObject>("gameobjects", obj => obj.Location != null && obj.Location.Id == location.Id).ToList();
     }
     
     /// <summary>

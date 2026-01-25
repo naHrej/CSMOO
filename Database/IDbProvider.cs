@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using CSMOO.Functions;
 using CSMOO.Object;
 
@@ -37,12 +38,12 @@ public interface IDbProvider
     /// <summary>
     /// Generic FindOne
     /// </summary>
-    T? FindOne<T>(string collectionName, Func<T, bool> predicate);
+    T? FindOne<T>(string collectionName, Expression<Func<T, bool>> predicate);
     
     /// <summary>
     /// Generic Find (with predicate)
     /// </summary>
-    IEnumerable<T> Find<T>(string collectionName, Func<T, bool> predicate);
+    IEnumerable<T> Find<T>(string collectionName, Expression<Func<T, bool>> predicate);
     
     /// <summary>
     /// Find all verbs for an object

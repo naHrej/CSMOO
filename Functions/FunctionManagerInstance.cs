@@ -1,4 +1,3 @@
-using LiteDB;
 using CSMOO.Database;
 using CSMOO.Object;
 using System.Collections.Generic;
@@ -11,11 +10,11 @@ namespace CSMOO.Functions;
 /// </summary>
 public class FunctionManagerInstance : IFunctionManager
 {
-    private readonly IGameDatabase _gameDatabase;
+    private readonly IDbProvider _dbProvider;
     
-    public FunctionManagerInstance(IGameDatabase gameDatabase)
+    public FunctionManagerInstance(IDbProvider dbProvider)
     {
-        _gameDatabase = gameDatabase;
+        _dbProvider = dbProvider;
     }
     
     /// <summary>
@@ -36,8 +35,7 @@ public class FunctionManagerInstance : IFunctionManager
             ModifiedAt = DateTime.UtcNow
         };
 
-        var functionCollection = _gameDatabase.GetCollection<Function>("functions");
-        functionCollection.Insert(function);
+        _dbProvider.Insert("functions", function);
 
         return function;
     }
@@ -48,10 +46,7 @@ public class FunctionManagerInstance : IFunctionManager
     public bool UpdateFunction(Function function)
     {
         function.ModifiedAt = DateTime.UtcNow;
-        var functionCollection = _gameDatabase.GetCollection<Function>("functions");
-        var result = functionCollection.Update(function);
-        
-        return result;
+        return _dbProvider.Update("functions", function);
     }
 
     /// <summary>
@@ -59,14 +54,11 @@ public class FunctionManagerInstance : IFunctionManager
     /// </summary>
     public bool DeleteFunction(string functionId)
     {
-        var functionCollection = _gameDatabase.GetCollection<Function>("functions");
-        var function = functionCollection.FindById(functionId);
+        var function = _dbProvider.FindById<Function>("functions", functionId);
         
         if (function == null) return false;
         
-        var result = functionCollection.Delete(functionId);
-        
-        return result;
+        return _dbProvider.Delete<Function>("functions", functionId);
     }
 
     /// <summary>
@@ -74,12 +66,11 @@ public class FunctionManagerInstance : IFunctionManager
     /// </summary>
     public int DeleteFunctionsOnObject(string objectId)
     {
-        var functionCollection = _gameDatabase.GetCollection<Function>("functions");
-        var functions = functionCollection.Find(f => f.ObjectId == objectId).ToList();
+        var functions = _dbProvider.Find<Function>("functions", f => f.ObjectId == objectId).ToList();
         
         foreach (var function in functions)
         {
-            functionCollection.Delete(function.Id);
+            _dbProvider.Delete<Function>("functions", function.Id);
         }
         
         return functions.Count;
@@ -90,8 +81,7 @@ public class FunctionManagerInstance : IFunctionManager
     /// </summary>
     public Function? GetFunction(string functionId)
     {
-        var functionCollection = _gameDatabase.GetCollection<Function>("functions");
-        return functionCollection.FindById(functionId);
+        return _dbProvider.FindById<Function>("functions", functionId);
     }
 
     /// <summary>
@@ -99,8 +89,7 @@ public class FunctionManagerInstance : IFunctionManager
     /// </summary>
     public Function? FindFunction(string objectId, string functionName)
     {
-        var functionCollection = _gameDatabase.GetCollection<Function>("functions");
-        return functionCollection.FindOne(f => f.ObjectId == objectId && f.Name.Equals(functionName, StringComparison.OrdinalIgnoreCase));
+        return _dbProvider.FindOne<Function>("functions", f => f.ObjectId == objectId && f.Name.Equals(functionName, StringComparison.OrdinalIgnoreCase));
     }
 
     /// <summary>
@@ -108,8 +97,7 @@ public class FunctionManagerInstance : IFunctionManager
     /// </summary>
     public List<Function> GetFunctionsOnObject(string objectId)
     {
-        var functionCollection = _gameDatabase.GetCollection<Function>("functions");
-        return functionCollection.Find(f => f.ObjectId == objectId).ToList();
+        return _dbProvider.Find<Function>("functions", f => f.ObjectId == objectId).ToList();
     }
 
     /// <summary>
@@ -117,8 +105,7 @@ public class FunctionManagerInstance : IFunctionManager
     /// </summary>
     public List<Function> GetFunctionsByCreator(string createdBy)
     {
-        var functionCollection = _gameDatabase.GetCollection<Function>("functions");
-        return functionCollection.Find(f => f.CreatedBy == createdBy).ToList();
+        return _dbProvider.Find<Function>("functions", f => f.CreatedBy == createdBy).ToList();
     }
 
     /// <summary>
@@ -173,8 +160,7 @@ public class FunctionManagerInstance : IFunctionManager
     /// </summary>
     public Dictionary<string, int> GetFunctionStatistics()
     {
-        var functionCollection = _gameDatabase.GetCollection<Function>("functions");
-        var allFunctions = functionCollection.FindAll().ToList();
+        var allFunctions = _dbProvider.FindAll<Function>("functions").ToList();
 
         var stats = new Dictionary<string, int>
         {
@@ -230,7 +216,6 @@ public class FunctionManagerInstance : IFunctionManager
     /// </summary>
     public List<Function> GetAllFunctions()
     {
-        var functionCollection = _gameDatabase.GetCollection<Function>("functions");
-        return functionCollection.FindAll().ToList();
+        return _dbProvider.FindAll<Function>("functions").ToList();
     }
 }

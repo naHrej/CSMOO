@@ -1,5 +1,6 @@
 using CSMOO.Functions;
 using CSMOO.Object;
+using System.Linq.Expressions;
 
 namespace CSMOO.Database;
 
@@ -11,10 +12,9 @@ public class DbProvider : IDbProvider
 {
     private static DbProvider? _instance;
     public static DbProvider Instance => _instance ?? throw new InvalidOperationException("DbProvider instance not set. Call DbProvider.SetInstance() first.");
-    private readonly IGameDatabase _db;
-    private IObjectManager? _objectManager;
+    private readonly IDatabase _db;
     
-    public DbProvider(IGameDatabase db)
+    public DbProvider(IDatabase db)
     {
         _db = db;
     }
@@ -25,14 +25,6 @@ public class DbProvider : IDbProvider
     public static void SetInstance(DbProvider instance)
     {
         _instance = instance;
-    }
-    
-    /// <summary>
-    /// Sets the object manager (used to resolve circular dependency)
-    /// </summary>
-    public void SetObjectManager(IObjectManager objectManager)
-    {
-        _objectManager = objectManager;
     }
     
     // Expose: find all verbs for an object
@@ -62,86 +54,31 @@ public class DbProvider : IDbProvider
     // Generic FindAll
     public IEnumerable<T> FindAll<T>(string collectionName)
     {
-        var results = GetCollection<T>(collectionName).FindAll();
-        // If T is GameObject, update the singleton cache
-        if (typeof(T) == typeof(GameObject))
-        {
-            var list = new List<T>();
-            foreach (var obj in results)
-            {
-                var go = obj as GameObject;
-                if (go != null)
-                {
-                    if (_objectManager != null)
-                    {
-                        _objectManager.CacheGameObject(go);
-                    }
-                    list.Add(obj);
-                }
-            }
-            return list;
-        }
-        return results;
+        return GetCollection<T>(collectionName).FindAll();
     }
 
     // Generic Find (with predicate)
-    public IEnumerable<T> Find<T>(string collectionName, Func<T, bool> predicate)
+    public IEnumerable<T> Find<T>(string collectionName, Expression<Func<T, bool>> predicate)
     {
-        var results = GetCollection<T>(collectionName).Find(predicate);
-        if (typeof(T) == typeof(GameObject))
-        {
-            var list = new List<T>();
-            foreach (var obj in results)
-            {
-                var go = obj as GameObject;
-                if (go != null)
-                {
-                    if (_objectManager != null)
-                    {
-                        _objectManager.CacheGameObject(go);
-                    }
-                    list.Add(obj);
-                }
-            }
-            return list;
-        }
-        return results;
+        return GetCollection<T>(collectionName).Find(predicate);
     }
 
     // Generic FindOne
-    public T? FindOne<T>(string collectionName, Func<T, bool> predicate)
+    public T? FindOne<T>(string collectionName, Expression<Func<T, bool>> predicate)
     {
-        var result = GetCollection<T>(collectionName).FindOne(predicate);
-        if (typeof(T) == typeof(GameObject) && result is GameObject go)
-        {
-            if (_objectManager != null)
-            {
-                var cached = _objectManager.CacheGameObject(go);
-                return cached is T t ? t : default;
-            }
-        }
-        return result;
+        return GetCollection<T>(collectionName).FindOne(predicate);
     }
 
     // Generic FindById
     public T? FindById<T>(string collectionName, string id)
     {
-        var result = GetCollection<T>(collectionName).FindById(id);
-        if (typeof(T) == typeof(GameObject) && result is GameObject go)
-        {
-            if (_objectManager != null)
-            {
-                var cached = _objectManager.CacheGameObject(go);
-                return cached is T t ? t : default;
-            }
-        }
-        return result;
+        return GetCollection<T>(collectionName).FindById(id);
     }
 
-    // Helper to get the collection from GameDatabase (now private)
-    private IDbCollection<T> GetCollection<T>(string collectionName)
+    // Helper to get the collection from IDatabase
+    private ICollection<T> GetCollection<T>(string collectionName)
     {
-        return new LiteCollectionAdapter<T>(_db.GetCollection<T>(collectionName));
+        return _db.GetCollection<T>(collectionName);
     }
 
     // Expose only what FunctionResolver needs: find all functions for an object

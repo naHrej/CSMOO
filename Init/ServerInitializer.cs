@@ -29,7 +29,8 @@ public static class ServerInitializer
         {
             // Initialize the database connection
             Logger.Info("Setting up database...");
-            var db = GameDatabase.Instance; // This creates the singleton instance
+            // Database is initialized via DI in production - this static method is for backward compatibility only
+            var db = DbProvider.Instance; // Use DbProvider instead of GameDatabase
             
             // Initialize the world structure
             Logger.Info("Initializing world...");
@@ -61,7 +62,7 @@ public static class ServerInitializer
     public static void Initialize(IServiceProvider serviceProvider)
     {
         var logger = serviceProvider.GetRequiredService<ILogger>();
-        var database = serviceProvider.GetRequiredService<IGameDatabase>();
+        var database = serviceProvider.GetRequiredService<IDatabase>();
         var dbProvider = serviceProvider.GetRequiredService<IDbProvider>();
         var playerManager = serviceProvider.GetRequiredService<IPlayerManager>();
         var objectManager = serviceProvider.GetRequiredService<IObjectManager>();
@@ -86,8 +87,8 @@ public static class ServerInitializer
             logger.Info("Initializing world...");
             worldInitializer.InitializeWorld();
 
-            // Load all GameObjects into the singleton cache
-            objectManager.LoadAllObjectsToCache();
+            // Lazy loading: Objects load on demand, no eager loading
+            // objectManager.LoadAllObjectsToCache(); // Removed - lazy loading
             
             // Create a test admin player if none exists
             CreateDefaultAdminIfNeeded(playerManager, objectManager, permissionManager);
@@ -301,7 +302,7 @@ public static class ServerInitializer
     public static void Shutdown(IServiceProvider? serviceProvider)
     {
         var logger = serviceProvider?.GetService<ILogger>();
-        var database = serviceProvider?.GetService<IGameDatabase>();
+        var database = serviceProvider?.GetService<IDatabase>();
         
         // Use injected logger if available, otherwise fall back to static
         if (logger != null)
@@ -361,7 +362,8 @@ public static class ServerInitializer
         }
         else
         {
-            GameDatabase.Instance.Dispose();
+            // Database disposal handled by DI container
+            // No need to dispose static instance
         }
         
         if (logger != null)

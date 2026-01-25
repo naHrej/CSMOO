@@ -5,22 +5,14 @@ using CSMOO.Functions;
 
 namespace CSMOO.Database;
 
+/// <summary>
+/// Legacy GameDatabase class - kept for backward compatibility
+/// New code should use IDatabase and LiteDbDatabase
+/// </summary>
+[Obsolete("Use IDatabase and LiteDbDatabase instead. This class is kept for backward compatibility only.")]
 public class GameDatabase : IGameDatabase
 {
     private readonly LiteDatabase _database;
-    private static GameDatabase? _instance;
-    private static readonly object _lock = new object();
-
-    /// <summary>
-    /// Sets the static instance for backward compatibility
-    /// </summary>
-    public static void SetInstance(GameDatabase instance)
-    {
-        lock (_lock)
-        {
-            _instance = instance;
-        }
-    }
 
     public GameDatabase(string connectionString)
     {
@@ -50,17 +42,6 @@ public class GameDatabase : IGameDatabase
         var functions = _database.GetCollection<GameFunction>("functions");
         functions.EnsureIndex(x => x.Id);
         functions.EnsureIndex(x => x.Name);
-    }
-
-    public static GameDatabase Instance
-    {
-        get
-        {
-            lock (_lock)
-            {
-                return _instance ??= new GameDatabase(Config.Instance.Database.GameDataFile);
-            }
-        }
     }
 
     // All direct collection access is now private; use DbProvider for all DB access.

@@ -24,7 +24,6 @@ public class ProgrammingCommands
     private readonly IObjectManager _objectManager;
     private readonly IPlayerManager _playerManager;
     private readonly IDbProvider _dbProvider;
-    private readonly IGameDatabase _gameDatabase;
     private readonly ILogger _logger;
     private readonly IRoomManager _roomManager;
     private readonly IHotReloadManager? _hotReloadManager;
@@ -51,7 +50,6 @@ public class ProgrammingCommands
         IObjectManager objectManager,
         IPlayerManager playerManager,
         IDbProvider dbProvider,
-        IGameDatabase gameDatabase,
         ILogger logger,
         IRoomManager roomManager,
         IFunctionManager functionManager,
@@ -70,7 +68,6 @@ public class ProgrammingCommands
         _objectManager = objectManager ?? throw new ArgumentNullException(nameof(objectManager));
         _playerManager = playerManager ?? throw new ArgumentNullException(nameof(playerManager));
         _dbProvider = dbProvider ?? throw new ArgumentNullException(nameof(dbProvider));
-        _gameDatabase = gameDatabase ?? throw new ArgumentNullException(nameof(gameDatabase));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _roomManager = roomManager ?? throw new ArgumentNullException(nameof(roomManager));
         _functionManager = functionManager ?? throw new ArgumentNullException(nameof(functionManager));
@@ -87,7 +84,7 @@ public class ProgrammingCommands
         : this(commandProcessor, player,
                CreateDefaultPermissionManager(), CreateDefaultVerbManager(), CreateDefaultFunctionResolver(),
                CreateDefaultObjectManager(), CreateDefaultPlayerManager(), CreateDefaultDbProvider(),
-               CreateDefaultGameDatabase(), CreateDefaultLogger(), CreateDefaultRoomManager(), CreateDefaultFunctionManager(),
+               CreateDefaultLogger(), CreateDefaultRoomManager(), CreateDefaultFunctionManager(),
                CreateDefaultScriptPrecompiler(), CreateDefaultCompilationCache(),
                CreateDefaultHotReloadManager(), CreateDefaultCoreHotReloadManager(),
                CreateDefaultFunctionInitializer(), CreateDefaultPropertyInitializer())
@@ -128,10 +125,6 @@ public class ProgrammingCommands
         return DbProvider.Instance;
     }
 
-    private static IGameDatabase CreateDefaultGameDatabase()
-    {
-        return GameDatabase.Instance;
-    }
 
     private static ILogger CreateDefaultLogger()
     {
@@ -145,7 +138,7 @@ public class ProgrammingCommands
 
     private static IFunctionManager CreateDefaultFunctionManager()
     {
-        return new FunctionManagerInstance(new GameDatabase(Config.Instance.Database.GameDataFile));
+        return new FunctionManagerInstance(DbProvider.Instance);
     }
 
     private static IHotReloadManager? CreateDefaultHotReloadManager()
@@ -388,8 +381,7 @@ public class ProgrammingCommands
     private bool HandleProgramFunction(string functionId)
     {
         // Find the function
-        var functions = _gameDatabase.GetCollection<Function>("functions");
-        var function = functions.FindById(functionId);
+        var function = _dbProvider.FindById<Function>("functions", functionId);
         
         if (function == null)
         {
@@ -755,9 +747,8 @@ public class ProgrammingCommands
         var verb = _verbManager.CreateVerb(objectId, verbName, pattern, "", _player.Name);
         if (!string.IsNullOrEmpty(aliases))
         {
-            var verbCollection = _gameDatabase.GetCollection<Verb>("verbs");
             verb.Aliases = aliases;
-            verbCollection.Update(verb);
+            _dbProvider.Update("verbs", verb);
         }
 
         _commandProcessor.SendToPlayer($"Created verb '{verbName}' on {GetObjectName(objectId)}.");
@@ -1685,8 +1676,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
             return true;
         }
 
-        var verbCollection = GameDatabase.Instance.GetCollection<Verb>("verbs");
-        var allVerbs = verbCollection.Find(v => v.ObjectId == objectId).ToList();
+        var allVerbs = _dbProvider.Find<Verb>("verbs", v => v.ObjectId == objectId).ToList();
 
         // Group verbs by name to find duplicates
         var verbGroups = allVerbs.GroupBy(v => v.Name?.ToLower() ?? "").Where(g => g.Count() > 1).ToList();
@@ -1706,7 +1696,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
                 foreach (var emptyVerb in emptyVerbs)
                 {
                     _commandProcessor.SendToPlayer($"  Removing empty verb: {emptyVerb.Id}");
-                    verbCollection.Delete(emptyVerb.Id);
+                    _dbProvider.Delete<Verb>("verbs", emptyVerb.Id);
                     removedCount++;
                 }
             }
@@ -1717,7 +1707,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
                 foreach (var verb in verbsToRemove)
                 {
                     _commandProcessor.SendToPlayer($"  Removing duplicate empty verb: {verb.Id}");
-                    verbCollection.Delete(verb.Id);
+                    _dbProvider.Delete<Verb>("verbs", verb.Id);
                     removedCount++;
                 }
             }
@@ -2363,8 +2353,8 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
             existingFunction.AccessModifiers = permissions;
             existingFunction.ModifiedAt = DateTime.UtcNow;
 
-            var functionsCollection = _gameDatabase.GetCollection<Function>("functions");
-            functionsCollection.Update(existingFunction);
+            // Update function via function manager
+            _functionManager.UpdateFunction(existingFunction);
 
             var updateParamString = string.Join(", ", parameterTypes.Zip(parameterNames, (type, name) => $"{type} {name}"));
             _commandProcessor.SendToPlayer($"Updated {permissions} function '{returnType} {functionName}({updateParamString})' on {GetObjectName(objectId)}.");
@@ -2385,8 +2375,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
 
         // Set visibility
         function.AccessModifiers = permissions;
-        var functions = _gameDatabase.GetCollection<Function>("functions");
-        functions.Update(function);
+        _functionManager.UpdateFunction(function);
 
         var paramString = string.Join(", ", parameterTypes.Zip(parameterNames, (type, name) => $"{type} {name}"));
         _commandProcessor.SendToPlayer($"Created {permissions} function '{returnType} {functionName}({paramString})' on {GetObjectName(objectId)}.");
