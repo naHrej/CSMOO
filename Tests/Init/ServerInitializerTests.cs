@@ -91,9 +91,10 @@ public class ServerInitializerTests
     {
         // Arrange & Act - Should not throw
         // This tests backward compatibility
+        // Note: Shutdown now requires IServiceProvider, so we need to pass null or a service provider
         try
         {
-            ServerInitializer.Shutdown();
+            ServerInitializer.Shutdown(null);
         }
         catch
         {

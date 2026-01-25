@@ -7,6 +7,7 @@ using CSMOO.Verbs;
 using CSMOO.Functions;
 using CSMOO.Init;
 using CSMOO.Core;
+using CSMOO.Scripting;
 using Moq;
 
 namespace CSMOO.Tests.TestHelpers;
@@ -69,7 +70,7 @@ public static class ServiceProviderHelper
             services.AddSingleton<IDatabase>(sp =>
             {
                 var config = sp.GetRequiredService<IConfig>();
-                return new Database.Implementations.LiteDbDatabase(config.Database.GameDataFile);
+                return new CSMOO.Database.Implementations.LiteDbDatabase(config.Database.GameDataFile);
             });
         }
         
@@ -108,7 +109,7 @@ public static class ServiceProviderHelper
         services.AddSingleton<IDatabase>(sp =>
         {
             var config = sp.GetRequiredService<IConfig>();
-            return new Database.Implementations.LiteDbDatabase(config.Database.GameDataFile);
+            return new CSMOO.Database.Implementations.LiteDbDatabase(config.Database.GameDataFile);
         });
         
         // DbProvider - singleton
@@ -261,7 +262,8 @@ public static class ServiceProviderHelper
             var dbProvider = sp.GetRequiredService<IDbProvider>();
             var objectManager = sp.GetRequiredService<IObjectManager>();
             var logger = sp.GetRequiredService<ILogger>();
-            return new VerbResolverInstance(dbProvider, objectManager, logger);
+            var scriptEngineFactory = sp.GetRequiredService<IScriptEngineFactory>();
+            return new VerbResolverInstance(dbProvider, objectManager, logger, () => scriptEngineFactory);
         });
         
         // ObjectResolver - singleton

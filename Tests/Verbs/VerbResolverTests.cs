@@ -4,6 +4,7 @@ using CSMOO.Verbs;
 using CSMOO.Database;
 using CSMOO.Object;
 using CSMOO.Logging;
+using CSMOO.Scripting;
 using CSMOO.Tests.TestHelpers;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -86,9 +87,10 @@ public class VerbResolverTests
         var mockDbProvider = new Mock<IDbProvider>();
         var mockObjectManager = new Mock<IObjectManager>();
         var mockLogger = new Mock<ILogger>();
+        var mockScriptEngineFactory = new Mock<IScriptEngineFactory>();
         
         // Act
-        var verbResolver = new VerbResolverInstance(mockDbProvider.Object, mockObjectManager.Object, mockLogger.Object);
+        var verbResolver = new VerbResolverInstance(mockDbProvider.Object, mockObjectManager.Object, mockLogger.Object, () => mockScriptEngineFactory.Object);
         
         // Assert
         Assert.NotNull(verbResolver);
@@ -113,7 +115,8 @@ public class VerbResolverTests
         var mockDbProvider = new Mock<IDbProvider>();
         var mockObjectManager = new Mock<IObjectManager>();
         var mockLogger = new Mock<ILogger>();
-        var verbResolver = new VerbResolverInstance(mockDbProvider.Object, mockObjectManager.Object, mockLogger.Object);
+        var mockScriptEngineFactory = new Mock<IScriptEngineFactory>();
+        var verbResolver = new VerbResolverInstance(mockDbProvider.Object, mockObjectManager.Object, mockLogger.Object, () => mockScriptEngineFactory.Object);
         
         var testVerb = new Verb
         {
