@@ -82,8 +82,15 @@ public class CompilationInitializer : ICompilationInitializer
                 else
                 {
                     _statistics.VerbsFailed++;
-                    var errorMessage = result.Errors.FirstOrDefault()?.Message ?? "Unknown error";
-                    _logger.Warning($"Failed to compile verb '{verb.Name}' (ID: {verb.Id}): {errorMessage}");
+                    if (result.Errors.Count > 0)
+                    {
+                        var errorMessages = string.Join("; ", result.Errors.Select(e => $"{e.ErrorCode}: {e.Message}"));
+                        _logger.Warning($"Failed to compile verb '{verb.Name}' (ID: {verb.Id}): {errorMessages}");
+                    }
+                    else
+                    {
+                        _logger.Warning($"Failed to compile verb '{verb.Name}' (ID: {verb.Id}): Unknown error (no diagnostics returned)");
+                    }
                 }
             }
             catch (Exception ex)
@@ -123,7 +130,15 @@ public class CompilationInitializer : ICompilationInitializer
                 else
                 {
                     _statistics.FunctionsFailed++;
-                    _logger.Warning($"Failed to compile function '{function.Name}' (ID: {function.Id}): {result.Errors.FirstOrDefault()?.Message ?? "Unknown error"}");
+                    if (result.Errors.Count > 0)
+                    {
+                        var errorMessages = string.Join("; ", result.Errors.Select(e => $"{e.ErrorCode}: {e.Message}"));
+                        _logger.Warning($"Failed to compile function '{function.Name}' (ID: {function.Id}): {errorMessages}");
+                    }
+                    else
+                    {
+                        _logger.Warning($"Failed to compile function '{function.Name}' (ID: {function.Id}): Unknown error (no diagnostics returned)");
+                    }
                 }
             }
             catch (Exception ex)

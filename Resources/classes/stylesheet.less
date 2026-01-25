@@ -1,22 +1,24 @@
 
-section.success {
-    // <section class='success'>
-    //   You go 
-    //   <span class='object'>North</span> 
-    //   to  
-    //   <span class='context'>Next Room</span>
-    //   .
-    // </section>
+section.InCharacter {
 
-    // <section class='success'>
-    //   <span class='actor'>Player</span>
-    //   goes
-    //   <span class='object'>North</span> 
-    //   to  
-    //   <span class='context'>Next Room</span> 
-    //   .
-    // </section>
+    /*
+     <section class='InCharacter'>
+       You go 
+       <span class='object'>North</span> 
+       to  
+       <span class='context'>Next Room</span>
+       .
+     </section>
 
+     <section class='InCharacter'>
+       <span class='actor'>Player</span>
+       goes
+       <span class='object'>North</span> 
+       to  
+       <span class='context'>Next Room</span> 
+       .
+     </section>
+    */
     color: dodgerblue;
 
     span.actor {
@@ -29,6 +31,19 @@ section.success {
 
     span.context {
         color: yellow;
+    }
+}
+
+// Success messages for actual success/confirmation messages (not in-character)
+section.Success {
+    color: green;
+    
+    span.object {
+        color: lightgreen;
+    }
+    
+    span.context {
+        color: lightgreen;
     }
 }
 
@@ -60,17 +75,22 @@ section.Error {
 
 // Room section styles
 section.Room {
-    margin: 0;
+    margin: 0.25em 0; // Top and bottom spacing outside the border
+    border: 1px solid blue;
+    border-radius: 0.5em;
+    overflow: hidden; // Ensures child elements respect the border radius
 
     h3.Name {
-        background-color: dodgerblue;
+        background-color: blue;
         color: white;
-        margin: 0;
+        margin: -1px -1px 0 -1px; // Extend over border to eliminate gap
+        padding-left: 0.5em;
         font-weight: bold;
+        border-radius: 0.5em 0.5em 0 0; // Top corners only
     }
 
     p.Description {
-        margin: 0.5em 0;
+        margin: 0.5em 0.25em;
     }
 
     p.Exits {
@@ -106,6 +126,65 @@ section.Room {
 
         span.Player {
             color: DodgerBlue;
+        }
+    }
+
+    // Two-column layout for Contents and Exits
+    div.RoomColumns {
+        display: flex;
+        gap: 1em;
+        margin: 0.5em 0;
+    }
+
+    div.RoomColumn {
+        display: flex;
+        flex-direction: column;
+    }
+
+    div.ContentsColumn {
+        flex: 1;
+        border-radius: 0.25em;
+
+        > div {
+            margin: 0 0.25em; // Left and right margin for contents items
+        }
+    }
+
+    div.ExitsColumn {
+        flex: 2;
+        border-radius: 0.25em;
+    }
+
+    h4.ColumnHeader {
+        margin: 0 0 0.5em 0;
+        padding: 0.25em 0.5em;
+        background-color: blue;
+        color: white;
+        font-weight: bold;
+        font-size: 1em;
+        border-radius: 0.25em;
+    }
+
+    div.ExitItem {
+        margin: 0.25em 0.25em;
+
+        span.Exit {
+            color: yellow;
+            font-weight: bold;
+        }
+
+        span.Destination {
+            color: lightblue;
+        }
+
+        span.Closed {
+            color: orange;
+            font-style: italic;
+        }
+
+        span.Locked {
+            color: red;
+            font-style: italic;
         }
     }
 }
@@ -222,5 +301,14 @@ section.Help {
 
     span.param {
         color: #997700;
+    }
+}
+
+// Informational/System messages (not in-character)
+section.Info {
+    color: cyan;
+    
+    span.object {
+        color: lightcyan;
     }
 }

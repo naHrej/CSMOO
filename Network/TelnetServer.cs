@@ -78,7 +78,7 @@ internal class TelnetServer
             var propertyInitializer = _serviceProvider.GetService<IPropertyInitializer>();
             var scriptPrecompiler = _serviceProvider.GetRequiredService<CSMOO.Scripting.IScriptPrecompiler>();
             var compilationCache = _serviceProvider.GetRequiredService<CSMOO.Scripting.ICompilationCache>();
-            commandProcessor = new CommandProcessor(clientGuid, connection, playerManager, verbResolver, permissionManager, objectManager, functionResolver, dbProvider, gameDatabase, logger, roomManager, scriptEngineFactory, verbManager, functionManager, scriptPrecompiler, compilationCache, hotReloadManager, coreHotReloadManager, functionInitializer, propertyInitializer);
+            commandProcessor = new CommandProcessor(clientGuid, connection, playerManager, verbResolver, permissionManager, objectManager, objectResolver, functionResolver, dbProvider, gameDatabase, logger, roomManager, scriptEngineFactory, verbManager, functionManager, scriptPrecompiler, compilationCache, hotReloadManager, coreHotReloadManager, functionInitializer, propertyInitializer);
         }
         else
         {

@@ -16,20 +16,19 @@ public class ObjectResolverTests
     [Fact]
     public void ResolveUnique_PartialTokenPrefix_Resolves_Object_By_Name_Token()
     {
-        var room = new Room { Id = "room-1", Name = "A Peaceful Grove" };
+        var room = new Room("room-1", "A Peaceful Grove", "A peaceful grove description");
         var player = new Player { Id = "p1", Name = "Tester", Location = room };
         var staff = new GameObject
         {
             Id = "staff-1",
             Name = "A Wooden Staff",
-            ClassId = "Item",
             Properties = new LiteDB.BsonDocument { ["name"] = "A Wooden Staff" }
         };
 
         var mockObjectManager = new Mock<IObjectManager>();
         mockObjectManager.Setup(m => m.GetObjectsInLocation(room.Id)).Returns(new List<GameObject> { staff });
         mockObjectManager.Setup(m => m.GetObjectsInLocation(player.Id)).Returns(new List<GameObject>());
-        mockObjectManager.Setup(m => m.GetAllObjects()).Returns(new List<GameObject> { player, room, staff });
+        mockObjectManager.Setup(m => m.GetAllObjects()).Returns(new List<GameObject> { player, room, staff }.Cast<dynamic>().ToList());
 
         var mockCoreClassFactory = new Mock<ICoreClassFactory>();
         var resolver = new ObjectResolverInstance(mockObjectManager.Object, mockCoreClassFactory.Object);
@@ -43,7 +42,7 @@ public class ObjectResolverTests
     [Fact]
     public void ResolveUnique_Ambiguous_PartialTokenPrefix_Returns_Ambiguous()
     {
-        var room = new Room { Id = "room-1", Name = "A Peaceful Grove" };
+        var room = new Room("room-1", "A Peaceful Grove", "A peaceful grove description");
         var player = new Player { Id = "p1", Name = "Tester", Location = room };
         var staff = new GameObject { Id = "staff-1", Name = "A Wooden Staff", Properties = new LiteDB.BsonDocument { ["name"] = "A Wooden Staff" } };
         var sword = new GameObject { Id = "sword-1", Name = "A Wooden Sword", Properties = new LiteDB.BsonDocument { ["name"] = "A Wooden Sword" } };
@@ -51,7 +50,7 @@ public class ObjectResolverTests
         var mockObjectManager = new Mock<IObjectManager>();
         mockObjectManager.Setup(m => m.GetObjectsInLocation(room.Id)).Returns(new List<GameObject> { staff, sword });
         mockObjectManager.Setup(m => m.GetObjectsInLocation(player.Id)).Returns(new List<GameObject>());
-        mockObjectManager.Setup(m => m.GetAllObjects()).Returns(new List<GameObject> { player, room, staff, sword });
+        mockObjectManager.Setup(m => m.GetAllObjects()).Returns(new List<GameObject> { player, room, staff, sword }.Cast<dynamic>().ToList());
 
         var mockCoreClassFactory = new Mock<ICoreClassFactory>();
         var resolver = new ObjectResolverInstance(mockObjectManager.Object, mockCoreClassFactory.Object);
@@ -65,7 +64,7 @@ public class ObjectResolverTests
     [Fact]
     public void ResolveUnique_Uses_Aliases_For_Matching()
     {
-        var room = new Room { Id = "room-1", Name = "A Peaceful Grove" };
+        var room = new Room("room-1", "A Peaceful Grove", "A peaceful grove description");
         var player = new Player { Id = "p1", Name = "Tester", Location = room };
         var staff = new GameObject
         {
@@ -81,7 +80,7 @@ public class ObjectResolverTests
         var mockObjectManager = new Mock<IObjectManager>();
         mockObjectManager.Setup(m => m.GetObjectsInLocation(room.Id)).Returns(new List<GameObject> { staff });
         mockObjectManager.Setup(m => m.GetObjectsInLocation(player.Id)).Returns(new List<GameObject>());
-        mockObjectManager.Setup(m => m.GetAllObjects()).Returns(new List<GameObject> { player, room, staff });
+        mockObjectManager.Setup(m => m.GetAllObjects()).Returns(new List<GameObject> { player, room, staff }.Cast<dynamic>().ToList());
 
         var mockCoreClassFactory = new Mock<ICoreClassFactory>();
         var resolver = new ObjectResolverInstance(mockObjectManager.Object, mockCoreClassFactory.Object);
@@ -95,7 +94,7 @@ public class ObjectResolverTests
     [Fact]
     public void ResolveUnique_Resolves_Exit_By_Abbreviation()
     {
-        var room = new Room { Id = "room-1", Name = "A Peaceful Grove" };
+        var room = new Room("room-1", "A Peaceful Grove", "A peaceful grove description");
         var player = new Player { Id = "p1", Name = "Tester", Location = room };
         var exit = new GameObject
         {
@@ -111,7 +110,7 @@ public class ObjectResolverTests
         var mockObjectManager = new Mock<IObjectManager>();
         mockObjectManager.Setup(m => m.GetObjectsInLocation(room.Id)).Returns(new List<GameObject> { exit });
         mockObjectManager.Setup(m => m.GetObjectsInLocation(player.Id)).Returns(new List<GameObject>());
-        mockObjectManager.Setup(m => m.GetAllObjects()).Returns(new List<GameObject> { player, room, exit });
+        mockObjectManager.Setup(m => m.GetAllObjects()).Returns(new List<GameObject> { player, room, exit }.Cast<dynamic>().ToList());
 
         var mockCoreClassFactory = new Mock<ICoreClassFactory>();
         var resolver = new ObjectResolverInstance(mockObjectManager.Object, mockCoreClassFactory.Object);
@@ -231,7 +230,7 @@ public class ObjectResolverTests
         
         // Assert
         Assert.NotNull(results);
-        Assert.IsType<List<dynamic>>(results);
+        Assert.IsType<List<GameObject>>(results);
         // "me" should resolve to the looker
         Assert.Single(results);
         Assert.Equal(testPlayer, results[0]);

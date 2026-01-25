@@ -35,6 +35,7 @@ public class ScriptEngine
     private readonly IVerbManager _verbManager;
     private readonly IRoomManager _roomManager;
     private readonly ICompilationCache _compilationCache;
+    private readonly Lazy<HashSet<string>> _knownTypeNames;
 
     // Primary constructor with DI dependencies
     public ScriptEngine(
@@ -92,6 +93,189 @@ public class ScriptEngine
                 "CSMOO.Exceptions",
                 "HtmlAgilityPack"
             );
+        
+        // Build type name cache from referenced assemblies
+        _knownTypeNames = new Lazy<HashSet<string>>(() => BuildTypeNameCache(_scriptOptions));
+    }
+    
+    /// <summary>
+    /// Builds a cache of all type names from the referenced assemblies
+    /// </summary>
+    private HashSet<string> BuildTypeNameCache(ScriptOptions scriptOptions)
+    {
+        var typeNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        
+        // Add C# keywords and built-in types
+        var builtInTypes = new[]
+        {
+            "string", "int", "bool", "float", "double", "decimal", "char", "byte", "sbyte",
+            "short", "ushort", "uint", "long", "ulong", "object", "void", "var", "dynamic"
+        };
+        foreach (var type in builtInTypes)
+        {
+            typeNames.Add(type);
+        }
+        
+        // Get types from assemblies we know are referenced
+        var assemblies = new[]
+        {
+            typeof(object).Assembly,                    // System.Object
+            typeof(Console).Assembly,                   // System.Console
+            typeof(Enumerable).Assembly,                // System.Linq
+            typeof(GameObject).Assembly,                // Our game objects
+            typeof(ObjectManager).Assembly,             // Our managers
+            typeof(ScriptGlobals).Assembly,             // CSMOO.Scripting
+            typeof(HtmlAgilityPack.HtmlDocument).Assembly, // HtmlAgilityPack
+            Assembly.GetExecutingAssembly()            // Current assembly
+        };
+        
+        foreach (var assembly in assemblies)
+        {
+            try
+            {
+                foreach (var type in assembly.GetTypes())
+                {
+                    // Add the simple type name (e.g., "StringBuilder")
+                    typeNames.Add(type.Name);
+                    
+                    // Add the full name without namespace for common types (e.g., "System.StringBuilder" -> "StringBuilder")
+                    if (type.Namespace != null)
+                    {
+                        var shortName = type.FullName?.Substring(type.Namespace.Length + 1);
+                        if (!string.IsNullOrEmpty(shortName))
+                        {
+                            typeNames.Add(shortName);
+                        }
+                    }
+                }
+            }
+            catch (ReflectionTypeLoadException ex)
+            {
+                // Some types might not be loadable, that's okay
+                foreach (var type in ex.Types.Where(t => t != null))
+                {
+                    try
+                    {
+                        typeNames.Add(type.Name);
+                        if (type.Namespace != null)
+                        {
+                            var shortName = type.FullName?.Substring(type.Namespace.Length + 1);
+                            if (!string.IsNullOrEmpty(shortName))
+                            {
+                                typeNames.Add(shortName);
+                            }
+                        }
+                    }
+                    catch
+                    {
+                        // Skip unloadable types
+                    }
+                }
+            }
+            catch
+            {
+                // Skip assemblies we can't load
+                continue;
+            }
+        }
+        
+        return typeNames;
+    }
+    
+    /// <summary>
+    /// Checks if an identifier is definitively a GameObject type (or subclass)
+    /// Only returns true if we can definitively determine it's a GameObject type, not based on naming patterns
+    /// </summary>
+    private bool IsGameObjectType(string identifier, string code, int identifierStart)
+    {
+        // Known GameObject variables from ScriptGlobals - these are always GameObject types
+        var knownGameObjectVars = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "Player", "This", "ThisGameObject", "ThisPlayer", "ThisRoom", "ThisExit",
+            "ThisObject", "Caller", "CallerGameObject", "CallerPlayer", "Location"
+        };
+        
+        // Check if it's a known GameObject variable from ScriptGlobals
+        if (knownGameObjectVars.Contains(identifier))
+            return true;
+        
+        // Check if the identifier is declared as a GameObject type in the code
+        // Look backwards from the identifier to find its declaration
+        var searchStart = Math.Max(0, identifierStart - 1000); // Look back up to 1000 chars
+        var searchText = code.Substring(searchStart, identifierStart - searchStart);
+        
+        // GameObject-derived types: GameObject, Room, Player, Exit, Item, Container
+        // Pattern: GameObject? identifier = or Room? identifier = etc.
+        var gameObjectTypePattern = new System.Text.RegularExpressions.Regex(@$"\b(GameObject\??|Room\??|Player\??|Exit\??|Item\??|Container\??)\s+{System.Text.RegularExpressions.Regex.Escape(identifier)}\s*=", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        if (gameObjectTypePattern.IsMatch(searchText))
+            return true;
+        
+        // Pattern: var identifier = ObjectResolver.ResolveObject(...) or GetObject(...) or GetObjectByDbRef(...)
+        var objectResolverPattern = new System.Text.RegularExpressions.Regex(@$"\bvar\s+{System.Text.RegularExpressions.Regex.Escape(identifier)}\s*=\s*(ObjectResolver\.ResolveObject|GetObject|GetObjectBy|GetObjectById|GetObjectByDbRef|GetGameObjectById|GetGameObjectByDbRef)\s*\(", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        if (objectResolverPattern.IsMatch(searchText))
+            return true;
+        
+        // Pattern: var identifier = new (Room|Player|Exit|Item|Container|GameObject)(...)
+        var newObjectPattern = new System.Text.RegularExpressions.Regex(@$"\bvar\s+{System.Text.RegularExpressions.Regex.Escape(identifier)}\s*=\s*new\s+(Room|Player|Exit|Item|Container|GameObject)\s*\(", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        if (newObjectPattern.IsMatch(searchText))
+            return true;
+        
+        return false;
+    }
+    
+    /// <summary>
+    /// Checks if the method call result needs a cast based on the assignment context
+    /// </summary>
+    private bool CheckIfNeedsCast(string code, int callEnd)
+    {
+        // Look ahead to see if the result is assigned to a typed variable
+        var lookAhead = callEnd;
+        while (lookAhead < code.Length && char.IsWhiteSpace(code[lookAhead]))
+            lookAhead++;
+        
+        if (lookAhead < code.Length && code[lookAhead] == '=')
+        {
+            // Found assignment, look backwards for type declaration
+            var searchStart = Math.Max(0, callEnd - 100);
+            var searchText = code.Substring(searchStart, callEnd - searchStart);
+            
+            // Check for typed variable declarations: List<GameObject> var = or string var =
+            var typedVarPattern = new System.Text.RegularExpressions.Regex(@"\b(List<[^>]+>|string|int|bool|GameObject\??|Room\??|Player\??)\s+\w+\s*=");
+            return typedVarPattern.IsMatch(searchText);
+        }
+        
+        return false;
+    }
+    
+    /// <summary>
+    /// Determines the cast type needed based on function definition or assignment context
+    /// Tries to get actual return type from function definition, falls back to assignment context
+    /// </summary>
+    private string? DetermineCastType(string code, int callEnd, string methodName, string objectIdentifier)
+    {
+        // Try to infer from assignment context
+        var lookAhead = callEnd;
+        while (lookAhead < code.Length && char.IsWhiteSpace(code[lookAhead]))
+            lookAhead++;
+        
+        if (lookAhead < code.Length && code[lookAhead] == '=')
+        {
+            // Found assignment, look backwards for type declaration
+            var searchStart = Math.Max(0, callEnd - 300);
+            var searchText = code.Substring(searchStart, callEnd - searchStart);
+            
+            // Try to extract type from variable declaration: string description = or List<GameObject> exits =
+            var typePattern = new System.Text.RegularExpressions.Regex(@"\b(List<[^>]+>|string\??|int\??|bool\??|GameObject\??|Room\??|Player\??|Exit\??|Item\??|Container\??)\s+\w+\s*=");
+            var match = typePattern.Match(searchText);
+            if (match.Success)
+            {
+                return match.Groups[1].Value;
+            }
+        }
+        
+        // If we can't infer from context, return null (no cast) - let the compiler handle it
+        // The function might return object? which is fine
+        return null;
     }
 
     // Backward compatibility constructor
@@ -729,6 +913,11 @@ public class ScriptEngine
             return $"GetObjectById(\"{objectId}\").{member} =";
         });
 
+        // Handle method calls on GameObject variables: variableName.MethodName(args)
+        // This rewrites typed method calls to use CallFunctionOnObject to avoid dynamic casting
+        // Process the string manually to handle nested parentheses correctly
+        result = RewriteMethodCalls(result);
+
         return result;
     }
 
@@ -946,6 +1135,242 @@ public class ScriptEngine
             // If compilation fails for any reason, assume it's not defined
             return false;
         }
+    }
+
+    private bool IsKnownStaticType(string identifier)
+    {
+        var staticTypes = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "StringComparer", "StringComparison", "System", "Console", "Math", "DateTime",
+            "TimeSpan", "Guid", "Regex", "Encoding", "Convert", "Environment", "AppDomain",
+            "Type", "Assembly", "Activator", "Task", "Thread", "ThreadPool", "Linq",
+            "Enumerable", "List", "Dictionary", "HashSet", "Array", "StringBuilder",
+            "Object", "Char", "Int32", "Int64", "Double", "Single", "Boolean", "Decimal",
+            "ObjectManager", "ObjectResolver", "Builtins"
+        };
+        return staticTypes.Contains(identifier);
+    }
+
+    /// <summary>
+    /// Rewrites method calls on GameObject variables to use CallFunctionOnObject
+    /// Only rewrites method calls on identifiers that are likely variables, not types
+    /// </summary>
+    private string RewriteMethodCalls(string code)
+    {
+        if (string.IsNullOrEmpty(code))
+            return code;
+
+        var knownBuiltInMethods = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "ToString", "GetType", "Equals", "GetHashCode", "ReferenceEquals",
+            "MemberwiseClone", "CompareTo", "Clone"
+        };
+
+        // Use reflection-based type cache instead of hardcoded list
+        var knownTypes = _knownTypeNames.Value;
+
+        var result = new System.Text.StringBuilder();
+        var i = 0;
+        var inString = false;
+        var inCharLiteral = false;
+        var stringChar = '\0';
+        
+        while (i < code.Length)
+        {
+            // Handle string and character literals - don't rewrite inside them
+            if (!inString && !inCharLiteral && (code[i] == '"' || code[i] == '\''))
+            {
+                if (code[i] == '"')
+                {
+                    inString = true;
+                    stringChar = '"';
+                }
+                else
+                {
+                    inCharLiteral = true;
+                    stringChar = '\'';
+                }
+                result.Append(code[i]);
+                i++;
+                continue;
+            }
+            
+            if (inString || inCharLiteral)
+            {
+                result.Append(code[i]);
+                // Check for end of string/char literal
+                if (code[i] == stringChar)
+                {
+                    // Check if it's escaped
+                    var isEscaped = false;
+                    if (i > 0 && code[i - 1] == '\\' && stringChar == '"')
+                    {
+                        var backslashCount = 0;
+                        var j = i - 1;
+                        while (j >= 0 && code[j] == '\\')
+                        {
+                            backslashCount++;
+                            j--;
+                        }
+                        isEscaped = (backslashCount % 2 == 1);
+                    }
+                    
+                    if (!isEscaped)
+                    {
+                        inString = false;
+                        inCharLiteral = false;
+                        stringChar = '\0';
+                    }
+                }
+                i++;
+                continue;
+            }
+            
+            // Look for pattern: identifier.MethodName(
+            // where identifier starts with letter/underscore and MethodName starts with capital letter
+            if (i < code.Length - 1 && (char.IsLetter(code[i]) || code[i] == '_'))
+            {
+                // Try to match identifier
+                var identifierStart = i;
+                while (i < code.Length && (char.IsLetterOrDigit(code[i]) || code[i] == '_'))
+                    i++;
+                
+                var identifier = code.Substring(identifierStart, i - identifierStart);
+                
+                // Skip if it's a known type or keyword
+                if (knownTypes.Contains(identifier) || IsKnownStaticType(identifier))
+                {
+                    result.Append(identifier);
+                    continue;
+                }
+                
+                // Check if this is a function call (identifier followed by '(') - don't rewrite those
+                var checkPos = i;
+                while (checkPos < code.Length && char.IsWhiteSpace(code[checkPos]))
+                    checkPos++;
+                if (checkPos < code.Length && code[checkPos] == '(')
+                {
+                    // This is a function call, not a variable - skip rewriting
+                    result.Append(identifier);
+                    continue;
+                }
+                
+                // Check if this looks like a type declaration (e.g., "string message" or "List<string>")
+                // Look ahead to see if this is followed by a space and then a variable name or generic type
+                var lookAhead = i;
+                while (lookAhead < code.Length && char.IsWhiteSpace(code[lookAhead]))
+                    lookAhead++;
+                
+                if (lookAhead < code.Length)
+                {
+                    // Check for generic type parameter: List<string>
+                    if (code[lookAhead] == '<')
+                    {
+                        result.Append(identifier);
+                        continue;
+                    }
+                    
+                    // Check if followed by a lowercase letter (likely a variable name in a parameter)
+                    // This catches: "string message", "int count", etc.
+                    if (char.IsLower(code[lookAhead]) || code[lookAhead] == '_')
+                    {
+                        result.Append(identifier);
+                        continue;
+                    }
+                }
+                
+                if (i < code.Length && code[i] == '.')
+                {
+                    i++; // skip '.'
+                    
+                    // Check if next token is a capital letter (method name)
+                    if (i < code.Length && char.IsUpper(code[i]))
+                    {
+                        var methodStart = i;
+                        while (i < code.Length && (char.IsLetterOrDigit(code[i]) || code[i] == '_'))
+                            i++;
+                        
+                        var methodName = code.Substring(methodStart, i - methodStart);
+                        
+                        // Skip whitespace before opening paren
+                        while (i < code.Length && char.IsWhiteSpace(code[i]))
+                            i++;
+                        
+                        if (i < code.Length && code[i] == '(')
+                        {
+                            // Found a method call pattern
+                            // Skip if it's a known built-in C# method
+                            if (!knownBuiltInMethods.Contains(methodName))
+                            {
+                                // Only rewrite if we can definitively determine this is a GameObject type
+                                // Check if identifier is declared as GameObject or a subclass
+                                if (IsGameObjectType(identifier, code, identifierStart))
+                                {
+                                    // Find matching closing parenthesis
+                                    var parenStart = i;
+                                    i++; // skip '('
+                                    var depth = 1;
+                                    
+                                    while (i < code.Length && depth > 0)
+                                    {
+                                        if (code[i] == '(')
+                                            depth++;
+                                        else if (code[i] == ')')
+                                            depth--;
+                                        i++;
+                                    }
+                                    
+                                    if (depth == 0)
+                                    {
+                                        // Found matching paren
+                                        var argsStart = parenStart + 1;
+                                        var argsEnd = i - 1;
+                                        var args = code.Substring(argsStart, argsEnd - argsStart).Trim();
+                                        
+                                        // Determine cast type from function definition or assignment context
+                                        var castType = DetermineCastType(code, i, methodName, identifier);
+                                        
+                                        // Rewrite to CallFunctionOnObject
+                                        var callExpr = string.IsNullOrEmpty(args)
+                                            ? $"CallFunctionOnObject({identifier}, \"{methodName}\")"
+                                            : $"CallFunctionOnObject({identifier}, \"{methodName}\", {args})";
+                                        
+                                        if (!string.IsNullOrEmpty(castType))
+                                        {
+                                            result.Append($"({castType}){callExpr}");
+                                        }
+                                        else
+                                        {
+                                            result.Append(callExpr);
+                                        }
+                                        continue; // Already advanced i past the closing paren
+                                    }
+                                }
+                            }
+                            
+                            // Not a method we should rewrite, or couldn't find matching paren
+                            // Write back what we've consumed so far
+                            result.Append(code.Substring(identifierStart, i - identifierStart));
+                            continue;
+                        }
+                    }
+                    
+                    // Not a method call, write back what we consumed
+                    result.Append(code.Substring(identifierStart, i - identifierStart));
+                    continue;
+                }
+                
+                // Not a method call pattern, write the identifier
+                result.Append(identifier);
+                continue;
+            }
+            
+            // Regular character, just append
+            result.Append(code[i]);
+            i++;
+        }
+        
+        return result.ToString();
     }
 
     /// <summary>

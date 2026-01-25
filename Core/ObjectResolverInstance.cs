@@ -209,7 +209,7 @@ public class ObjectResolverInstance : IObjectResolver
 
         // Tiered: exact first, then token-prefix.
         var chosen = exact.Count > 0 ? exact : prefix;
-        return chosen.Cast<dynamic>().ToList();
+        return chosen;
     }
 
     private static List<string> Tokenize(string text)
