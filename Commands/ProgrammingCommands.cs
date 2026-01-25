@@ -682,11 +682,11 @@ public class ProgrammingCommands
                     }
                     catch { /* Logger may not be available in script context */ }
                     
-                    _logger.Info($"[SCRIPT RESULT] Player '{_player.Name}' (ID: {_player.Id}): Script executed successfully (no result)");
+                    _logger.Debug($"[SCRIPT RESULT] Player '{_player.Name}' (ID: {_player.Id}): Script executed successfully (no result)");
                     _commandProcessor.SendToPlayer("Script executed successfully.");
                     if (!string.IsNullOrEmpty(result) && result != "null")
                     {
-                        _logger.Info($"[SCRIPT RESULT] Player '{_player.Name}' (ID: {_player.Id}): Script result: {result}");
+                        _logger.Debug($"[SCRIPT RESULT] Player '{_player.Name}' (ID: {_player.Id}): Script result: {result}");
                         _commandProcessor.SendToPlayer($"Script result: {result}");
                     }
                 }

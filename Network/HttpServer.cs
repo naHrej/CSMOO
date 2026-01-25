@@ -115,7 +115,7 @@ public class HttpServer
                     {
                         await writer.WriteAsync(stylesheet);
                     }
-                    _logger.Info($"[HTTP] Served stylesheet.less to {context.Request.RemoteEndPoint}");
+                    _logger.Debug($"[HTTP] Served stylesheet.less to {context.Request.RemoteEndPoint}");
                 }
                 else
                 {

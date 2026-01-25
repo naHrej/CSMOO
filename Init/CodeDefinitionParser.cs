@@ -79,7 +79,7 @@ public static class CodeDefinitionParser
                         {
                             var description = ExtractDescriptionFromXml(helpMetadata, code, method);
                             _helpPreamble = description ?? helpMetadata.Summary;
-                            Logger.Info($"[HELP PARSER] Parsed help preamble: {!string.IsNullOrEmpty(_helpPreamble)}");
+                            Logger.Debug($"[HELP PARSER] Parsed help preamble: {!string.IsNullOrEmpty(_helpPreamble)}");
                         }
                         continue;
                     }
@@ -115,7 +115,7 @@ public static class CodeDefinitionParser
                             var summary = helpMetadata2.Summary;
                             
                             _helpMetadata[categoryOrTopic] = (description, summary);
-                            Logger.Info($"[HELP PARSER] Parsed help metadata for '{categoryOrTopic}': Description={!string.IsNullOrEmpty(description)}, Summary={!string.IsNullOrEmpty(summary)}");
+                            Logger.Debug($"[HELP PARSER] Parsed help metadata for '{categoryOrTopic}': Description={!string.IsNullOrEmpty(description)}, Summary={!string.IsNullOrEmpty(summary)}");
                         }
                     }
                 }
@@ -338,11 +338,11 @@ public static class CodeDefinitionParser
                     
                     if (verb.Categories.Count > 0 || verb.Topics.Count > 0)
                     {
-                        Logger.Info($"[HELP PARSER] Verb '{verb.Name}' has {verb.Categories.Count} categories and {verb.Topics.Count} topics");
+                        Logger.Debug($"[HELP PARSER] Verb '{verb.Name}' has {verb.Categories.Count} categories and {verb.Topics.Count} topics");
                     }
                     else
                     {
-                        Logger.Info($"[HELP PARSER] Verb '{verb.Name}' has NO categories or topics (helpMetadata was {(helpMetadata == null ? "NULL" : "not null")})");
+                        Logger.Debug($"[HELP PARSER] Verb '{verb.Name}' has NO categories or topics (helpMetadata was {(helpMetadata == null ? "NULL" : "not null")})");
                     }
                     
                     verbs.Add(verb);
@@ -546,7 +546,7 @@ public static class CodeDefinitionParser
                 trivia.IsKind(SyntaxKind.MultiLineDocumentationCommentTrivia))
             {
                 text = trivia.ToString();
-                Logger.Info($"[HELP PARSER] Method '{methodName}' - Found doc comment in leading trivia");
+                Logger.Debug($"[HELP PARSER] Method '{methodName}' - Found doc comment in leading trivia");
                 break;
             }
         }
@@ -565,7 +565,7 @@ public static class CodeDefinitionParser
                         trivia.IsKind(SyntaxKind.MultiLineDocumentationCommentTrivia))
                     {
                         text = trivia.ToString();
-                        Logger.Info($"[HELP PARSER] Method '{methodName}' - Found doc comment in attribute list trailing trivia");
+                        Logger.Debug($"[HELP PARSER] Method '{methodName}' - Found doc comment in attribute list trailing trivia");
                         break;
                     }
                 }
@@ -579,7 +579,7 @@ public static class CodeDefinitionParser
                         trivia.IsKind(SyntaxKind.MultiLineDocumentationCommentTrivia))
                     {
                         text = trivia.ToString();
-                        Logger.Info($"[HELP PARSER] Method '{methodName}' - Found doc comment in attribute list leading trivia");
+                        Logger.Debug($"[HELP PARSER] Method '{methodName}' - Found doc comment in attribute list leading trivia");
                         break;
                     }
                 }
@@ -598,7 +598,7 @@ public static class CodeDefinitionParser
                     trivia.IsKind(SyntaxKind.MultiLineDocumentationCommentTrivia))
                 {
                     text = trivia.ToString();
-                    Logger.Info($"[HELP PARSER] Method '{methodName}' - Found doc comment in modifier trailing trivia");
+                    Logger.Debug($"[HELP PARSER] Method '{methodName}' - Found doc comment in modifier trailing trivia");
                     break;
                 }
             }
@@ -614,7 +614,7 @@ public static class CodeDefinitionParser
                     trivia.IsKind(SyntaxKind.MultiLineDocumentationCommentTrivia))
                 {
                     text = trivia.ToString();
-                    Logger.Info($"[HELP PARSER] Method '{methodName}' - Found doc comment in return type leading trivia");
+                    Logger.Debug($"[HELP PARSER] Method '{methodName}' - Found doc comment in return type leading trivia");
                     break;
                 }
             }
@@ -624,12 +624,12 @@ public static class CodeDefinitionParser
         {
             // Debug: Log what trivia we found
             var triviaTypes = string.Join(", ", allLeadingTrivia.Select(t => t.Kind().ToString()));
-            Logger.Info($"[HELP PARSER] Method '{methodName}' - No documentation comment found. Leading trivia ({allLeadingTrivia.Count} items): {triviaTypes}");
+            Logger.Debug($"[HELP PARSER] Method '{methodName}' - No documentation comment found. Leading trivia ({allLeadingTrivia.Count} items): {triviaTypes}");
             if (method.AttributeLists.Count > 0)
             {
                 var lastAttrTrailing = method.AttributeLists.Last().GetTrailingTrivia();
                 var attrTriviaTypes = string.Join(", ", lastAttrTrailing.Select(t => t.Kind().ToString()));
-                Logger.Info($"[HELP PARSER] Method '{methodName}' - Last attribute trailing trivia ({lastAttrTrailing.Count} items): {attrTriviaTypes}");
+                Logger.Debug($"[HELP PARSER] Method '{methodName}' - Last attribute trailing trivia ({lastAttrTrailing.Count} items): {attrTriviaTypes}");
             }
             return null;
         }
@@ -647,7 +647,7 @@ public static class CodeDefinitionParser
         if (normalizedText.Length > 0)
         {
             var debugText = normalizedText.Length > 200 ? normalizedText.Substring(0, 200) + "..." : normalizedText;
-            Logger.Info($"[HELP PARSER] Method '{methodName}' - Normalized XML (first 200 chars): {debugText.Replace("\r", "\\r").Replace("\n", "\\n")}");
+            Logger.Debug($"[HELP PARSER] Method '{methodName}' - Normalized XML (first 200 chars): {debugText.Replace("\r", "\\r").Replace("\n", "\\n")}");
         }
         
         var metadata = new HelpMetadata();
@@ -664,14 +664,14 @@ public static class CodeDefinitionParser
         metadata.Categories = ExtractXmlTags(normalizedText, "category");
         if (metadata.Categories.Count > 0)
         {
-            Logger.Info($"[HELP PARSER] Method '{methodName}' - Found {metadata.Categories.Count} categories: {string.Join(", ", metadata.Categories)}");
+            Logger.Debug($"[HELP PARSER] Method '{methodName}' - Found {metadata.Categories.Count} categories: {string.Join(", ", metadata.Categories)}");
         }
         
         // Extract topics
         metadata.Topics = ExtractXmlTags(normalizedText, "topic");
         if (metadata.Topics.Count > 0)
         {
-            Logger.Info($"[HELP PARSER] Method '{methodName}' - Found {metadata.Topics.Count} topics: {string.Join(", ", metadata.Topics)}");
+            Logger.Debug($"[HELP PARSER] Method '{methodName}' - Found {metadata.Topics.Count} topics: {string.Join(", ", metadata.Topics)}");
         }
         
         // Extract usage
@@ -711,7 +711,7 @@ public static class CodeDefinitionParser
     private static HelpMetadata? ExtractHelpMetadataFromSource(string sourceCode, MethodDeclarationSyntax method)
     {
         var methodName = method.Identifier.ValueText;
-        Logger.Info($"[HELP PARSER] Method '{methodName}' - Fallback: Starting source text extraction");
+        Logger.Debug($"[HELP PARSER] Method '{methodName}' - Fallback: Starting source text extraction");
         
         // Anchor on the identifier token (method name). This is reliably within the method declaration,
         // even when Roslyn's MethodDeclarationSyntax.Span doesn't include attributes the way we expect.
@@ -739,14 +739,14 @@ public static class CodeDefinitionParser
         
         if (methodLineIndex < 0)
         {
-            Logger.Info($"[HELP PARSER] Method '{methodName}' - Fallback: Could not find method line");
+            Logger.Debug($"[HELP PARSER] Method '{methodName}' - Fallback: Could not find method line");
             return null;
         }
         
         // Get lines before the method declaration line
         var lines = allLines.Take(methodLineIndex).ToArray();
         
-        Logger.Info($"[HELP PARSER] Method '{methodName}' - Fallback: Checking {lines.Length} lines before method (method is on line {methodLineIndex + 1})");
+        Logger.Debug($"[HELP PARSER] Method '{methodName}' - Fallback: Checking {lines.Length} lines before method (method is on line {methodLineIndex + 1})");
         
         var xmlLines = new List<string>();
         
@@ -820,13 +820,13 @@ public static class CodeDefinitionParser
             }
         }
         
-        Logger.Info($"[HELP PARSER] Method '{methodName}' - Fallback: Found {xmlLines.Count} XML comment lines");
+        Logger.Debug($"[HELP PARSER] Method '{methodName}' - Fallback: Found {xmlLines.Count} XML comment lines");
         
         if (xmlLines.Count == 0)
         {
             // Debug: show last few lines before method
             var lastLines = lines.Length > 10 ? lines.Skip(lines.Length - 10) : lines;
-            Logger.Info($"[HELP PARSER] Method '{methodName}' - Fallback: Last 10 lines before method: {string.Join(" | ", lastLines.Select(l => l.Trim().Substring(0, Math.Min(50, l.Trim().Length))))}");
+            Logger.Debug($"[HELP PARSER] Method '{methodName}' - Fallback: Last 10 lines before method: {string.Join(" | ", lastLines.Select(l => l.Trim().Substring(0, Math.Min(50, l.Trim().Length))))}");
             return null;
         }
         
@@ -875,7 +875,7 @@ public static class CodeDefinitionParser
         if (metadata.Categories.Count > 0 || metadata.Topics.Count > 0 || 
             !string.IsNullOrEmpty(metadata.Usage) || !string.IsNullOrEmpty(metadata.HelpText))
         {
-            Logger.Info($"[HELP PARSER] Method '{methodName}' - Found help metadata via source text fallback");
+            Logger.Debug($"[HELP PARSER] Method '{methodName}' - Found help metadata via source text fallback");
             return metadata;
         }
         
@@ -899,7 +899,7 @@ public static class CodeDefinitionParser
         // Log at Info level for visibility
         if (results.Count > 0)
         {
-            Logger.Info($"[HELP PARSER] ExtractXmlTags('{tagName}') found {results.Count} matches: {string.Join(", ", results)}");
+            Logger.Debug($"[HELP PARSER] ExtractXmlTags('{tagName}') found {results.Count} matches: {string.Join(", ", results)}");
         }
         
         return results;

@@ -86,7 +86,33 @@ public class System
     public verb Inventory()
     {
         // Inventory command - show what the player is carrying
-        Builtins.ShowInventory();
+        var playerGameObject = ObjectResolver.ResolveObject("me", Player) ?? ObjectResolver.ResolveObject(Player.Id, Player);
+        if (playerGameObject == null)
+        {
+            notify(Player, "<section class='Error'>Unable to find player object.</section>");
+            return;
+        }
+
+        if (playerGameObject.Contents == null || playerGameObject.Contents.Count == 0)
+        {
+            notify(Player, "<section class='InCharacter'>You are carrying nothing.</section>");
+            return;
+        }
+
+        var output = new StringBuilder();
+        output.Append("<section class='InCharacter'>You are carrying:</section>");
+        output.Append("<section class='InCharacter'>");
+        foreach (var itemId in playerGameObject.Contents)
+        {
+            var item = ObjectResolver.ResolveObject(itemId, Player);
+            if (item != null)
+            {
+                var name = Builtins.GetProperty(item, "shortDescription")?.AsString ?? item.Name ?? "something";
+                output.Append($"<div>  {name}</div>");
+            }
+        }
+        output.Append("</section>");
+        notify(Player, output.ToString());
     }
 
     [VerbAliases("?")]

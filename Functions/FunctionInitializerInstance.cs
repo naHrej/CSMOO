@@ -137,9 +137,9 @@ public class FunctionInitializerInstance : IFunctionInitializer
         
         try
         {
-            _logger.Info($"Loading functions from file: {filePath}");
+            _logger.Debug($"Loading functions from file: {filePath}");
             var functionDefs = CodeDefinitionParser.ParseFunctions(filePath);
-            _logger.Info($"Parsed {functionDefs.Count} function definition(s) from {filePath}");
+            _logger.Debug($"Parsed {functionDefs.Count} function definition(s) from {filePath}");
             
             foreach (var functionDef in functionDefs)
             {
@@ -149,27 +149,27 @@ public class FunctionInitializerInstance : IFunctionInitializer
                     continue;
                 }
 
-                _logger.Info($"Processing function '{functionDef.Name}' from class '{functionDef.TargetClass}' in {filePath}");
+                _logger.Debug($"Processing function '{functionDef.Name}' from class '{functionDef.TargetClass}' in {filePath}");
 
                 // Determine if this is a class function or system function
                 if (functionDef.TargetClass?.ToLower() == "system" || string.IsNullOrEmpty(functionDef.TargetClass))
                 {
                     // System function (global)
-                    _logger.Info($"Function '{functionDef.Name}' is a system function, attaching to system object");
+                    _logger.Debug($"Function '{functionDef.Name}' is a system function, attaching to system object");
                     var systemObjectId = GetOrCreateSystemObject();
                     if (systemObjectId != null)
                     {
-                        _logger.Info($"System object ID: {systemObjectId}");
+                        _logger.Debug($"System object ID: {systemObjectId}");
                         var (loadedCount, skippedCount) = CreateSystemFunction(systemObjectId, functionDef);
                         loaded += loadedCount;
                         skipped += skippedCount;
                         if (loadedCount > 0)
                         {
-                            _logger.Info($"Successfully created system function '{functionDef.Name}' on system object {systemObjectId}");
+                            _logger.Debug($"Successfully created system function '{functionDef.Name}' on system object {systemObjectId}");
                         }
                         else if (skippedCount > 0)
                         {
-                            _logger.Info($"Skipped system function '{functionDef.Name}' (already exists)");
+                            _logger.Debug($"Skipped system function '{functionDef.Name}' (already exists)");
                         }
                     }
                     else
@@ -179,7 +179,7 @@ public class FunctionInitializerInstance : IFunctionInitializer
                 }
                 else
                 {
-                    _logger.Info($"Function '{functionDef.Name}' is a class function for class '{functionDef.TargetClass}'");
+                    _logger.Debug($"Function '{functionDef.Name}' is a class function for class '{functionDef.TargetClass}'");
                     var (loadedCount, skippedCount) = CreateClassFunction(functionDef);
                     loaded += loadedCount;
                     skipped += skippedCount;
@@ -252,12 +252,12 @@ public class FunctionInitializerInstance : IFunctionInitializer
                 existingFunction.HelpText = functionDef.HelpText;
                 
                 _dbProvider.Update("functions", existingFunction);
-                _logger.Info($"Updated existing system function '{functionDef.Name}' on class '{functionDef.TargetClass}'");
+                _logger.Debug($"Updated existing system function '{functionDef.Name}' on class '{functionDef.TargetClass}'");
                 return (1, 0);
             }
             else
             {
-                _logger.Info($"Skipped function '{functionDef.Name}' on class '{functionDef.TargetClass}' (created by user, not system)");
+                _logger.Debug($"Skipped function '{functionDef.Name}' on class '{functionDef.TargetClass}' (created by user, not system)");
                 return (0, 1);
             }
         }
@@ -280,7 +280,7 @@ public class FunctionInitializerInstance : IFunctionInitializer
             // If name changed (case difference), delete old and create new
             if (!existingFunction.Name.Equals(functionDef.Name, StringComparison.Ordinal))
             {
-                _logger.Info($"Function name changed from '{existingFunction.Name}' to '{functionDef.Name}', updating...");
+                _logger.Debug($"Function name changed from '{existingFunction.Name}' to '{functionDef.Name}', updating...");
                 _dbProvider.Delete<Function>("functions", existingFunction.Id);
             }
             else
@@ -300,7 +300,7 @@ public class FunctionInitializerInstance : IFunctionInitializer
                     existingFunction.HelpText = functionDef.HelpText;
                     
                     _dbProvider.Update("functions", existingFunction);
-                    _logger.Info($"Updated existing system function '{functionDef.Name}' on system object");
+                    _logger.Debug($"Updated existing system function '{functionDef.Name}' on system object");
                     return (1, 0);
                 }
                 else

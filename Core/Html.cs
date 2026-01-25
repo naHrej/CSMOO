@@ -366,7 +366,7 @@ public static class Html
             if (File.Exists(path))
             {
                 lessPath = path;
-                Logger.Info($"[STYLESHEET] GetStylesheet: Found stylesheet at: {path}");
+                Logger.Debug($"[STYLESHEET] GetStylesheet: Found stylesheet at: {path}");
                 break;
             }
         }
@@ -379,13 +379,13 @@ public static class Html
             throw new FileNotFoundException(errorMsg);
         }
 
-        Logger.Info($"[STYLESHEET] GetStylesheet: Reading LESS file from: {lessPath}");
+        Logger.Debug($"[STYLESHEET] GetStylesheet: Reading LESS file from: {lessPath}");
         var lessContent = File.ReadAllText(lessPath);
-        Logger.Info($"[STYLESHEET] GetStylesheet: LESS file read, length: {lessContent.Length} characters");
+        Logger.Debug($"[STYLESHEET] GetStylesheet: LESS file read, length: {lessContent.Length} characters");
         
-        Logger.Info("[STYLESHEET] GetStylesheet: Compiling LESS to CSS...");
+        Logger.Debug("[STYLESHEET] GetStylesheet: Compiling LESS to CSS...");
         var css = Style.ProcessLess(lessContent);
-        Logger.Info($"[STYLESHEET] GetStylesheet: LESS compiled to CSS, length: {css.Length} characters");
+        Logger.Debug($"[STYLESHEET] GetStylesheet: LESS compiled to CSS, length: {css.Length} characters");
         
         // Log first 200 characters of CSS for verification
         var preview = css.Length > 200 ? css.Substring(0, 200) + "..." : css;

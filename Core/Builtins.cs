@@ -1553,7 +1553,7 @@ public static class Builtins
         if (currentPlayer == null) return;
 
         var playerGameObject = ObjectManagerInstance.GetObject(currentPlayer.Id);
-        if (playerGameObject?.Contents == null || !playerGameObject!.Contents.Any())
+        if (playerGameObject?.Contents == null || playerGameObject!.Contents.Count == 0)
         {
             Notify(currentPlayer, "You are carrying nothing.");
             return;

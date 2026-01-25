@@ -38,7 +38,7 @@ public class CompilationInitializer : ICompilationInitializer
 
     public async Task RecompileAllAsync()
     {
-        _logger.Info("Starting compilation cache initialization...");
+        _logger.Debug("Starting compilation cache initialization...");
         _statistics = new CompilationStatistics();
 
         try
@@ -60,7 +60,7 @@ public class CompilationInitializer : ICompilationInitializer
     private async Task RecompileAllVerbsAsync()
     {
         var verbs = _verbManager.GetAllVerbs();
-        _logger.Info($"Recompiling {verbs.Count} verbs...");
+        _logger.Debug($"Recompiling {verbs.Count} verbs...");
 
         foreach (var verb in verbs)
         {
@@ -109,7 +109,7 @@ public class CompilationInitializer : ICompilationInitializer
     private async Task RecompileAllFunctionsAsync()
     {
         var functions = _functionManager.GetAllFunctions();
-        _logger.Info($"Recompiling {functions.Count} functions...");
+        _logger.Debug($"Recompiling {functions.Count} functions...");
 
         foreach (var function in functions)
         {

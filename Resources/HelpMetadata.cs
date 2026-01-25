@@ -18,6 +18,7 @@ namespace CSMOO.Resources
         /// or '<span class='command'>help</span> <span class='param'>&lt;command&gt;</span>' for detailed information.
         /// </description>
         public static void _help_preamble() { }
+        
         /// <summary>
         /// Communication category - Commands for interacting with other players
         /// </summary>

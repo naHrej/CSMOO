@@ -467,13 +467,21 @@ public class VerbResolverInstance : IVerbResolver
         var verb = parts[0].ToLower();
 
         // Try to find a matching verb in this order:
-        // 1. Objects in the room (including the player)
-        // 2. The room itself
-        // 3. The player
+        // 1. Player (commands on the player class)
+        // 2. Room (commands on the room)
+        // 3. Objects in the room (that contain verbs)
         // 4. Global verbs (on the system object)
 
-        // 1. Check the room itself FIRST (before objects in the room)
-        // This ensures room verbs take precedence over object verbs
+        // 1. Check the player FIRST
+        // This ensures player-specific commands like "inventory" execute on the player
+        var playerVerbResult = FindMatchingVerbWithVariables(player.Id, parts);
+        if (playerVerbResult != null)
+        {
+            _logger.Info($"[VERB] Executing verb '{playerVerbResult.Verb.Name}' on player '{player.Name}' (ID: {player.Id})");
+            return ExecuteVerb(playerVerbResult.Verb, input, player, commandProcessor, player.Id, playerVerbResult.Variables);
+        }
+
+        // 2. Check the room
         var room = player.Location;
         if (room != null)
         {
@@ -486,7 +494,7 @@ public class VerbResolverInstance : IVerbResolver
             }
         }
 
-        // 2. Check objects in the room (excluding exits for certain verbs)
+        // 3. Check objects in the room (excluding exits for certain verbs)
         var roomObjects = _objectManager.GetObjectsInLocation(player.Location);
         var exitClass = _dbProvider.FindOne<ObjectClass>("objectclasses", c => c.Name == "Exit");
         foreach (var obj in roomObjects)
@@ -508,14 +516,6 @@ public class VerbResolverInstance : IVerbResolver
             }
         }
 
-        // 3. Check the player
-        var playerVerbResult = FindMatchingVerbWithVariables(player.Id, parts);
-        if (playerVerbResult != null)
-        {
-            _logger.Info($"[VERB] Executing verb '{playerVerbResult.Verb.Name}' on player '{player.Name}' (ID: {player.Id})");
-            return ExecuteVerb(playerVerbResult.Verb, input, player, commandProcessor, player.Id, playerVerbResult.Variables);
-        }
-
         // 4. Check global verbs (we'll use a special "system" object)
         var systemObject = GetOrCreateSystemObject();
         var globalVerbResult = FindMatchingVerbWithVariables(systemObject.Id, parts);
@@ -529,19 +529,20 @@ public class VerbResolverInstance : IVerbResolver
         if (parts.Length > 1)
         {
             // Check all objects in order for verbs with named variable patterns
+            // Order: Player, Room, Objects in room, System
             var allObjectIds = new List<string>();
+            
+            // Add player first
+            allObjectIds.Add(player.Id);
+            
+            // Add room
+            if (room != null) allObjectIds.Add(room.Id);
             
             // Add room objects
             var roomObjectList = _objectManager.GetObjectsInLocation(player.Location);
             allObjectIds.AddRange(roomObjectList.Select(obj => obj.Id));
             
-            // Add room
-            if (room != null) allObjectIds.Add(room.Id);
-            
-            // Add player
-            allObjectIds.Add(player.Id);
-            
-            // Add system object
+            // Add system object last
             allObjectIds.Add(systemObject.Id);
             
             foreach (var objectId in allObjectIds)
