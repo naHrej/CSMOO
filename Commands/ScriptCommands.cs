@@ -13,15 +13,17 @@ namespace CSMOO.Commands;
     {
         private readonly CommandProcessor _commandProcessor;
         private readonly Player _player;
+        private readonly IScriptEngineFactory _scriptEngineFactory;
         
         // For multi-line script input
         private bool _isInScriptMode = false;
         private readonly StringBuilder _currentCode = new StringBuilder();
 
-        public ScriptCommands(CommandProcessor commandProcessor, Player player)
+        public ScriptCommands(CommandProcessor commandProcessor, Player player, IScriptEngineFactory scriptEngineFactory)
         {
             _commandProcessor = commandProcessor;
             _player = player;
+            _scriptEngineFactory = scriptEngineFactory ?? throw new ArgumentNullException(nameof(scriptEngineFactory));
         }
 
         public bool IsInScriptMode => _isInScriptMode;
@@ -87,7 +89,7 @@ namespace CSMOO.Commands;
                     };
                     
                     // Use the verb script engine for consistent behavior with other verbs
-                    var verbEngine = new ScriptEngine();
+                    var verbEngine = _scriptEngineFactory.Create();
                     var result = verbEngine.ExecuteVerb(tempVerb, "@script", _player, _commandProcessor, "system");
                     
                     // Show result

@@ -44,47 +44,6 @@ public class ScriptHelpers
         _roomManager = roomManager ?? throw new ArgumentNullException(nameof(roomManager));
     }
 
-    // Backward compatibility constructor
-    public ScriptHelpers(Player player, CommandProcessor commandProcessor)
-        : this(player, commandProcessor,
-               CreateDefaultObjectManager(), CreateDefaultPlayerManager(), CreateDefaultDbProvider(),
-               CreateDefaultLogger(), CreateDefaultVerbManager(), CreateDefaultRoomManager())
-    {
-    }
-
-    // Helper methods for backward compatibility
-    private static IObjectManager CreateDefaultObjectManager()
-    {
-        var dbProvider = DbProvider.Instance;
-        var logger = new LoggerInstance(Config.Instance);
-        var classManager = new ClassManagerInstance(dbProvider, logger);
-        return new ObjectManagerInstance(dbProvider, classManager);
-    }
-
-    private static IPlayerManager CreateDefaultPlayerManager()
-    {
-        return new PlayerManagerInstance(DbProvider.Instance);
-    }
-
-    private static IDbProvider CreateDefaultDbProvider()
-    {
-        return DbProvider.Instance;
-    }
-
-    private static ILogger CreateDefaultLogger()
-    {
-        return new LoggerInstance(Config.Instance);
-    }
-
-    private static IVerbManager CreateDefaultVerbManager()
-    {
-        return new VerbManagerInstance(DbProvider.Instance);
-    }
-
-    private static IRoomManager CreateDefaultRoomManager()
-    {
-        return new RoomManagerInstance(DbProvider.Instance, CreateDefaultLogger(), CreateDefaultObjectManager());
-    }
 
     #region Player and Session Management
 

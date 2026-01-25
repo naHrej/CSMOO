@@ -71,7 +71,8 @@ internal class Program
             var sessionHandler = serviceProvider.GetRequiredService<ISessionHandler>();
             SessionHandler.SetInstance(sessionHandler);
             
-            // Set Logger static instance (used by ServerInitializer and other components)
+            // Set Logger static instance (used by static classes: Html, CodeDefinitionParser, Config, and data class: Container)
+            // These are acceptable exceptions - static classes and data classes can't use DI
             Logger.SetInstance(logger);
             
             // Set RoomManager static instance (used by ServerInitializer)
@@ -82,20 +83,18 @@ internal class Program
             var permissionManager = serviceProvider.GetRequiredService<IPermissionManager>();
             PermissionManager.SetInstance(permissionManager);
             
-            // Set ObjectResolver static instance (used by System.cs verbs: Look, Examine, Get, Drop)
+            // Set ObjectResolver static instance (used by GameObject data class)
             var objectResolver = serviceProvider.GetRequiredService<IObjectResolver>();
             ObjectResolver.SetInstance(objectResolver);
             
-            // Set VerbResolver static instance (used by @verbs command)
-            var verbResolver = serviceProvider.GetRequiredService<IVerbResolver>();
-            VerbResolver.SetInstance(verbResolver);
+            // Set Builtins static instance (used by scripts via Builtins static methods)
+            var builtinsInstance = serviceProvider.GetRequiredService<CSMOO.Core.IBuiltinsInstance>();
+            CSMOO.Core.Builtins.SetInstance(builtinsInstance);
             
-            // Set GameDatabase static instance (used by @cleanup command)
-            var gameDatabase = serviceProvider.GetRequiredService<IGameDatabase>();
-            if (gameDatabase is GameDatabase gdb)
-            {
-                GameDatabase.SetInstance(gdb);
-            }
+            // VerbResolver no longer uses static wrapper - use DI instead
+            
+            // GameDatabase static instance removed - use IDatabase via DI
+            // If @cleanup command needs it, update to use IDatabase
             
             // Initialize logging system (sets up log rotation and directories)
             logger.Initialize();
@@ -168,17 +167,16 @@ internal class Program
         });
         
         // Database - singleton (one database connection for the entire application)
-        services.AddSingleton<IGameDatabase>(sp =>
+        services.AddSingleton<IDatabase>(sp =>
         {
             var config = sp.GetRequiredService<IConfig>();
-            return new GameDatabase(config.Database.GameDataFile);
+            return new Database.Implementations.LiteDbDatabase(config.Database.GameDataFile);
         });
         
         // DbProvider - singleton (one provider instance for the entire application)
-        // Note: ObjectManager will be set later to resolve circular dependency
         services.AddSingleton<IDbProvider>(sp =>
         {
-            var db = sp.GetRequiredService<IGameDatabase>();
+            var db = sp.GetRequiredService<IDatabase>();
             return new DbProvider(db);
         });
         
@@ -207,13 +205,8 @@ internal class Program
             var classManager = sp.GetRequiredService<IClassManager>();
             var objectManager = new ObjectManagerInstance(dbProvider, classManager);
             
-            // Set the object manager in DbProvider to resolve circular dependency
-            if (dbProvider is DbProvider dbp)
-            {
-                dbp.SetObjectManager(objectManager);
-            }
-            
-            // Set the object manager in PlayerManager to resolve circular dependency
+            // Circular dependency resolved - DbProvider no longer needs ObjectManager
+            // Set the object manager in PlayerManager (for GetOnlinePlayers, etc.)
             var playerManager = sp.GetRequiredService<IPlayerManager>();
             if (playerManager is PlayerManagerInstance pmi)
             {
@@ -384,8 +377,8 @@ internal class Program
         // FunctionManager - singleton (one function manager instance for the entire application)
         services.AddSingleton<IFunctionManager>(sp =>
         {
-            var gameDatabase = sp.GetRequiredService<IGameDatabase>();
-            return new FunctionManagerInstance(gameDatabase);
+            var dbProvider = sp.GetRequiredService<IDbProvider>();
+            return new FunctionManagerInstance(dbProvider);
         });
         
         // VerbResolver - singleton (one verb resolver instance for the entire application)
@@ -397,7 +390,8 @@ internal class Program
             var dbProvider = sp.GetRequiredService<IDbProvider>();
             var objectManager = sp.GetRequiredService<IObjectManager>();
             var logger = sp.GetRequiredService<ILogger>();
-            return new VerbResolverInstance(dbProvider, objectManager, logger);
+            // Use factory function to break circular dependency - IScriptEngineFactory will be resolved lazily
+            return new VerbResolverInstance(dbProvider, objectManager, logger, () => sp.GetRequiredService<IScriptEngineFactory>());
         });
         
         // ObjectResolver - singleton (one object resolver instance for the entire application)
@@ -424,6 +418,33 @@ internal class Program
         
         // CompilationCache - singleton (one cache instance for the entire application)
         services.AddSingleton<CSMOO.Scripting.ICompilationCache>(sp => new CSMOO.Scripting.CompilationCache());
+        
+        // BuiltinsInstance - singleton (one builtins instance for the entire application)
+        services.AddSingleton<CSMOO.Core.IBuiltinsInstance>(sp =>
+        {
+            // Force InstanceManager to be created first to ensure it's set on ObjectManager
+            var _ = sp.GetRequiredService<IInstanceManager>();
+            
+            var objectManager = sp.GetRequiredService<IObjectManager>();
+            var playerManager = sp.GetRequiredService<IPlayerManager>();
+            var permissionManager = sp.GetRequiredService<IPermissionManager>();
+            var functionResolver = sp.GetRequiredService<IFunctionResolver>();
+            var verbResolver = sp.GetRequiredService<IVerbResolver>();
+            var verbManager = sp.GetRequiredService<IVerbManager>();
+            var roomManager = sp.GetRequiredService<IRoomManager>();
+            var logger = sp.GetRequiredService<ILogger>();
+            var scriptEngineFactory = sp.GetRequiredService<IScriptEngineFactory>();
+            return new CSMOO.Core.BuiltinsInstance(
+                objectManager,
+                playerManager,
+                permissionManager,
+                functionResolver,
+                verbResolver,
+                verbManager,
+                roomManager,
+                logger,
+                scriptEngineFactory);
+        });
         
         // ScriptPrecompiler - singleton (one precompiler instance for the entire application)
         services.AddSingleton<CSMOO.Scripting.IScriptPrecompiler>(sp =>

@@ -37,8 +37,7 @@ public static class FunctionInitializer
             var logger = new LoggerInstance(Config.Instance);
             var classManager = new ClassManagerInstance(dbProvider, logger);
             var objectManager = new ObjectManagerInstance(dbProvider, classManager);
-            var gameDatabase = GameDatabase.Instance;
-            var functionManager = new FunctionManagerInstance(gameDatabase);
+            var functionManager = new FunctionManagerInstance(dbProvider);
             _instance = new FunctionInitializerInstance(dbProvider, logger, objectManager, functionManager);
         }
     }

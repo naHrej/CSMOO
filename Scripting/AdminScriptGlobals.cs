@@ -1,6 +1,7 @@
 using CSMOO.Core;
 using CSMOO.Database;
 using CSMOO.Functions;
+using CSMOO.Logging;
 using CSMOO.Object;
 using CSMOO.Verbs;
 
@@ -14,14 +15,11 @@ namespace CSMOO.Scripting
             IObjectResolver objectResolver,
             IVerbResolver verbResolver,
             IFunctionResolver functionResolver,
-            IDbProvider dbProvider)
-            : base(objectManager, verbResolver, functionResolver, dbProvider)
-        {
-        }
-
-        // Backward compatibility constructor
-        public AdminScriptGlobals()
-            : base()
+            IDbProvider dbProvider,
+            IScriptEngineFactory scriptEngineFactory,
+            ILogger logger,
+            IPlayerManager playerManager)
+            : base(objectManager, objectResolver, verbResolver, functionResolver, dbProvider, scriptEngineFactory, logger, playerManager)
         {
         }
 

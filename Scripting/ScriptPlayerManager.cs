@@ -26,24 +26,6 @@ public class ScriptPlayerManager
         }
     }
 
-    // Backward compatibility constructor
-    public ScriptPlayerManager()
-        : this(CreateDefaultPlayerManager(), CreateDefaultObjectManager())
-    {
-    }
-
-    private static IPlayerManager CreateDefaultPlayerManager()
-    {
-        return new PlayerManagerInstance(DbProvider.Instance);
-    }
-
-    private static IObjectManager CreateDefaultObjectManager()
-    {
-        var dbProvider = DbProvider.Instance;
-        var logger = new LoggerInstance(Config.Instance);
-        var classManager = new ClassManagerInstance(dbProvider, logger);
-        return new ObjectManagerInstance(dbProvider, classManager);
-    }
 
     public List<string> GetOnlinePlayerNames()
     {

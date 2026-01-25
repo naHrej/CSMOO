@@ -24,7 +24,6 @@ public class ProgrammingCommands
     private readonly IObjectManager _objectManager;
     private readonly IPlayerManager _playerManager;
     private readonly IDbProvider _dbProvider;
-    private readonly IGameDatabase _gameDatabase;
     private readonly ILogger _logger;
     private readonly IRoomManager _roomManager;
     private readonly IHotReloadManager? _hotReloadManager;
@@ -34,6 +33,7 @@ public class ProgrammingCommands
     private readonly IPropertyInitializer? _propertyInitializer;
     private readonly IScriptPrecompiler _scriptPrecompiler;
     private readonly ICompilationCache _compilationCache;
+    private readonly IVerbResolver _verbResolver;
     
     // For multi-line programming
     private bool _isInProgrammingMode = false;
@@ -51,12 +51,12 @@ public class ProgrammingCommands
         IObjectManager objectManager,
         IPlayerManager playerManager,
         IDbProvider dbProvider,
-        IGameDatabase gameDatabase,
         ILogger logger,
         IRoomManager roomManager,
         IFunctionManager functionManager,
         IScriptPrecompiler scriptPrecompiler,
         ICompilationCache compilationCache,
+        IVerbResolver verbResolver,
         IHotReloadManager? hotReloadManager = null,
         ICoreHotReloadManager? coreHotReloadManager = null,
         IFunctionInitializer? functionInitializer = null,
@@ -70,146 +70,16 @@ public class ProgrammingCommands
         _objectManager = objectManager ?? throw new ArgumentNullException(nameof(objectManager));
         _playerManager = playerManager ?? throw new ArgumentNullException(nameof(playerManager));
         _dbProvider = dbProvider ?? throw new ArgumentNullException(nameof(dbProvider));
-        _gameDatabase = gameDatabase ?? throw new ArgumentNullException(nameof(gameDatabase));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _roomManager = roomManager ?? throw new ArgumentNullException(nameof(roomManager));
         _functionManager = functionManager ?? throw new ArgumentNullException(nameof(functionManager));
         _scriptPrecompiler = scriptPrecompiler ?? throw new ArgumentNullException(nameof(scriptPrecompiler));
         _compilationCache = compilationCache ?? throw new ArgumentNullException(nameof(compilationCache));
+        _verbResolver = verbResolver ?? throw new ArgumentNullException(nameof(verbResolver));
         _hotReloadManager = hotReloadManager;
         _coreHotReloadManager = coreHotReloadManager;
         _functionInitializer = functionInitializer;
         _propertyInitializer = propertyInitializer;
-    }
-
-    // Backward compatibility constructor
-    public ProgrammingCommands(CommandProcessor commandProcessor, Player player)
-        : this(commandProcessor, player,
-               CreateDefaultPermissionManager(), CreateDefaultVerbManager(), CreateDefaultFunctionResolver(),
-               CreateDefaultObjectManager(), CreateDefaultPlayerManager(), CreateDefaultDbProvider(),
-               CreateDefaultGameDatabase(), CreateDefaultLogger(), CreateDefaultRoomManager(), CreateDefaultFunctionManager(),
-               CreateDefaultScriptPrecompiler(), CreateDefaultCompilationCache(),
-               CreateDefaultHotReloadManager(), CreateDefaultCoreHotReloadManager(),
-               CreateDefaultFunctionInitializer(), CreateDefaultPropertyInitializer())
-    {
-    }
-
-    // Helper methods for backward compatibility
-    private static IPermissionManager CreateDefaultPermissionManager()
-    {
-        return new PermissionManagerInstance(DbProvider.Instance, new LoggerInstance(Config.Instance));
-    }
-
-    private static IVerbManager CreateDefaultVerbManager()
-    {
-        return new VerbManagerInstance(DbProvider.Instance);
-    }
-
-    private static IFunctionResolver CreateDefaultFunctionResolver()
-    {
-        return new FunctionResolverInstance(DbProvider.Instance, CreateDefaultObjectManager());
-    }
-
-    private static IObjectManager CreateDefaultObjectManager()
-    {
-        var dbProvider = DbProvider.Instance;
-        var logger = new LoggerInstance(Config.Instance);
-        var classManager = new ClassManagerInstance(dbProvider, logger);
-        return new ObjectManagerInstance(dbProvider, classManager);
-    }
-
-    private static IPlayerManager CreateDefaultPlayerManager()
-    {
-        return new PlayerManagerInstance(DbProvider.Instance);
-    }
-
-    private static IDbProvider CreateDefaultDbProvider()
-    {
-        return DbProvider.Instance;
-    }
-
-    private static IGameDatabase CreateDefaultGameDatabase()
-    {
-        return GameDatabase.Instance;
-    }
-
-    private static ILogger CreateDefaultLogger()
-    {
-        return new LoggerInstance(Config.Instance);
-    }
-
-    private static IRoomManager CreateDefaultRoomManager()
-    {
-        return new RoomManagerInstance(DbProvider.Instance, CreateDefaultLogger(), CreateDefaultObjectManager());
-    }
-
-    private static IFunctionManager CreateDefaultFunctionManager()
-    {
-        return new FunctionManagerInstance(new GameDatabase(Config.Instance.Database.GameDataFile));
-    }
-
-    private static IHotReloadManager? CreateDefaultHotReloadManager()
-    {
-        // Create default instance using the same pattern as EnsureInstance
-        var config = Config.Instance;
-        var logger = new LoggerInstance(config);
-        var dbProvider = DbProvider.Instance;
-        var classManager = new ClassManagerInstance(dbProvider, logger);
-        var objectManager = new ObjectManagerInstance(dbProvider, classManager);
-        var playerManager = new PlayerManagerInstance(dbProvider);
-        var verbInitializer = new VerbInitializerInstance(dbProvider, logger, objectManager);
-        var functionManager = CreateDefaultFunctionManager();
-        var functionInitializer = new FunctionInitializerInstance(dbProvider, logger, objectManager, functionManager);
-        return new HotReloadManagerInstance(logger, config, verbInitializer, functionInitializer, playerManager);
-    }
-
-    private static ICoreHotReloadManager? CreateDefaultCoreHotReloadManager()
-    {
-        var logger = new LoggerInstance(Config.Instance);
-        var playerManager = new PlayerManagerInstance(DbProvider.Instance);
-        var permissionManager = new PermissionManagerInstance(DbProvider.Instance, logger);
-        return new CoreHotReloadManagerInstance(logger, playerManager, permissionManager);
-    }
-
-    private static IFunctionInitializer? CreateDefaultFunctionInitializer()
-    {
-        var dbProvider = DbProvider.Instance;
-        var logger = new LoggerInstance(Config.Instance);
-        var classManager = new ClassManagerInstance(dbProvider, logger);
-        var objectManager = new ObjectManagerInstance(dbProvider, classManager);
-        var functionManager = CreateDefaultFunctionManager();
-        return new FunctionInitializerInstance(dbProvider, logger, objectManager, functionManager);
-    }
-
-    private static IPropertyInitializer? CreateDefaultPropertyInitializer()
-    {
-        var dbProvider = DbProvider.Instance;
-        var logger = new LoggerInstance(Config.Instance);
-        var classManager = new ClassManagerInstance(dbProvider, logger);
-        var objectManager = new ObjectManagerInstance(dbProvider, classManager);
-        return new PropertyInitializerInstance(dbProvider, logger, objectManager);
-    }
-
-    private static IScriptPrecompiler CreateDefaultScriptPrecompiler()
-    {
-        var dbProvider = DbProvider.Instance;
-        var logger = new LoggerInstance(Config.Instance);
-        var config = Config.Instance;
-        var classManager = new ClassManagerInstance(dbProvider, logger);
-        var objectManager = new ObjectManagerInstance(dbProvider, classManager);
-        var coreClassFactory = new CoreClassFactoryInstance(dbProvider, logger);
-        var objectResolver = new ObjectResolverInstance(objectManager, coreClassFactory);
-        var verbResolver = new VerbResolverInstance(dbProvider, objectManager, logger);
-        var functionResolver = new FunctionResolverInstance(dbProvider, objectManager);
-        var playerManager = new PlayerManagerInstance(dbProvider);
-        var verbManager = new VerbManagerInstance(dbProvider);
-        var roomManager = new RoomManagerInstance(dbProvider, logger, objectManager);
-        return new ScriptPrecompiler(objectManager, logger, config, objectResolver, verbResolver, functionResolver, dbProvider, playerManager, verbManager, roomManager);
-    }
-
-    private static ICompilationCache CreateDefaultCompilationCache()
-    {
-        return new CompilationCache();
     }
 
     public bool IsInProgrammingMode => _isInProgrammingMode;
@@ -388,8 +258,7 @@ public class ProgrammingCommands
     private bool HandleProgramFunction(string functionId)
     {
         // Find the function
-        var functions = _gameDatabase.GetCollection<Function>("functions");
-        var function = functions.FindById(functionId);
+        var function = _dbProvider.FindById<Function>("functions", functionId);
         
         if (function == null)
         {
@@ -755,9 +624,8 @@ public class ProgrammingCommands
         var verb = _verbManager.CreateVerb(objectId, verbName, pattern, "", _player.Name);
         if (!string.IsNullOrEmpty(aliases))
         {
-            var verbCollection = _gameDatabase.GetCollection<Verb>("verbs");
             verb.Aliases = aliases;
-            verbCollection.Update(verb);
+            _dbProvider.Update("verbs", verb);
         }
 
         _commandProcessor.SendToPlayer($"Created verb '{verbName}' on {GetObjectName(objectId)}.");
@@ -1147,7 +1015,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
             return true;
         }
 
-        var allVerbs = VerbResolver.GetAllVerbsOnObject(objectId);
+        var allVerbs = _verbResolver.GetAllVerbsOnObject(objectId);
         var allFunctions = _functionResolver.GetAllFunctionsOnObject(objectId);
         
         _commandProcessor.SendToPlayer($"=== Verbs and Functions on {GetObjectName(objectId)} ===");
@@ -1685,8 +1553,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
             return true;
         }
 
-        var verbCollection = GameDatabase.Instance.GetCollection<Verb>("verbs");
-        var allVerbs = verbCollection.Find(v => v.ObjectId == objectId).ToList();
+        var allVerbs = _dbProvider.Find<Verb>("verbs", v => v.ObjectId == objectId).ToList();
 
         // Group verbs by name to find duplicates
         var verbGroups = allVerbs.GroupBy(v => v.Name?.ToLower() ?? "").Where(g => g.Count() > 1).ToList();
@@ -1706,7 +1573,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
                 foreach (var emptyVerb in emptyVerbs)
                 {
                     _commandProcessor.SendToPlayer($"  Removing empty verb: {emptyVerb.Id}");
-                    verbCollection.Delete(emptyVerb.Id);
+                    _dbProvider.Delete<Verb>("verbs", emptyVerb.Id);
                     removedCount++;
                 }
             }
@@ -1717,7 +1584,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
                 foreach (var verb in verbsToRemove)
                 {
                     _commandProcessor.SendToPlayer($"  Removing duplicate empty verb: {verb.Id}");
-                    verbCollection.Delete(verb.Id);
+                    _dbProvider.Delete<Verb>("verbs", verb.Id);
                     removedCount++;
                 }
             }
@@ -2363,8 +2230,8 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
             existingFunction.AccessModifiers = permissions;
             existingFunction.ModifiedAt = DateTime.UtcNow;
 
-            var functionsCollection = _gameDatabase.GetCollection<Function>("functions");
-            functionsCollection.Update(existingFunction);
+            // Update function via function manager
+            _functionManager.UpdateFunction(existingFunction);
 
             var updateParamString = string.Join(", ", parameterTypes.Zip(parameterNames, (type, name) => $"{type} {name}"));
             _commandProcessor.SendToPlayer($"Updated {permissions} function '{returnType} {functionName}({updateParamString})' on {GetObjectName(objectId)}.");
@@ -2385,8 +2252,7 @@ _commandProcessor.SendToPlayer($"{progDataPrefix}Command: @program {dbref}.{func
 
         // Set visibility
         function.AccessModifiers = permissions;
-        var functions = _gameDatabase.GetCollection<Function>("functions");
-        functions.Update(function);
+        _functionManager.UpdateFunction(function);
 
         var paramString = string.Join(", ", parameterTypes.Zip(parameterNames, (type, name) => $"{type} {name}"));
         _commandProcessor.SendToPlayer($"Created {permissions} function '{returnType} {functionName}({paramString})' on {GetObjectName(objectId)}.");

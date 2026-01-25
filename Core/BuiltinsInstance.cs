@@ -16,6 +16,7 @@ public class BuiltinsInstance : IBuiltinsInstance
     public IPlayerManager PlayerManager { get; }
     public IPermissionManager PermissionManager { get; }
     public IFunctionResolver FunctionResolver { get; }
+    public IVerbResolver VerbResolver { get; }
     public IVerbManager VerbManager { get; }
     public IRoomManager RoomManager { get; }
     public ILogger Logger { get; }
@@ -26,6 +27,7 @@ public class BuiltinsInstance : IBuiltinsInstance
         IPlayerManager playerManager,
         IPermissionManager permissionManager,
         IFunctionResolver functionResolver,
+        IVerbResolver verbResolver,
         IVerbManager verbManager,
         IRoomManager roomManager,
         ILogger logger,
@@ -35,6 +37,7 @@ public class BuiltinsInstance : IBuiltinsInstance
         PlayerManager = playerManager ?? throw new ArgumentNullException(nameof(playerManager));
         PermissionManager = permissionManager ?? throw new ArgumentNullException(nameof(permissionManager));
         FunctionResolver = functionResolver ?? throw new ArgumentNullException(nameof(functionResolver));
+        VerbResolver = verbResolver ?? throw new ArgumentNullException(nameof(verbResolver));
         VerbManager = verbManager ?? throw new ArgumentNullException(nameof(verbManager));
         RoomManager = roomManager ?? throw new ArgumentNullException(nameof(roomManager));
         Logger = logger ?? throw new ArgumentNullException(nameof(logger));

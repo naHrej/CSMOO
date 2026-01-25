@@ -1,4 +1,5 @@
 using CSMOO.Commands;
+using CSMOO.Core;
 using CSMOO.Database;
 using CSMOO.Functions;
 using CSMOO.Object;
@@ -15,69 +16,44 @@ namespace CSMOO.Scripting;
 public class ScriptGlobals
 {
     private readonly IObjectManager _objectManager;
+    private readonly IObjectResolver _objectResolver;
     private readonly IVerbResolver _verbResolver;
     private readonly IFunctionResolver _functionResolver;
     private readonly IDbProvider _dbProvider;
+    private readonly IScriptEngineFactory _scriptEngineFactory;
+    private readonly ILogger _logger;
+    private readonly IPlayerManager _playerManager;
 
     // Primary constructor with DI dependencies
     public ScriptGlobals(
         IObjectManager objectManager,
+        IObjectResolver objectResolver,
         IVerbResolver verbResolver,
         IFunctionResolver functionResolver,
-        IDbProvider dbProvider)
+        IDbProvider dbProvider,
+        IScriptEngineFactory scriptEngineFactory,
+        ILogger logger,
+        IPlayerManager playerManager)
     {
         _objectManager = objectManager ?? throw new ArgumentNullException(nameof(objectManager));
+        _objectResolver = objectResolver ?? throw new ArgumentNullException(nameof(objectResolver));
         _verbResolver = verbResolver ?? throw new ArgumentNullException(nameof(verbResolver));
         _functionResolver = functionResolver ?? throw new ArgumentNullException(nameof(functionResolver));
         _dbProvider = dbProvider ?? throw new ArgumentNullException(nameof(dbProvider));
+        _scriptEngineFactory = scriptEngineFactory ?? throw new ArgumentNullException(nameof(scriptEngineFactory));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _playerManager = playerManager ?? throw new ArgumentNullException(nameof(playerManager));
         
         // Initialize script managers with DI dependencies
         ObjectManager = new ScriptObjectManager(_objectManager);
-        var playerManager = CreateDefaultPlayerManager();
         // PlayerManagerInstance requires ObjectManager to be set via SetObjectManager
-        if (playerManager is PlayerManagerInstance pmi)
+        if (_playerManager is PlayerManagerInstance pmi)
         {
             pmi.SetObjectManager(_objectManager);
         }
-        PlayerManager = new ScriptPlayerManager(playerManager, _objectManager);
+        PlayerManager = new ScriptPlayerManager(_playerManager, _objectManager);
     }
 
-    // Backward compatibility constructor
-    public ScriptGlobals()
-        : this(CreateDefaultObjectManager(), CreateDefaultVerbResolver(), CreateDefaultFunctionResolver(), CreateDefaultDbProvider())
-    {
-    }
-
-    private static IObjectManager CreateDefaultObjectManager()
-    {
-        var dbProvider = DbProvider.Instance;
-        var logger = new LoggerInstance(Config.Instance);
-        var classManager = new ClassManagerInstance(dbProvider, logger);
-        return new ObjectManagerInstance(dbProvider, classManager);
-    }
-
-    private static IVerbResolver CreateDefaultVerbResolver()
-    {
-        var dbProvider = DbProvider.Instance;
-        var logger = new LoggerInstance(Config.Instance);
-        var classManager = new ClassManagerInstance(dbProvider, logger);
-        var objectManager = new ObjectManagerInstance(dbProvider, classManager);
-        return new VerbResolverInstance(dbProvider, objectManager, logger);
-    }
-
-    private static IFunctionResolver CreateDefaultFunctionResolver()
-    {
-        var dbProvider = DbProvider.Instance;
-        var logger = new LoggerInstance(Config.Instance);
-        var classManager = new ClassManagerInstance(dbProvider, logger);
-        var objectManager = new ObjectManagerInstance(dbProvider, classManager);
-        return new FunctionResolverInstance(dbProvider, objectManager);
-    }
-
-    private static IPlayerManager CreateDefaultPlayerManager()
-    {
-        return new PlayerManagerInstance(DbProvider.Instance);
-    }
 
     // EnhancedScriptGlobals logic
     private ScriptObjectFactory? _objectFactory;
@@ -92,14 +68,12 @@ public class ScriptGlobals
                 helpers,
                 _objectManager,
                 _functionResolver,
-                _dbProvider);
+                _dbProvider,
+                _scriptEngineFactory,
+                _logger);
         }
     }
 
-    private static IDbProvider CreateDefaultDbProvider()
-    {
-        return DbProvider.Instance;
-    }
     /// <summary>
     /// Get an object by reference - dynamic version for backward compatibility
     /// </summary>
@@ -115,8 +89,8 @@ public class ScriptGlobals
     {
         var scriptObj = _objectFactory?.GetObject(objectReference);
         // ScriptObject wraps a GameObject, so we need to extract it
-        // For now, resolve directly using ObjectResolver
-        return CSMOO.Core.ObjectResolver.ResolveObject(objectReference, Player);
+        // Use injected ObjectResolver instead of static wrapper
+        return _objectResolver.ResolveObject(objectReference, Player);
     }
 
     /// <summary>
@@ -584,7 +558,7 @@ public class ScriptGlobals
             }
 
             // Execute the verb with the provided arguments
-            var scriptEngine = ScriptEngineFactoryStatic.Create();
+            var scriptEngine = _scriptEngineFactory.Create();
             
             // Build input string from arguments
             var inputArgs = args.Select(a => a?.ToString() ?? "").ToArray();
@@ -640,7 +614,7 @@ public class ScriptGlobals
             throw new ArgumentException($"Function '{functionName}' not found on object '{objectRef}'.");
         }
 
-        var engine = ScriptEngineFactoryStatic.Create();
+        var engine = _scriptEngineFactory.Create();
         return engine.ExecuteFunction(function, parameters, dbPlayer, CommandProcessor, objectId);
     }
 
@@ -659,7 +633,7 @@ public class ScriptGlobals
             throw new Exceptions.FunctionExecutionException($"Function '{functionName}' not found on object {obj.Name}(#{obj.DbRef}). Check function name and ensure it's defined on this object or its class.");
         }
 
-        var engine = ScriptEngineFactoryStatic.Create();
+        var engine = _scriptEngineFactory.Create();
         return engine.ExecuteFunction(function, args ?? new object[0], Player, CommandProcessor, obj.Id);
     }
 

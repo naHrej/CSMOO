@@ -32,7 +32,7 @@ public static class ServiceProviderHelper
     public static ServiceProvider CreateServiceProviderWithMocks(
         Mock<IConfig>? mockConfig = null,
         Mock<ILogger>? mockLogger = null,
-        Mock<IGameDatabase>? mockDatabase = null,
+        Mock<IDatabase>? mockDatabase = null,
         Mock<IDbProvider>? mockDbProvider = null)
     {
         var services = new ServiceCollection();
@@ -62,14 +62,14 @@ public static class ServiceProviderHelper
         
         if (mockDatabase != null)
         {
-            services.AddSingleton<IGameDatabase>(mockDatabase.Object);
+            services.AddSingleton<IDatabase>(mockDatabase.Object);
         }
         else
         {
-            services.AddSingleton<IGameDatabase>(sp =>
+            services.AddSingleton<IDatabase>(sp =>
             {
                 var config = sp.GetRequiredService<IConfig>();
-                return new GameDatabase(config.Database.GameDataFile);
+                return new Database.Implementations.LiteDbDatabase(config.Database.GameDataFile);
             });
         }
         
@@ -81,7 +81,7 @@ public static class ServiceProviderHelper
         {
             services.AddSingleton<IDbProvider>(sp =>
             {
-                var db = sp.GetRequiredService<IGameDatabase>();
+                var db = sp.GetRequiredService<IDatabase>();
                 return new DbProvider(db);
             });
         }
@@ -105,16 +105,16 @@ public static class ServiceProviderHelper
         });
         
         // Database - singleton
-        services.AddSingleton<IGameDatabase>(sp =>
+        services.AddSingleton<IDatabase>(sp =>
         {
             var config = sp.GetRequiredService<IConfig>();
-            return new GameDatabase(config.Database.GameDataFile);
+            return new Database.Implementations.LiteDbDatabase(config.Database.GameDataFile);
         });
         
         // DbProvider - singleton
         services.AddSingleton<IDbProvider>(sp =>
         {
-            var db = sp.GetRequiredService<IGameDatabase>();
+            var db = sp.GetRequiredService<IDatabase>();
             return new DbProvider(db);
         });
         
@@ -251,8 +251,8 @@ public static class ServiceProviderHelper
         // FunctionManager - singleton
         services.AddSingleton<IFunctionManager>(sp =>
         {
-            var gameDatabase = sp.GetRequiredService<IGameDatabase>();
-            return new FunctionManagerInstance(gameDatabase);
+            var dbProvider = sp.GetRequiredService<IDbProvider>();
+            return new FunctionManagerInstance(dbProvider);
         });
         
         // VerbResolver - singleton

@@ -34,8 +34,7 @@ public static class FunctionManager
         {
             // Create default instances for backward compatibility
             var config = Config.Instance;
-            var gameDatabase = new GameDatabase(config.Database.GameDataFile);
-            _instance = new FunctionManagerInstance(gameDatabase);
+            _instance = new FunctionManagerInstance(DbProvider.Instance);
         }
     }
 

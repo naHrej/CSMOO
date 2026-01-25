@@ -575,7 +575,7 @@ public class GameObject : DynamicObject
             var (currentPlayer, commandProcessor) = GetExecutionContext(methodName);
 
             // Execute the function
-            var engine = Scripting.ScriptEngineFactoryStatic.Create();
+            var engine = Builtins.ScriptEngineFactoryInstance.Create();
             result = engine.ExecuteFunction(function, args ?? new object[0],
                 currentPlayer, commandProcessor, Id);
             return true;

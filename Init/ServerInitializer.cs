@@ -29,7 +29,8 @@ public static class ServerInitializer
         {
             // Initialize the database connection
             Logger.Info("Setting up database...");
-            var db = GameDatabase.Instance; // This creates the singleton instance
+            // Database is initialized via DI in production - this static method is for backward compatibility only
+            var db = DbProvider.Instance; // Use DbProvider instead of GameDatabase
             
             // Initialize the world structure
             Logger.Info("Initializing world...");
@@ -38,8 +39,7 @@ public static class ServerInitializer
             // Load all GameObjects into the singleton cache
             ObjectManager.LoadAllObjectsToCache();
             
-            // Create a test admin player if none exists
-            CreateDefaultAdminIfNeeded();
+            // Create a test admin player if none exists (removed - use DI version in Initialize(IServiceProvider))
 
             // Initialize hot reload functionality
             HotReloadManager.Initialize();
@@ -61,13 +61,14 @@ public static class ServerInitializer
     public static void Initialize(IServiceProvider serviceProvider)
     {
         var logger = serviceProvider.GetRequiredService<ILogger>();
-        var database = serviceProvider.GetRequiredService<IGameDatabase>();
+        var database = serviceProvider.GetRequiredService<IDatabase>();
         var dbProvider = serviceProvider.GetRequiredService<IDbProvider>();
         var playerManager = serviceProvider.GetRequiredService<IPlayerManager>();
         var objectManager = serviceProvider.GetRequiredService<IObjectManager>();
         var worldInitializer = serviceProvider.GetRequiredService<IWorldInitializer>();
         var hotReloadManager = serviceProvider.GetRequiredService<IHotReloadManager>();
         var permissionManager = serviceProvider.GetRequiredService<IPermissionManager>();
+        var roomManager = serviceProvider.GetRequiredService<IRoomManager>();
         
         // Set static PermissionManager instance for backward compatibility
         PermissionManager.SetInstance(permissionManager);
@@ -86,11 +87,11 @@ public static class ServerInitializer
             logger.Info("Initializing world...");
             worldInitializer.InitializeWorld();
 
-            // Load all GameObjects into the singleton cache
-            objectManager.LoadAllObjectsToCache();
+            // Lazy loading: Objects load on demand, no eager loading
+            // objectManager.LoadAllObjectsToCache(); // Removed - lazy loading
             
             // Create a test admin player if none exists
-            CreateDefaultAdminIfNeeded(playerManager, objectManager, permissionManager);
+            CreateDefaultAdminIfNeeded(playerManager, objectManager, permissionManager, roomManager, logger);
 
             // Load functions and verbs before hot reload initialization
             var functionInitializer = serviceProvider.GetRequiredService<IFunctionInitializer>();
@@ -132,11 +133,6 @@ public static class ServerInitializer
         }
     }
 
-    private static void SetObjectOwners(Player adminPlayer)
-    {
-        SetObjectOwners(adminPlayer, null);
-    }
-    
     private static void SetObjectOwners(Player adminPlayer, IObjectManager? objectManager)
     {
         Logger.Info("Setting object owners...");
@@ -183,48 +179,14 @@ public static class ServerInitializer
     }
 
     /// <summary>
-    /// Creates a default admin player for testing if no players exist
-    /// </summary>
-    private static void CreateDefaultAdminIfNeeded()
-    {
-        var existingPlayers = PlayerManager.GetAllPlayers();
-        if (existingPlayers.Any())
-        {
-            Logger.Info($"Found {existingPlayers.Count()} existing players in database.");
-            return;
-        }
-
-        Logger.Info("No players found. Creating default admin player...");
-
-        var startingRoom = RoomManager.GetStartingRoom();
-        var admin = PlayerManager.CreatePlayer("Admin", "password", startingRoom?.Id);
-
-        // Initialize proper admin permissions using the permission system
-        PermissionManager.InitializeAdminPermissions(admin);
-
-        // Set some admin-specific properties
-        ObjectManager.SetProperty(admin, "level", 100);
-        ObjectManager.SetProperty(admin, "health", 1000);
-        ObjectManager.SetProperty(admin, "maxHealth", 1000);
-        ObjectManager.SetProperty(admin, "name", "Admin");
-        ObjectManager.SetProperty(admin, "shortDescription", "the Administrator");
-        ObjectManager.SetProperty(admin, "longDescription",
-            "The all-powerful administrator of this realm. They have the ability to create and modify the world itself.");
-
-        Logger.Info("Default admin player created (username: admin, password: password)");
-
-        SetObjectOwners(admin);
-    }
-    
-    /// <summary>
     /// Creates a default admin player for testing if no players exist (DI version)
     /// </summary>
-    private static void CreateDefaultAdminIfNeeded(IPlayerManager playerManager, IObjectManager objectManager, IPermissionManager permissionManager)
+    private static void CreateDefaultAdminIfNeeded(IPlayerManager playerManager, IObjectManager objectManager, IPermissionManager permissionManager, IRoomManager roomManager, ILogger logger)
     {
         var existingPlayers = playerManager.GetAllPlayers();
         if (existingPlayers.Any())
         {
-            Logger.Info($"Found {existingPlayers.Count()} existing players in database.");
+            logger.Info($"Found {existingPlayers.Count()} existing players in database.");
             
             // Check if admin player exists and has permissions, if not initialize them
             var adminPlayer = existingPlayers.FirstOrDefault(p => 
@@ -234,27 +196,27 @@ public static class ServerInitializer
             {
                 if (!permissionManager.HasFlag(adminPlayer, PermissionManager.Flag.Admin))
                 {
-                    Logger.Info("Admin player exists but lacks admin permissions. Initializing permissions...");
+                    logger.Info("Admin player exists but lacks admin permissions. Initializing permissions...");
                     permissionManager.InitializeAdminPermissions(adminPlayer);
-                    Logger.Info($"Admin permissions initialized. Flags: {permissionManager.GetFlagsString(adminPlayer)}");
+                    logger.Info($"Admin permissions initialized. Flags: {permissionManager.GetFlagsString(adminPlayer)}");
                 }
                 else
                 {
-                    Logger.Info($"Admin player found with permissions. Flags: {permissionManager.GetFlagsString(adminPlayer)}");
+                    logger.Info($"Admin player found with permissions. Flags: {permissionManager.GetFlagsString(adminPlayer)}");
                 }
             }
             
             return;
         }
 
-        Logger.Info("No players found. Creating default admin player...");
+        logger.Info("No players found. Creating default admin player...");
 
-        var startingRoom = RoomManager.GetStartingRoom();
+        var startingRoom = roomManager.GetStartingRoom();
         var admin = playerManager.CreatePlayer("Admin", "password", startingRoom?.Id);
 
         // Initialize proper admin permissions using the permission system
         permissionManager.InitializeAdminPermissions(admin);
-        Logger.Info($"Admin permissions initialized. Flags: {permissionManager.GetFlagsString(admin)}");
+        logger.Info($"Admin permissions initialized. Flags: {permissionManager.GetFlagsString(admin)}");
 
         // Set some admin-specific properties
         objectManager.SetProperty(admin, "level", 100);
@@ -271,37 +233,29 @@ public static class ServerInitializer
         {
             var finalFlags = permissionManager.GetFlagsString(reloadedAdmin);
             var hasAdminFlag = permissionManager.HasFlag(reloadedAdmin, PermissionManager.Flag.Admin);
-            Logger.Info($"Admin player verification after property updates - Flags: {finalFlags}, Has Admin: {hasAdminFlag}");
+            logger.Info($"Admin player verification after property updates - Flags: {finalFlags}, Has Admin: {hasAdminFlag}");
             
             // If admin flag is missing, re-initialize
             if (!hasAdminFlag)
             {
-                Logger.Warning("Admin flag missing after property updates! Re-initializing permissions...");
+                logger.Warning("Admin flag missing after property updates! Re-initializing permissions...");
                 permissionManager.InitializeAdminPermissions(reloadedAdmin);
-                Logger.Info($"Re-initialized admin permissions. Flags: {permissionManager.GetFlagsString(reloadedAdmin)}");
+                logger.Info($"Re-initialized admin permissions. Flags: {permissionManager.GetFlagsString(reloadedAdmin)}");
             }
         }
 
-        Logger.Info("Default admin player created (username: admin, password: password)");
+        logger.Info("Default admin player created (username: admin, password: password)");
 
         SetObjectOwners(admin, objectManager);
     }
 
-    /// <summary>
-    /// Shuts down the server gracefully
-    /// </summary>
-    public static void Shutdown()
-    {
-        Shutdown(null);
-    }
-    
     /// <summary>
     /// Shuts down the server gracefully using dependency injection
     /// </summary>
     public static void Shutdown(IServiceProvider? serviceProvider)
     {
         var logger = serviceProvider?.GetService<ILogger>();
-        var database = serviceProvider?.GetService<IGameDatabase>();
+        var database = serviceProvider?.GetService<IDatabase>();
         
         // Use injected logger if available, otherwise fall back to static
         if (logger != null)
@@ -361,7 +315,8 @@ public static class ServerInitializer
         }
         else
         {
-            GameDatabase.Instance.Dispose();
+            // Database disposal handled by DI container
+            // No need to dispose static instance
         }
         
         if (logger != null)

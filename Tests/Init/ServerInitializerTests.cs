@@ -30,7 +30,7 @@ public class ServerInitializerTests
     {
         // Arrange
         var mockLogger = new Mock<ILogger>();
-        var mockDatabase = new Mock<IGameDatabase>();
+        var mockDatabase = new Mock<IDatabase>();
         var mockDbProvider = new Mock<IDbProvider>();
         
         var serviceProvider = ServiceProviderHelper.CreateServiceProviderWithMocks(
@@ -61,7 +61,7 @@ public class ServerInitializerTests
     {
         // Arrange
         var mockLogger = new Mock<ILogger>();
-        var mockDatabase = new Mock<IGameDatabase>();
+        var mockDatabase = new Mock<IDatabase>();
         
         var serviceProvider = ServiceProviderHelper.CreateServiceProviderWithMocks(
             mockLogger: mockLogger,

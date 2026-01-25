@@ -27,6 +27,7 @@ public class WebSocketServer
     private bool _isRunning;
     private readonly int _port;
     private readonly IServiceProvider? _serviceProvider;
+    private readonly ILogger? _logger;
 
     public WebSocketServer(int port)
     {
@@ -35,6 +36,7 @@ public class WebSocketServer
         _httpListener.Prefixes.Add($"http://localhost:{port}/");
         _sessions = new Dictionary<Guid, WebSocketSession>();
         _serviceProvider = null;
+        _logger = null;
     }
 
     public WebSocketServer(int port, IServiceProvider serviceProvider)
@@ -44,6 +46,7 @@ public class WebSocketServer
         _httpListener.Prefixes.Add($"http://localhost:{port}/");
         _sessions = new Dictionary<Guid, WebSocketSession>();
         _serviceProvider = serviceProvider;
+        _logger = serviceProvider.GetService<ILogger>();
     }
 
     public async Task StartAsync()
@@ -53,11 +56,14 @@ public class WebSocketServer
             _httpListener.Start();
             _isRunning = true;
 
-            Logger.DisplaySectionHeader("WEBSOCKET SERVER");
-            Logger.Game($"WebSocket server started on port {_port}...");
-            Logger.Info("WebSocket endpoints:");
-            Logger.Info($"  ws://localhost:{_port}/ws - Main game connection");
-            Logger.Info($"  ws://localhost:{_port}/api - JSON API connection");
+            if (_logger != null)
+            {
+                _logger.DisplaySectionHeader("WEBSOCKET SERVER");
+                _logger.Game($"WebSocket server started on port {_port}...");
+                _logger.Info("WebSocket endpoints:");
+                _logger.Info($"  ws://localhost:{_port}/ws - Main game connection");
+                _logger.Info($"  ws://localhost:{_port}/api - JSON API connection");
+            }
 
             while (_isRunning)
             {
@@ -69,7 +75,7 @@ public class WebSocketServer
         {
             if (_isRunning) // Only log if we're supposed to be running
             {
-                Logger.Error($"WebSocket server error: {ex.Message}");
+                _logger?.Error($"WebSocket server error: {ex.Message}");
             }
         }
     }
@@ -117,7 +123,7 @@ public class WebSocketServer
         }
         catch (Exception ex)
         {
-            Logger.Error($"WebSocket connection error: {ex.Message}");
+            _logger?.Error($"WebSocket connection error: {ex.Message}");
         }
     }
 
@@ -146,7 +152,7 @@ public class WebSocketServer
         }
         catch (Exception ex)
         {
-            Logger.Error($"Failed to send welcome message: {ex.Message}");
+            _logger?.Error($"Failed to send welcome message: {ex.Message}");
         }
     }
 
@@ -163,7 +169,6 @@ public class WebSocketServer
             var objectManager = _serviceProvider.GetRequiredService<IObjectManager>();
             var functionResolver = _serviceProvider.GetRequiredService<IFunctionResolver>();
             var dbProvider = _serviceProvider.GetRequiredService<IDbProvider>();
-            var gameDatabase = _serviceProvider.GetRequiredService<IGameDatabase>();
             var logger = _serviceProvider.GetRequiredService<ILogger>();
             var roomManager = _serviceProvider.GetRequiredService<IRoomManager>();
             var scriptEngineFactory = _serviceProvider.GetRequiredService<IScriptEngineFactory>();
@@ -176,12 +181,11 @@ public class WebSocketServer
             var propertyInitializer = _serviceProvider.GetService<IPropertyInitializer>();
             var scriptPrecompiler = _serviceProvider.GetRequiredService<CSMOO.Scripting.IScriptPrecompiler>();
             var compilationCache = _serviceProvider.GetRequiredService<CSMOO.Scripting.ICompilationCache>();
-            commandProcessor = new CommandProcessor(session.SessionId, connection, playerManager, verbResolver, permissionManager, objectManager, objectResolver, functionResolver, dbProvider, gameDatabase, logger, roomManager, scriptEngineFactory, verbManager, functionManager, scriptPrecompiler, compilationCache, hotReloadManager, coreHotReloadManager, functionInitializer, propertyInitializer);
+            commandProcessor = new CommandProcessor(session.SessionId, connection, playerManager, verbResolver, permissionManager, objectManager, objectResolver, functionResolver, dbProvider, logger, roomManager, scriptEngineFactory, verbManager, functionManager, scriptPrecompiler, compilationCache, hotReloadManager, coreHotReloadManager, functionInitializer, propertyInitializer);
         }
         else
         {
-            // Backward compatibility - use static constructor
-            commandProcessor = new CommandProcessor(session.SessionId, connection);
+            throw new InvalidOperationException("WebSocketServer requires ServiceProvider for dependency injection. Backward compatibility constructors have been removed.");
         }
         var buffer = new byte[4096];
 
@@ -211,11 +215,11 @@ public class WebSocketServer
         }
         catch (WebSocketException ex)
         {
-            Logger.Error($"WebSocket disconnected: {ex.Message}");
+            _logger?.Error($"WebSocket disconnected: {ex.Message}");
         }
         catch (Exception ex)
         {
-            Logger.Error($"WebSocket session error: {ex.Message}");
+            _logger?.Error($"WebSocket session error: {ex.Message}");
         }
         finally
         {
@@ -244,7 +248,7 @@ public class WebSocketServer
         }
         catch (Exception ex)
         {
-            Logger.Error($"Error handling WebSocket message: {ex.Message}");
+            _logger?.Error($"Error handling WebSocket message: {ex.Message}");
             
             if (session.ChannelType == WebSocketChannelType.Json)
             {
@@ -535,7 +539,7 @@ public class WebSocketServer
         }
 
         _httpListener?.Stop();
-        Logger.Game("WebSocket server stopped.");
+        _logger?.Game("WebSocket server stopped.");
     }
 
     public int GetActiveSessionCount()
